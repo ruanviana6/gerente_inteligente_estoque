@@ -3,6 +3,78 @@
 > Documento de passagem entre planejamento em ChatGPT e implementação no Codex.
 > Atualização inicial: 28/10/2026. Este arquivo descreve **intenção e decisões**, não comprova testes executados.
 
+## Ordem de execução aprovada (28/10/2026)
+
+Agora o proprietário pediu ao Codex que **conclua a versão web inteira**, incluindo
+correções do MVP, PostgreSQL Supabase em São Paulo (ref
+`csiqpzoudruzppfbpqqx`), autenticação, Master, RLS e permissões, dashboard,
+insights, relatórios mensais, publicação Streamlit e testes com dados fictícios.
+**A API do GestãoClick só será fornecida depois que a versão web for
+validada**. A evolução do fluxo de pedidos, cesta e sazonalidade continua
+reservada para a fase posterior.
+
+Arquivos de **execução obrigatória e ordenada**:
+1. `docs/EXECUCAO_CODEX.md` para implementar o app web integral.
+2. `docs/REVISAO_FINAL_CODEX.md` como segunda tarefa para revisar TODO o
+   projeto modificado, testar funcionalidade e segurança, corrigir falhas e
+   comprovar os resultados.
+
+O sistema não está implementado apenas porque os documentos foram atualizados.
+O proprietário poderá ter que autorizar configurações de hospedagem, login
+inicial e provedor de e-mail; nunca pedir secrets em chat ou Git.
+
+## Evolução futura de pedidos e padrões (28/10/2026)
+
+O usuário solicitou registrar, para **somente depois de o aplicativo web
+funcionar**, o fluxo dos pedidos: `em andamento` não baixa estoque, pois a
+compra ainda não está fechada; `em separação` e `concretizada` já baixam.
+O gerente deverá avaliar cenários de demanda potencial dos pedidos em
+andamento **sem alterar o estoque oficial**, identificar riscos adicionais
+e impedir baixa duplicada na transição dos status.
+
+Em etapas mais avançadas, deseja descobrir **produtos geralmente vendidos
+juntos** usando pedidos fechados e investigar **sazonalidade** quando
+existir histórico suficiente. Não implementar agora. Escopo completo em
+`docs/PEDIDOS_E_PADROES_FUTUROS.md`.
+## Planejamento de relatórios por e-mail (28/10/2026)
+
+Foi adicionada uma etapa futura de **envio mensal automático** dos indicadores
+de estoque e vendas. Usar o e-mail do usuário autorizado, com controle pelo
+Master dos destinatários, periodicidade e permissões. O mês anterior é o
+período padrão; o relatório deve destacar mais vendidos, riscos, parados e
+tendências. Custos apenas quando houver dados e acesso financeiro permitido.
+
+O agendamento e o provedor de envio são externos ao login Supabase Auth.
+Implementar apenas depois da migração para PostgreSQL, sistema de acesso e
+proteção de dados. **Consulte `docs/RELATORIOS_EMAIL.md` antes de codificar.**
+
+## Decisão de segurança (28/10/2026)
+
+O usuário escolheu **login com senha e permissões controladas por ele como Master**.
+Implementar nativamente **Supabase Auth com e-mail/senha** e nome de usuário
+para exibição, com cadastro público desativado. Criar tela administrativa para
+ativar/desativar usuários e conceder/revogar permissões individualmente por
+função. Quatro perfis base: Master, Administrador, Operador e Visualizador.
+Validar acesso no banco com RLS e privilégios mínimos, além de ocultar controles
+na interface. O aplicativo atual ainda NÃO implementa essa segurança.
+
+O plano mais recente, com detalhes e riscos de SMTP/convites, está em
+docs/PLANO_WEB_PRIVADO.md. Esta decisão **substitui a sugestão inicial de OIDC**.
+
+## Atualização de direção (28/10/2026)
+
+O usuário esclareceu que deseja **somente um aplicativo na web**, acessível
+por computador e celular, **com controle de acesso por usuário**, e não duas
+versões para trabalhar e demonstrar. A arquitetura-alvo passa a ser Streamlit
+Cloud com aplicativo privado e PostgreSQL gratuito no Supabase, com autenticação
+e autorização implementadas antes do uso de dados empresariais. A preferência
+por custo zero permanece. Consulte `docs/PLANO_WEB_PRIVADO.md` para detalhes.
+
+**Esta atualização substitui referências anteriores à versão local como destino
+final.** SQLite continua descrevendo o MVP atual, mas não será a persistência
+oficial do serviço web. A branch `feat/demo-publica-streamlit` não deve ser
+mesclada como proposta de duas aplicações.
+
 ## 1. O que queremos resolver
 
 O **Gerente Inteligente de Estoque** nasceu de um problema real da rotina: o ERP registra vendas, quantidades e outros dados, mas é difícil visualizar rapidamente o que corre risco, o que precisa ser reposto, o que está parado e **quanto pedir e por quê**.
