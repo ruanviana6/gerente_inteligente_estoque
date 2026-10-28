@@ -3,6 +3,26 @@
 > Documento de passagem entre planejamento em ChatGPT e implementação no Codex.
 > Atualização inicial: 28/10/2026. Este arquivo descreve **intenção e decisões**, não comprova testes executados.
 
+## Ordem de execução aprovada (28/10/2026)
+
+Agora o proprietário pediu ao Codex que **conclua a versão web inteira**, incluindo
+correções do MVP, PostgreSQL Supabase em São Paulo (ref
+`csiqpzoudruzppfbpqqx`), autenticação, Master, RLS e permissões, dashboard,
+insights, relatórios mensais, publicação Streamlit e testes com dados fictícios.
+**A API do GestãoClick só será fornecida depois que a versão web for
+validada**. A evolução do fluxo de pedidos, cesta e sazonalidade continua
+reservada para a fase posterior.
+
+Arquivos de **execução obrigatória e ordenada**:
+1. `docs/EXECUCAO_CODEX.md` para implementar o app web integral.
+2. `docs/REVISAO_FINAL_CODEX.md` como segunda tarefa para revisar TODO o
+   projeto modificado, testar funcionalidade e segurança, corrigir falhas e
+   comprovar os resultados.
+
+O sistema não está implementado apenas porque os documentos foram atualizados.
+O proprietário poderá ter que autorizar configurações de hospedagem, login
+inicial e provedor de e-mail; nunca pedir secrets em chat ou Git.
+
 ## Evolução futura de pedidos e padrões (28/10/2026)
 
 O usuário solicitou registrar, para **somente depois de o aplicativo web
