@@ -1,20 +1,24 @@
 # 📦 Gerente Inteligente de Estoque
 
-**Uma camada pessoal de análise e decisão sobre os dados de estoque — não um substituto do GestãoClick.**
+Criei este projeto para facilitar algumas tarefas de estoque no meu dia a dia. A ideia é reunir informações de produtos e vendas em uma tela simples e ajudar a entender o que está acabando, o que está parado e quanto pode ser necessário comprar.
 
-Projeto gratuito e local, construído com Python, Streamlit, pandas e SQLite. O objetivo é facilitar a rotina de trabalho com produtos, vendas, fornecedores e reposição.
+É uma ferramenta pessoal, gratuita e ainda em desenvolvimento. Por enquanto, funciona no computador com dados fictícios ou arquivos CSV. Mais para frente, quero integrá-la ao GestãoClick, que continuará sendo o sistema oficial da empresa.
 
-## Problema que motivou o projeto
+## Por que comecei
 
-O ERP informa: **Produto X tem 14 unidades**. Porém, isso não responde se esse saldo dura até a próxima entrega, se é necessário comprar hoje, quanto solicitar, nem quais produtos estão parados e imobilizando capital.
+O GestãoClick já guarda informações de estoque, vendas e compras. O que eu queria era uma maneira mais prática de olhar para esses dados e decidir o que merece atenção.
 
-Este projeto nasceu para transformar dados em recomendações transparentes: **o que está em risco, o que pedir, quanto pedir e por quê**. É uma ferramenta de uso próprio para apoiar decisões dentro de uma empresa, sem pretensão de virar uma plataforma comercial.
+Por exemplo, saber que um produto tem 14 unidades é útil, mas não me diz se ele vai durar até a próxima entrega. Quero conseguir consultar a cobertura em dias, o prazo do fornecedor e uma sugestão de reposição com o cálculo explicado.
 
-## Desenvolvimento com Vibe Coding e IA
+O programa não faz pedidos sozinho. Ele organiza as informações para me ajudar a decidir.
 
-O desenvolvimento usa **Vibe Coding de forma declarada e transparente**. O idealizador definiu a necessidade, os problemas reais e as regras prioritárias. A IA foi utilizada para ajudar a planejar a arquitetura, revisar quatro arquivos iniciais (config.py, motor.py, dados.py e app.py), escrever e reorganizar código, comentar as funções, criar testes e redigir a documentação.
+## Como estou desenvolvendo
 
-A abordagem não consiste em confiar cegamente em código gerado por IA. A implementação foi estruturada em componentes com responsabilidades distintas e testes para proteger cálculos essenciais. **As sugestões ainda precisam de validação humana antes de compras reais.** O objetivo é aprender Engenharia de Software, Clean Code, SQL, segurança básica, logística e análise de dados por meio de um problema concreto.
+Estou construindo o projeto com ajuda de inteligência artificial, usando **Vibe Coding**. Eu trouxe o problema, defini os objetivos e as regras que quero seguir. A IA tem ajudado a estruturar o código, revisar soluções, criar testes e escrever a documentação.
+
+Também compartilhei quatro arquivos de referência (`config.py`, `motor.py`, `dados.py` e `app.py`). As ideias úteis foram aproveitadas, e o restante foi reorganizado para facilitar a leitura e a manutenção.
+
+Além de ser útil no trabalho, quero usar o projeto para praticar Python, SQL, análise de dados e boas práticas de programação. Como ainda está em desenvolvimento, toda sugestão de compra precisa ser conferida antes de ser usada de verdade.
 
 ## Funcionalidades do MVP
 
@@ -53,17 +57,17 @@ O semáforo usa dias de cobertura: ruptura com estoque zerado e demanda recente 
 
 ## Arquitetura e estrutura
 
-O programa funciona como **monólito modular** para evitar complexidade desnecessária.
+Separei o código em arquivos com responsabilidades diferentes para ficar mais fácil de entender, testar e manter.
 
-- app.py — interface em Streamlit, filtros, tabelas e gráficos.
-- config.py — valores padrão e políticas.
-- dados.py — dados simulados, importação CSV e validação.
-- motor.py — regras de cobertura, classificação, tendências, reposição e ABC.
-- storage.py — banco SQLite, snapshots, histórico de decisões e backup.
-- integracoes/gestaoclick.py — contrato reservado para a futura API, sem conexão ativa.
-- tests/ — testes automatizados de lógica, dados e persistência.
-- docs/regras-de-negocio.md — premissas e limitações.
-- requirements.txt — dependências gratuitas.
+- app.py: interface em Streamlit, filtros, tabelas e gráficos.
+- config.py: valores padrão e políticas.
+- dados.py: dados simulados, importação CSV e validação.
+- motor.py: regras de cobertura, classificação, tendências, reposição e ABC.
+- storage.py: banco SQLite, snapshots, histórico de decisões e backup.
+- integracoes/gestaoclick.py: contrato reservado para a futura API, sem conexão ativa.
+- tests/: testes automatizados de lógica, dados e persistência.
+- docs/regras-de-negocio.md: premissas e limitações.
+- requirements.txt: dependências gratuitas.
 
 ## Instalar e executar
 
@@ -94,9 +98,9 @@ O navegador abrirá o endereço local indicado pelo Streamlit (normalmente http:
 
 Envie dois arquivos UTF-8 com campos normalizados:
 
-**produtos.csv** — obrigatórios: codigo, nome, estoque. Opcionais: fornecedor, custo_unitario, prazo_entrega_dias, estoque_seguranca, pedidos_pendentes, reservas, cobertura_alvo_dias.
+**produtos.csv**: obrigatórios: codigo, nome, estoque. Opcionais: fornecedor, custo_unitario, prazo_entrega_dias, estoque_seguranca, pedidos_pendentes, reservas, cobertura_alvo_dias.
 
-**vendas.csv** — obrigatórios: data, codigo, quantidade.
+**vendas.csv**: obrigatórios: data, codigo, quantidade.
 
 O separador padrão é ponto e vírgula, decimal com vírgula. O código agrega múltiplas vendas do mesmo SKU/dia. CSVs nativos do GestãoClick podem ter outros nomes: precisam de adaptação verificada, que ainda não foi implementada.
 
@@ -130,6 +134,6 @@ ruff check .
 6. Avaliar indicadores de clientes (RFM), chat numérico auditável e expedição.
 7. Futuramente integrar com o projeto separado de automação de NF-e, sem misturar lógica fiscal à lógica de compras.
 
-## Propósito
+## O que espero desse projeto
 
-**Transformar informação em decisão**, usando uma aplicação simples, explicável e de custo zero, enquanto pratico Engenharia de Software, Python, SQL, dados, logística e desenvolvimento assistido por inteligência artificial.
+Quero ganhar tempo para acompanhar o estoque e planejar as reposições, enquanto aprendo e melhoro o código aos poucos.
