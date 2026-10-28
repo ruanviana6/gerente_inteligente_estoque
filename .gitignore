@@ -1,0 +1,24 @@
+# Dados comerciais nunca devem ser publicados.
+data/
+backups/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.csv
+*.xlsx
+*.xls
+.env
+.env.*
+!.env.example
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+*.py[cod]
+.DS_Store
+.streamlit/secrets.toml
+coverage.xml
+.coverage
+htmlcov/

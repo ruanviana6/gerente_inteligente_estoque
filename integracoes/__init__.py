@@ -1,0 +1,1 @@
+"""Integrações opcionais. Nenhuma conexão externa é feita no MVP."""
