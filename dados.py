@@ -147,8 +147,8 @@ def carregar_de_csv(
     if decimal not in (",", "."):
         raise ValueError("Separador decimal inválido.")
     try:
-        p = pd.read_csv(arquivo_produtos, sep=separador, decimal=decimal, encoding="utf-8-sig")
-        v = pd.read_csv(arquivo_vendas, sep=separador, decimal=decimal, encoding="utf-8-sig")
+        p = pd.read_csv(BytesIO(arquivo_produtos) if isinstance(arquivo_produtos, bytes) else arquivo_produtos, sep=separador, decimal=decimal, encoding="utf-8-sig")
+        v = pd.read_csv(BytesIO(arquivo_vendas) if isinstance(arquivo_vendas, bytes) else arquivo_vendas, sep=separador, decimal=decimal, encoding="utf-8-sig")
     except (OSError, UnicodeError, pd.errors.ParserError, pd.errors.EmptyDataError) as erro:
         raise ValueError("Não foi possível ler um dos arquivos CSV.") from erro
     produtos = validar_produtos(p)
