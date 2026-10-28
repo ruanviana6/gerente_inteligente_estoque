@@ -1,5 +1,19 @@
 # Ordem principal para o Codex: finalizar a aplicação web
 
+## Regra permanente: GestãoClick SEMPRE somente leitura
+
+**Regra do proprietário, inclusive depois da integração com a API:** o Gerente Inteligente de Estoque **nunca pode modificar nada no GestãoClick**. A integração será **unidirecional**: GestãoClick → Gerente (consulta/sincronização de dados), sem envio de comandos operacionais de volta ao ERP.
+
+- Permitido: autenticar-se na API autorizada, consultar produtos, saldo, vendas, pedidos, fornecedores e histórico que a API realmente disponibilizar; armazenar cópia analítica e snapshots no **próprio banco Supabase** do gerente.
+- Proibido em qualquer fase: criar, editar ou excluir produtos, preços, clientes, vendas, pedidos, status, reservas, movimentações, saldos, compras, notas fiscais ou qualquer outro objeto do GestãoClick. Não realizar baixa nem estorno no ERP.
+- Não implementar endpoints de escrita, rotinas de sincronização reversa, callbacks/webhooks que alterem o ERP, nem botões administrativos de "aplicar sugestão" no GestãoClick. Recomendações e simulações só geram informações e ações **internas ao gerente**.
+- Usar credencial de API com escopo somente leitura **se o GestãoClick disponibilizar**; em qualquer caso restringir o cliente de integração aos métodos/endpoints comprovadamente de consulta. Operações de escrita HTTP (POST/PUT/PATCH/DELETE para mutação) ficam bloqueadas na camada de integração.
+- Os status `em andamento`, `em separação` e `concretizada` são **observados**, nunca modificados pelo gerente. Quando a operação do ERP já descontou o estoque, o gerente não realiza segunda baixa.
+- Criar testes que verifiquem que as rotinas de importação/sincronização/relatórios/simulações **não disparam mutações na API**. Registrar erros e divergências no banco interno, para conferência humana no sistema oficial.
+- O sistema pode criar/alterar **seus próprios** usuários, permissões, indicadores, relatórios e histórico no Supabase. A proibição de escrita aplica-se ao **GestãoClick**, não ao banco interno do gerente.
+- Não interpretar "integração futura" como autorização futura para escrita. Nenhum componente deve prever escrita no GestãoClick como requisito ou atalho.
+
+
 > INSTRUÇÃO DE EXECUÇÃO, não comprovação de entrega. Atualizado em 28/10/2026.
 > Antes de agir, ler AGENTS.md, docs/CONTEXTO_CODEX.md, docs/PLANO_WEB_PRIVADO.md, docs/RELATORIOS_EMAIL.md e docs/regras-de-negocio.md.
 > Este documento é a fonte para a **fase de implementação**. Em seguida, executar docs/REVISAO_FINAL_CODEX.md como fase separada.
@@ -46,7 +60,7 @@ O planejamento mais recente foi registrado na branch docs/web-unica-privada e PR
 
 ## Fora do escopo desta fase, PROIBIDO adiantar
 
-- **API GestãoClick:** não conectar, testar credenciais, buscar dados reais ou alterar ERP nesta entrega. O proprietário fornecerá a API posteriormente e a integração começará por leitura, com autorização.
+- **API GestãoClick:** não conectar, testar credenciais, buscar dados reais ou alterar ERP nesta entrega. O proprietário fornecerá a API posteriormente e a integração será de leitura estrita e permanente, com autorização, sem qualquer escrita no ERP.
 - Não fazer baixas de estoque, emissão de NF-e, compras automáticas ou mudanças de status no ERP.
 - Pedido em andamento, risco de conversão, padrões de cesta, sazonalidade avançada e qualquer ML: manter exclusivamente no backlog docs/PEDIDOS_E_PADROES_FUTUROS.md para depois da versão web estar operacional, salvo componentes básicos já necessários ao dashboard.
 
