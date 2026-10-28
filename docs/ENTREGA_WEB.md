@@ -20,15 +20,15 @@ Os testes de interface utilizam serviços fictícios para controlar cenários. O
 
 ## Resultados comprovados
 
-A [execução 40743605948](https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/40743605948), commit `bc93aa119c954d7c1249f03add75dddaa66725bc`, concluiu todos os jobs com sucesso:
+A [execução 40751883831](https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/40751883831), commit `0f6187fb10f0246a1328b52e3c67ad82f4e9d035`, concluiu todos os jobs com sucesso:
 
-- **347 testes Python**, tanto em 3.11 quanto em 3.12, incluindo os cenários preservados do MVP, backend, relatórios, segurança e interface.
-- **4 testes com Supabase Auth e PostgREST reais**: login/importação/consulta/relatório; senha incorreta e cadastro público bloqueado; desativação com JWT ainda válido; renovação e logout.
-- **75 verificações SQL**, repetidas após dump e restauração em outro PostgreSQL descartável.
+- **363 testes Python**, tanto em 3.11 quanto em 3.12, incluindo os cenários preservados do MVP, backend, relatórios, segurança e interface.
+- **5 testes com Supabase Auth e PostgREST reais**: login/importação/consulta/relatório; senha incorreta e cadastro público bloqueado; desativação com JWT ainda válido; renovação e logout; Visualizador com painel autorizado e leitura bruta negada pela API.
+- **101 verificações SQL**, repetidas após dump e restauração em outro PostgreSQL descartável.
 - **1 teste concorrente** com duas sessões de Masters de organizações distintas disputando o mesmo UUID.
 - Ruff, `pip check` e `pip-audit` aprovados, sem vulnerabilidades conhecidas identificadas naquele ambiente.
 
-Depois dessa execução, a migração de concorrência recebeu a versão efetivamente aplicada no projeto remoto. Os testes de Auth foram reforçados para conferir o motivo do bloqueio de cadastro e a chamada real de renovação. Foram acrescentados três cenários sobre precisão e ausência de indicadores nos relatórios. A versão final e seus resultados adicionais estão nos checks do PR #5; os números acima identificam explicitamente a execução já comprovada, sem atribuí-los a um commit diferente.
+Depois dessa execução, a última migração recebeu a versão efetivamente aplicada no projeto remoto e este registro foi atualizado. O código e os cenários acima não foram alterados nessa consolidação. A versão final deve também apresentar checks aprovados no PR #5; os números acima identificam uma execução comprovada, sem atribuí-los a um commit diferente.
 
 As dependências foram instaladas e as suítes completas executadas no GitHub Actions. O executor de edição não tinha Pytest, Ruff ou Streamlit instalados; nele foram usados compilação, verificações do diff e reproduções Python pontuais. Não há alegação de execução local dessas suítes.
 
@@ -41,8 +41,9 @@ Projeto `csiqpzoudruzppfbpqqx`, São Paulo (`sa-east-1`), plano Free consultado.
 | `20261028171810_web_privada.sql` | Schema, tabelas, constraints, funções, grants, RLS, bootstrap e fila |
 | `20261028174209_ajustes_validacao.sql` | Índices de chaves estrangeiras e negações explícitas para tabelas privadas da rotina |
 | `20261028181759_proteger_cadastro_concorrente.sql` | Serialização do vínculo de uma identidade entre organizações |
+| `20261028191333_restringir_leitura_operacional.sql` | Leitura bruta condicionada a `inventory.view` e segredo dedicado para cálculos dos demais módulos no backend |
 
-As **16 tabelas públicas da aplicação têm RLS habilitado**. As 75 verificações SQL foram executadas no projeto existente dentro de uma transação com rollback. A conferência posterior encontrou zero contas Auth, zero perfis, zero lotes e nenhum schema de teste remanescente. O proprietário ainda deve criar sua própria conta. O Security Advisor retornou `lints: []` após as três migrações. Isso comprova os controles verificados, não uma garantia de ausência de vulnerabilidades.
+As **16 tabelas públicas da aplicação têm RLS habilitado**. As 101 verificações SQL foram executadas no projeto existente dentro de uma transação com rollback. A conferência posterior encontrou zero contas Auth, zero perfis, zero lotes, zero credenciais de backend e nenhum schema de teste remanescente. O proprietário ainda deve criar sua própria conta. O Security Advisor retornou `lints: []` após as quatro migrações. Isso comprova os controles verificados, não uma garantia de ausência de vulnerabilidades.
 
 A migração de concorrência foi exercitada no PostgreSQL descartável antes da aplicação. O teste concorrente não roda no projeto real e recusa o schema Auth completo, para evitar alterações de teste persistentes nesse ambiente.
 
@@ -55,6 +56,7 @@ A migração de concorrência foi exercitada no PostgreSQL descartável antes da
 - A edição de usuário preserva permissões herdadas e oferece escolhas explícitas de herdar, permitir ou negar.
 - Exportações revalidam acesso, inclusive quando `reports.view` ou `finance.view` são revogados durante a operação.
 - O vínculo concorrente de um UUID não permite que outro Master modifique uma conta de organização diferente.
+- Um Visualizador autorizado apenas ao painel não consegue mais consultar catálogo, vendas e snapshots brutos pela API. Os cálculos de seus módulos passam pelo backend com segredo dedicado por organização, além do JWT e das permissões individuais. Esse segredo não substitui autorização nem libera custos.
 - O ambiente de teste mantém o provedor de e-mail ativo enquanto bloqueia cadastro público; a falha anterior do job Auth foi diagnosticada e corrigida.
 - A ativação do scheduler usa variável de repositório, e as oportunidades adicionais de execução respeitam os limites de tentativas e idempotência no banco.
 
@@ -64,7 +66,7 @@ A [revisão de integração](REVISAO_IMPLEMENTACAO_WEB.md) registra achados e ev
 
 1. **Auth:** no painel Supabase, manter o provedor de e-mail habilitado e desligar cadastro público e logins anônimos.
 2. **Master:** criar sua identidade confirmada em Authentication → Users; executar `private.bootstrap_master(UUID, nome, organização)` como `postgres`. Não há senha padrão. O procedimento completo está em [CONFIGURACAO_WEB.md](CONFIGURACAO_WEB.md#2-ativar-a-conta-master).
-3. **Streamlit:** conectar o repositório, selecionar a branch do PR e `app.py`, escolher Python 3.12 e configurar os Secrets protegidos conforme o exemplo. Publicar uma única aplicação e validar a URL com dados fictícios. Não enviar chaves ou senhas pelo chat.
+3. **Streamlit:** configurar o segredo dedicado do backend no banco e nos Secrets protegidos, conforme o guia. Conectar o repositório, selecionar a branch do PR e `app.py`, escolher Python 3.12 e preencher os demais Secrets do exemplo. Publicar uma única aplicação e validar a URL com dados fictícios. Não enviar chaves ou senhas pelo chat.
 4. **E-mail, opcional:** configurar segredo dedicado do worker e agendamento para simulação. Envio real exige remetente/provedor compatível, URL verificada, permissão dos destinatários e os dois controles de autorização. Recuperação de senha por e-mail tem configuração independente. Ver [ATIVAR_RELATORIOS.md](ATIVAR_RELATORIOS.md).
 
 Não há conector autorizado para operar a conta do Streamlit, gravar seus Secrets ou configurar Auth no painel. Esses são bloqueios de ativação externos; não impedem testar o código e o banco. O merge continua sob revisão do proprietário. O schedule do GitHub só passa a funcionar na branch padrão.
