@@ -101,7 +101,7 @@ As consultas retornaram:
 - Zero políticas em `public`.
 - Advisors de segurança e desempenho sem alertas retornados.
 
-**Advisors vazios em um banco sem aplicação não comprovam segurança de RLS.** Não havia persistência remota da aplicação para validar reinício, usuários ou endpoints autorizados. O banco não foi modificado. Não foram solicitadas nem impressas chaves administrativas.
+**Advisors vazios em um schema `public` sem tabelas de aplicação não comprovam segurança de RLS.** Não havia persistência remota da aplicação para validar reinício, usuários ou endpoints autorizados. O banco não foi modificado. Não foram solicitadas nem impressas chaves administrativas.
 
 ## Execução e evidências
 
@@ -112,6 +112,8 @@ A primeira execução das correções, commit `90ed078`, [execução 40692779175
 A rodada do commit `182fa4ab` aprovou **157 testes, Ruff e pip check nos dois interpretadores** e detectou as vulnerabilidades do ferramental. Depois da correção, o commit `6d535980`, [execução 40704934677](https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/40704934677), teve o CI completo **aprovado**: 157 testes em Python 3.11 (7,40 s) e 3.12 (7,90 s), Ruff e pip check sem erros, e `pip-audit` reportando nenhuma vulnerabilidade conhecida.
 
 A rodada `7b14ea3e` acrescentou três regressões de ausência de chamadas externas e encontrou uma falha, com 159 testes aprovados: o cálculo financeiro não aceitava `None` quando todos os custos voltavam como NULL do SQLite. A correção preserva custos desconhecidos e acrescenta cobertura das três representações de ausência. O teste de integração mantém o caminho CSV → SQLite → motor, com rede proibida. Consulte o commit mais recente e o resultado final de todas as verificações no PR #4.
+
+A correção foi validada no commit `579d18f6`, [execução 40706839899](https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/40706839899): **162 testes aprovados em Python 3.11 (7,84 s) e 3.12 (7,18 s)**, Ruff e pip check aprovados nos dois ambientes, e nenhuma vulnerabilidade conhecida identificada pelo pip-audit. Os logs foram consultados diretamente. O CI ainda registra avisos de depreciação de Node nas actions de infraestrutura; eles não são falhas da suíte Python e a atualização dessas actions permanece uma recomendação de manutenção.
 
 Comandos do CI:
 

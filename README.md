@@ -142,8 +142,8 @@ ruff check .
 
 1. Concluir a Issue #2: aplicativo web único, Supabase, login, Master, permissões e RLS.
 2. Implementar insights e relatórios mensais com dados confiáveis e envio inicialmente simulado.
-3. Reexecutar a auditoria da Issue #3, incluindo os testes negativos de acesso e a URL verdadeira.
-4. Publicar e validar a versão privada com dados fictícios, antes de qualquer uso empresarial autorizado.
+3. Reexecutar os testes negativos de acesso e a auditoria dos controles da Issue #3 antes de publicar.
+4. Após aprovar esses controles, publicar com dados fictícios e concluir a auditoria da URL verdadeira, antes de qualquer uso empresarial autorizado.
 5. Só após a validação e autorização, integrar a API GestãoClick **sempre somente por leitura, sem qualquer escrita no ERP**.
 6. Estudar sazonalidade, ML e outras análises apenas quando houver histórico suficiente e benefício demonstrado.
 7. Manter a automação de NF-e como projeto separado, sem antecipar integração fiscal.
