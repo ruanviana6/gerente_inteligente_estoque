@@ -1,0 +1,39 @@
+name: Relatórios mensais controlados
+on:
+  schedule:
+    # 06h, 09h e 12h de Fortaleza. O banco respeita dia, idempotência e até 3 tentativas.
+    - cron: '0 9,12,15 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: relatorios-mensais
+  cancel-in-progress: false
+jobs:
+  relatorios:
+    if: vars.REPORT_SCHEDULER_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: relatorios
+    env:
+      SUPABASE_URL: https://csiqpzoudruzppfbpqqx.supabase.co
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+      REPORT_JOB_SECRET: ${{ secrets.REPORT_JOB_SECRET }}
+      REPORT_ALLOW_REAL_EMAIL: ${{ vars.REPORT_ALLOW_REAL_EMAIL }}
+      REPORT_APP_URL: ${{ vars.REPORT_APP_URL }}
+      REPORT_EMAIL_FROM: ${{ vars.REPORT_EMAIL_FROM }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Instalar dependências
+        run: python -m pip install -r requirements.txt setuptools==84.1.0
+      - name: Executar rotina autorizada
+        run: |
+          if [ "$REPORT_ALLOW_REAL_EMAIL" = "true" ]; then
+            python -m scripts.run_monthly_reports --real
+          else
+            python -m scripts.run_monthly_reports
+          fi

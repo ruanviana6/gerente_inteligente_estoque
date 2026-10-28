@@ -5,6 +5,50 @@ on:
 permissions:
   contents: read
 jobs:
+  supabase_local:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Instalar dependências
+        run: python -m pip install -r requirements.txt setuptools==84.1.0
+      - name: Preparar Supabase descartável
+        run: |
+          npx --yes supabase@2.122.0 init --help
+          npx --yes supabase@2.122.0 init
+          python - <<'PY'
+          from pathlib import Path
+          import tomllib
+          config = Path('supabase/config.toml')
+          linhas = []
+          secao = ''
+          for linha in config.read_text().splitlines():
+              if linha.startswith('['):
+                  secao = linha.strip()
+              if secao == '[auth]' and linha.strip().startswith('enable_signup ='):
+                  linha = 'enable_signup = false'
+              linhas.append(linha)
+          config.write_text('\n'.join(linhas) + '\n')
+          valores = tomllib.loads(config.read_text())
+          assert valores['auth']['enable_signup'] is False
+          assert valores['auth']['email']['enable_signup'] is True
+          PY
+          npx --yes supabase@2.122.0 start --help
+          npx --yes supabase@2.122.0 start > /tmp/supabase-start.log 2>&1
+      - name: Testar Auth e PostgREST reais
+        run: python -m pytest tests/live_supabase.py -ra --junitxml=resultado-auth-real.xml
+      - name: Guardar resultado sem credenciais locais
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: evidencias-auth-real
+          path: resultado-auth-real.xml
+      - name: Encerrar ambiente descartável
+        if: always()
+        run: npx --yes supabase@2.122.0 stop --no-backup > /dev/null 2>&1
   qualidade:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -14,9 +58,9 @@ jobs:
         python: ['3.11', '3.12']
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
       - name: Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: ${{ matrix.python }}
           cache: pip
@@ -34,7 +78,7 @@ jobs:
         run: python -m pip freeze > dependencias-testadas.txt
       - name: Guardar evidências
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: evidencias-python-${{ matrix.python }}
           path: |
@@ -45,9 +89,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
       - name: Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: '3.11'
       - name: Instalar aplicativo e auditor
@@ -70,8 +114,61 @@ jobs:
           PY
       - name: Guardar resultado da auditoria de dependências
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: auditoria-dependencias
           path: auditoria-dependencias.json
+  banco:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: senha-exclusiva-do-teste-descartavel
+          POSTGRES_DB: estoque_testes
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: senha-exclusiva-do-teste-descartavel
+      PGDATABASE: estoque_testes
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+      - name: Preparar Auth fictício e aplicar schema
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/sql/bootstrap.sql
+          for migracao in supabase/migrations/*.sql; do
+            psql -v ON_ERROR_STOP=1 -f "$migracao"
+          done
+      - name: Testar PostgreSQL, RLS e autorização
+        run: |
+          set -o pipefail
+          psql -v ON_ERROR_STOP=1 -f tests/sql/security.sql 2>&1 | tee evidencias-banco.txt
+      - name: Verificar backup e restauração descartáveis
+        run: |
+          pg_dump --format=custom --file=/tmp/estoque-teste.dump
+          createdb estoque_restaurado
+          pg_restore --dbname=estoque_restaurado /tmp/estoque-teste.dump
+          PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/security.sql
+      - name: Testar vínculo concorrente de usuário
+        env:
+          GERENTE_DISPOSABLE_DATABASE: '1'
+        run: python tests/sql/concorrencia.py
+      - name: Guardar evidências do banco
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: evidencias-postgresql
+          path: |
+            evidencias-banco.txt
+            supabase/migrations/
 

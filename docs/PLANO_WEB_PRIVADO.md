@@ -1,0 +1,160 @@
+# Aplicativo único na web: acesso por usuário e permissões
+
+## Regra permanente: GestãoClick SEMPRE somente leitura
+
+**Regra do proprietário, inclusive depois da integração com a API:** o Gerente Inteligente de Estoque **nunca pode modificar nada no GestãoClick**. A integração será **unidirecional**: GestãoClick → Gerente (consulta/sincronização de dados), sem envio de comandos operacionais de volta ao ERP.
+
+- Permitido: autenticar-se na API autorizada, consultar produtos, saldo, vendas, pedidos, fornecedores e histórico que a API realmente disponibilizar; armazenar cópia analítica e snapshots no **próprio banco Supabase** do gerente.
+- Proibido em qualquer fase: criar, editar ou excluir produtos, preços, clientes, vendas, pedidos, status, reservas, movimentações, saldos, compras, notas fiscais ou qualquer outro objeto do GestãoClick. Não realizar baixa nem estorno no ERP.
+- Não implementar endpoints de escrita, rotinas de sincronização reversa, callbacks/webhooks que alterem o ERP, nem botões administrativos de "aplicar sugestão" no GestãoClick. Recomendações e simulações só geram informações e ações **internas ao gerente**.
+- Usar credencial de API com escopo somente leitura **se o GestãoClick disponibilizar**; em qualquer caso restringir o cliente de integração aos métodos/endpoints comprovadamente de consulta. Operações de escrita HTTP (POST/PUT/PATCH/DELETE para mutação) ficam bloqueadas na camada de integração.
+- Os status `em andamento`, `em separação` e `concretizada` são **observados**, nunca modificados pelo gerente. Quando a operação do ERP já descontou o estoque, o gerente não realiza segunda baixa.
+- Criar testes que verifiquem que as rotinas de importação/sincronização/relatórios/simulações **não disparam mutações na API**. Registrar erros e divergências no banco interno, para conferência humana no sistema oficial.
+- O sistema pode criar/alterar **seus próprios** usuários, permissões, indicadores, relatórios e histórico no Supabase. A proibição de escrita aplica-se ao **GestãoClick**, não ao banco interno do gerente.
+- Não interpretar "integração futura" como autorização futura para escrita. Nenhum componente deve prever escrita no GestãoClick como requisito ou atalho.
+
+
+> Decisão de requisitos de 28/10/2026. Este documento é o escopo de segurança para o Codex; **não significa que os controles já foram implementados ou testados**.
+
+## Execução completa autorizada (28/10/2026)
+
+Foi solicitado **concluir todo o aplicativo web e colocar em funcionamento,
+com dados fictícios e segurança testada**, antes de fornecer a API GestãoClick.
+
+- Projeto Supabase **existente**, aprovado e na região certa:
+  `gerente-inteligente-estoque`, ref `csiqpzoudruzppfbpqqx`,
+  `sa-east-1` (São Paulo). Não criar segundo projeto.
+- O Codex deve seguir **`docs/EXECUCAO_CODEX.md`** para codificação,
+  migrações, login Master, UI Streamlit, insights, relatórios, CI e deploy.
+- Em seguida deve executar, como **tarefa independente**,
+  **`docs/REVISAO_FINAL_CODEX.md`**, revisando todo o código e novos
+  comportamentos com testes funcionais, negativos e de segurança.
+- A integração GestãoClick, envio/baixa de pedidos no ERP, NF-e e análises
+  avançadas de cestas e sazonalidade seguem **fora do escopo** até depois
+  da aprovação do web. O relatório mensal dentro do app deve funcionar
+  nesta fase; e-mail agendado exige provedor e remetente reais configurados.
+- Não declarar deploy concluído sem URL visitada e validada; etapas externas
+  bloqueadas exigem instruções mínimas ao proprietário, sem inventar êxito.
+
+## Objetivo e arquitetura
+
+Um único Gerente Inteligente de Estoque, acessível no navegador por computador ou celular, para uso pessoal no trabalho e sem serviços pagos. A primeira tela após o login mostra um flash rotativo de **insights calculados** pelo motor: riscos, reposição, tendências e produtos parados.
+
+- Interface: Streamlit Community Cloud.
+- Login: Supabase Auth por **e-mail e senha** (com nome de usuário de exibição). Não inventar autenticação própria por apelido e senha nem gravar hashes/senhas em tabelas caseiras.
+- Banco persistente: Supabase PostgreSQL Free, com Row Level Security (RLS) e privilégios mínimos.
+- Repositório GitHub: apenas código e documentação. Dados reais, banco, chaves e backups nunca podem ser publicados.
+- GestãoClick: integração futura e sempre somente leitura autorizada, sem qualquer alteração no ERP, após validação do aplicativo. Automação NF-e é outro projeto para integração posterior.
+
+O endereço do app pode exibir publicamente apenas a página de login, com toda consulta e operação bloqueada até autenticação e autorização. Privacidade adicional no Streamlit Cloud pode ser utilizada, mas o convite de viewers na plataforma não substitui as permissões internas. Não utilizar SQLite efêmero do host como banco oficial.
+
+## Identidade Master e cadastro
+
+- Criar **uma conta Master inicial** em procedimento administrativo protegido, identificada pelo UUID imutável do Supabase Auth. Não usar senha padrão, role editável no navegador ou cadastro automático de Master.
+- Cadastro público deve ficar DESATIVADO. Somente contas autorizadas são criadas por fluxo administrativo.
+- Master acessa a tela Administração / Usuários para cadastrar, ativar, desativar contas, definir perfis, marcar permissões e consultar auditoria.
+- Perfis básicos: Master, Administrador, Operador e Visualizador. Perfil define opções iniciais; o Master pode ajustar cada permissão individualmente. Ninguém se torna Master pela própria interface.
+- O Master pode gerenciar acesso a qualquer módulo, mas operações críticas permanecem auditáveis. Evitar conceder gerenciamento de Master ou configuração de credenciais.
+- Criar usuário via API administrativa somente no servidor; chaves administrativas nunca vão para o navegador nem são usadas indiscriminadamente nas consultas normais.
+- Recuperação e criação de senhas devem ser seguras, com troca de senha e tratamento correto das sessões. Atenção: o SMTP padrão do Supabase tem envio restrito aos endereços autorizados da equipe. Convites e recuperação por e-mail para outras pessoas exigem SMTP próprio ou outro fluxo seguro e validado. Não prometer que o envio está pronto ou automaticamente gratuito.
+
+## Permissões por função
+
+Padrão: **tudo negado até liberação explícita**. As permissões são verificadas no frontend e novamente no backend/banco. Ocultar botões não é um controle de segurança.
+
+| Permissão | Funcionalidade |
+| --- | --- |
+| dashboard.view | Ver painel e flash de insights |
+| inventory.view | Consultar saldos, produtos e histórico |
+| replenishment.view | Consultar recomendações de reposição |
+| replenishment.export | Exportar lista de compras |
+| finance.view | Consultar custos e indicadores financeiros |
+| trends.view | Consultar tendência e ABC |
+| inventory.import | Importar ou atualizar dados de estoque/vendas |
+| parameters.edit | Editar lead time, estoque de segurança e parâmetros |
+| decisions.write | Registrar avaliações e decisões |
+| audit.view | Ver trilha de auditoria |
+| users.manage | Criar e desativar usuários autorizados |
+| permissions.manage | Conceder ou retirar permissões |
+| integrations.manage | Futuro controle de sincronização com GestãoClick |
+
+Exemplos: um Operador pode consultar reposições sem enxergar custos ou exportar. Um Visualizador pode ter acesso apenas ao painel. Master controla concessões e revogações.
+
+## Persistência e proteção técnica
+
+- Supabase Auth gerencia senhas e tokens; nunca armazenar senhas no SQLite, Postgres de aplicação, Git ou logs.
+- Estruturar tabelas de perfis, catálogo de permissões, permissões de perfis, concessões individuais e eventos de auditoria. Cada conta usa o UUID do Supabase Auth.
+- Aplicar **RLS em todas as tabelas expostas** e grants mínimos para anon e authenticated. Nenhum dado interno fica acessível anonimamente.
+- Usar identidade do usuário nas consultas e políticas do banco. A service key administrativa ignora RLS e só pode participar de ações administrativas pontuais com checagem de permissão.
+- A desativação deve impedir NOVAS consultas/operações, mesmo com sessão antiga, com checagem de status/permissão atual no servidor/banco; planejar expiração e revogação de tokens.
+- Não compartilhar tokens, sessões, caches ou resultados entre usuários do Streamlit. Testar duas sessões simultâneas.
+- Registrar alterações relevantes com autor, data, função, alvo e resultado; nunca registrar segredos.
+- Implementar logout, expiração/renovação segura de sessão, senhas fortes, limitação de tentativas, mensagens de erro genéricas, fluxos seguros de recuperação e testes de permissão negada.
+- Guardar segredos apenas em Streamlit Secrets ou serviço equivalente. Não enviar credenciais em chat.
+- Não hospedar informações reais da empresa sem autorização e avaliação de segurança/LGPD.
+
+## Custos e limitações
+
+Objetivo de custo zero dentro dos planos gratuitos. O Supabase Free oferece 500 MB e pode pausar por baixa atividade; também não possui os mesmos backups automáticos dos planos pagos. Projetar backups exportáveis e testes de restauração. Não prometer SLA, disponibilidade 24/7 ou recuperação de senha via e-mail antes de configurar o envio.
+
+## Relatório mensal automático por e-mail (etapa futura)
+
+Foi aprovado incluir no planejamento um **relatório mensal por e-mail** para
+usuários autorizados, com envio padrão no dia 1 de cada mês e números do mês
+anterior. O usuário Master decide quem recebe, o que pode ser incluído e se a
+rotina está ativa. O relatório deve conter, conforme dados e permissões,
+mais vendidos, volume vendido, variações, parados, rupturas, tendências e
+recomendações. Custos e indicadores financeiros exigem `finance.view`.
+
+Permissões adicionais: `reports.view`, `reports.export`, `reports.receive` e
+`reports.manage`. O usuário só recebe conteúdo autorizado no momento da
+geração **e novamente antes do envio**. Apenas o Master pode configurar
+destinatários por padrão. Não confundir e-mail de login com SMTP de envio.
+
+A rotina deve rodar fora do Streamlit e ter histórico, registro de falhas e
+proteção contra duplicidade. Prioridade de custo zero, sujeita à verificação
+dos limites de agendamento e da exigência de domínio/remetente do provedor.
+**Escopo detalhado:** `docs/RELATORIOS_EMAIL.md`. Nada disso está ativo.
+## Após a estabilização: pedidos em andamento e padrões
+
+**Não implementar nesta fase.** Após o app web com login, Master, banco
+persistente e testes estar funcionando, estudar o status real dos pedidos no
+GestãoClick. O usuário informou:
+
+- **em andamento**: ainda não desconta o estoque; é demanda potencial.
+- **em separação** e **concretizada**: o estoque já é baixado.
+- Uma mudança de separação para concretizada não autoriza nova baixa.
+- O gerente deverá estimar possíveis riscos considerando a eventual
+  conversão de pedidos em andamento, com cenários separados do saldo
+  operacional, sem tratar hipóteses como vendas certas.
+- Mais adiante, analisar associação de produtos frequentemente vendidos
+  juntos e sazonalidade, somente com dados e histórico confiáveis.
+
+**Ver `docs/PEDIDOS_E_PADROES_FUTUROS.md` para requisitos, campos mínimos,
+testes e condicionantes.** Não altera o cronograma atual de entrega do MVP.
+## Sequência para o Codex
+
+1. Auditoria do MVP e execução efetiva dos testes existentes.
+2. PostgreSQL, migrações, contratos e RLS; testes de segurança de dados.
+3. Supabase Auth por e-mail/senha e bootstrap seguro do Master, sem cadastro público.
+4. Painel Master com gestão de usuários e permissões por função.
+5. Migração de todo fluxo operacional para o banco persistente e autorização por operação.
+6. Flash de insights explicáveis na página inicial.
+7. Testes de login, acesso negado, revogação, sessão expirada, isolamento de usuários e dados fictícios.
+8. Publicação única no Streamlit Cloud. Dados empresariais somente com autorização.
+9. Relatório mensal por e-mail somente depois de login, permissões, banco persistente, dados mensais validados e segurança; seguir `docs/RELATORIOS_EMAIL.md`.
+10. Integração GestãoClick após a conclusão e validação. NF-e continua planejado para depois.
+
+O estado atual da branch main ainda é um MVP local com SQLite sem login. A branch experimental feat/demo-publica-streamlit foi criada antes da decisão de aplicação única: não mesclar automaticamente.
+
+## Documentação oficial
+
+- https://supabase.com/docs/guides/auth/passwords
+- https://supabase.com/docs/guides/auth/general-configuration
+- https://supabase.com/docs/reference/python/auth-admin-createuser
+- https://supabase.com/docs/guides/auth/auth-smtp
+- https://supabase.com/docs/guides/api/custom-claims-and-role-based-access-control-rbac
+- https://supabase.com/docs/guides/database/postgres/row-level-security
+- https://docs.streamlit.io/deploy/streamlit-community-cloud/share-your-app
+- https://docs.streamlit.io/deploy/concepts/secrets
+

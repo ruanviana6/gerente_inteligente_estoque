@@ -25,4 +25,8 @@ htmlcov/
 resultado-testes.xml
 dependencias-testadas.txt
 auditoria-dependencias.json
+evidencias-banco.txt
+.tools/
+supabase/.temp/
+supabase/.branches/
 

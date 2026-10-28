@@ -10,7 +10,7 @@ from dados import gerar_dados_exemplo, hoje_local
 from motor import gerar_painel
 from storage import listar_decisoes, salvar_importacao
 
-APP = Path(__file__).resolve().parents[1] / "app.py"
+APP = Path(__file__).resolve().parent / "fixtures" / "mvp_app.py"
 
 
 def abrir_app(tmp_path, monkeypatch):
@@ -88,8 +88,8 @@ def test_banco_indisponivel_nao_expoe_excecao(tmp_path, monkeypatch):
 
 def test_sem_dias_elegiveis_exibe_limite_da_estimativa(tmp_path, monkeypatch):
     """Indisponibilidade contínua não pode aparecer como demanda zero confiável."""
-    import app as interface
     import storage
+    from dados import exportar_csv_seguro
 
     produtos, vendas, _ = gerar_dados_exemplo()
     produtos = produtos.loc[produtos["codigo"] == "P009"]
@@ -108,4 +108,4 @@ def test_sem_dias_elegiveis_exibe_limite_da_estimativa(tmp_path, monkeypatch):
     assert metricas["Sugestão (un.)"] == "Revisar dados"
     assert any("Sem dias elegíveis" in aviso.value for aviso in app.warning)
     # A rota real da UI precisa aplicar a proteção de fórmulas da camada de dados.
-    assert "'=1+1" in interface.exportar_csv(pd.DataFrame({"nome": ["=1+1"]})).decode("utf-8-sig")
+    assert "'=1+1" in exportar_csv_seguro(pd.DataFrame({"nome": ["=1+1"]})).decode("utf-8-sig")

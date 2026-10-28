@@ -1,154 +1,101 @@
-# 📦 Gerente Inteligente de Estoque
+# Gerente Inteligente de Estoque
 
-Criei este projeto para facilitar algumas tarefas de estoque no meu dia a dia. A ideia é reunir informações de produtos e vendas em uma tela simples e ajudar a entender o que está acabando, o que está parado e quanto pode ser necessário comprar.
+Criei este projeto para entender melhor o estoque no dia a dia. Saber o saldo de um produto nem sempre é suficiente para decidir quando repor, quanto pedir ou o que merece atenção.
 
-É uma ferramenta pessoal, gratuita e ainda em desenvolvimento. Por enquanto, funciona no computador com dados fictícios ou arquivos CSV. Mais para frente, quero integrá-la ao GestãoClick, que continuará sendo o sistema oficial da empresa.
+O gerente transforma catálogo, vendas e histórico de disponibilidade em indicadores explicáveis. O GestãoClick continua sendo a fonte operacional oficial da empresa. **Esta versão não se conecta à sua API e nunca deve alterar dados no ERP, inclusive em uma integração futura.**
 
-## Estado verificado na auditoria
+O desenvolvimento acontece com apoio de IA e Vibe Coding: eu defini o problema e as necessidades da rotina, e a IA ajuda a escrever, revisar e testar o código. O objetivo é ter uma ferramenta útil e aprender Python, SQL, Engenharia de Software, dados e logística. As sugestões continuam dependendo de conferência humana.
 
-A auditoria da Issue #3 encontrou e corrigiu falhas do MVP local. A versão web planejada na Issue #2 ainda não foi entregue: este código não tem login, Master, permissões, persistência Supabase nem relatórios mensais. Não use esta versão como aplicativo privado na internet.
+## Versão web
 
-As correções e as evidências estão no [PR #4](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/4) e no [relatório da auditoria](docs/AUDITORIA_ISSUE_3.md). A revisão inclui testes de cálculo, CSV, SQLite, backup e interface Streamlit. Testes do MVP não comprovam os controles de segurança da futura versão web.
+A aplicação tem uma única entrada, **app.py**, em Streamlit, com Supabase Auth e PostgreSQL. O projeto Supabase utilizado é o já existente em São Paulo, csiqpzoudruzppfbpqqx. SQLite fica apenas como referência técnica do MVP e suporte aos seus testes de regressão; não armazena os dados da web.
 
-## Por que comecei
+O código da versão web está no [PR #5](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/5), incorporando as correções auditadas do PR #4. **A publicação e o login com a conta do proprietário dependem da configuração protegida descrita no guia. Não há URL publicada declarada como validada neste README.**
 
-O GestãoClick já guarda informações de estoque, vendas e compras. O que eu queria era uma maneira mais prática de olhar para esses dados e decidir o que merece atenção.
+## O que o aplicativo faz
 
-Por exemplo, saber que um produto tem 14 unidades é útil, mas não me diz se ele vai durar até a próxima entrega. Quero conseguir consultar a cobertura em dias, o prazo do fornecedor e uma sugestão de reposição com o cálculo explicado.
+- Login por e-mail e senha, logout, renovação de sessão e fluxo de recuperação por código do Supabase.
+- Conta Master criada por procedimento administrativo, sem senha padrão e sem promoção pela interface.
+- Perfis Administrador, Operador e Visualizador, com concessões e revogações individuais. Desativação e permissões são verificadas no backend e no banco.
+- Painel com indicadores, avisos de qualidade e flash rotativo de insights calculados.
+- Estoque, filtros por fornecedor, histórico de vendas e snapshots, detalhes do produto e memória do cálculo.
+- Cobertura, risco durante o prazo do fornecedor, reposição, tendências e Curva ABC a custo quando autorizada.
+- Importação CSV completa e transacional. Cada lote preserva sua versão do catálogo, vendas e custos; uma repetição idêntica não duplica o histórico.
+- Parâmetros de reposição e registro de decisões internas, sem compras automáticas.
+- Relatórios de mês fechado, visualização e exportação autorizadas, com comparação anterior quando há dados comparáveis.
+- Agendador separado do Streamlit, com simulação, destinatários controlados, histórico, limite de tentativas e proteção contra duplicidade. E-mail real exige configuração e autorização adicionais.
 
-O programa não faz pedidos sozinho. Ele organiza as informações para me ajudar a decidir.
+Custos ficam em tabela separada e exigem **finance.view**. O navegador não concede permissões por conta própria. As consultas comuns usam o JWT individual, sem chave administrativa. Usuários sem **inventory.view** acessam seus módulos pelo backend, protegido também por um segredo exclusivo da organização. Esse segredo fica no servidor e não concede permissões ao usuário. Sessões e dados não são compartilhados em cache global.
 
-## Como estou desenvolvendo
+## Começar com segurança
 
-Estou construindo o projeto com ajuda de inteligência artificial, usando **Vibe Coding**. Eu trouxe o problema, defini os objetivos e as regras que quero seguir. A IA tem ajudado a estruturar o código, revisar soluções, criar testes e escrever a documentação.
+Siga o [guia de configuração e publicação](docs/CONFIGURACAO_WEB.md). Ele detalha:
 
-Também compartilhei quatro arquivos de referência (`config.py`, `motor.py`, `dados.py` e `app.py`). As ideias úteis foram aproveitadas, e o restante foi reorganizado para facilitar a leitura e a manutenção.
+1. Desligar cadastro público e acesso anônimo no Supabase Auth.
+2. Criar sua conta e ativar o Master pelo UUID, no painel administrativo.
+3. Gerar um segredo aleatório em um gerenciador de senhas, configurá-lo com `private.configure_backend_secret` e guardar o mesmo valor em `SUPABASE_BACKEND_SECRET` nos Secrets do Streamlit. O guia explica o procedimento protegido e os limites de 32 a 512 caracteres.
+4. Configurar os demais Secrets e publicar a branch autorizada no Streamlit Community Cloud.
+5. Validar com dados e usuários fictícios, incluindo as restrições de acesso.
 
-Além de ser útil no trabalho, quero usar o projeto para praticar Python, SQL, análise de dados e boas práticas de programação. Como ainda está em desenvolvimento, toda sugestão de compra precisa ser conferida antes de ser usada de verdade.
+Não cole credenciais no chat nem no GitHub. O arquivo .streamlit/secrets.example.toml contém somente o modelo. O segredo do backend é diferente de `REPORT_JOB_SECRET` e precisa ser configurado mesmo que o primeiro login Master funcione sem ele. Relatórios por e-mail têm [instruções separadas](docs/ATIVAR_RELATORIOS.md), porque não usam o SMTP do login automaticamente.
 
-## Funcionalidades do MVP
+A aplicação foi pensada para uso dentro dos limites gratuitos. Não há contratação de serviço pago, garantia de disponibilidade contínua nem autorização implícita para dados empresariais.
 
-| Função | Estado |
+## Importação e relatórios
+
+Os arquivos são UTF-8, com separador ponto e vírgula e decimal com vírgula:
+
+| Arquivo | Campos obrigatórios |
 | --- | --- |
-| Painel com semáforo de risco e indicadores | Implementado |
-| Lista de reposição por fornecedor e exportação CSV | Implementado |
-| Detalhe do produto, gráfico de vendas e justificativa do cálculo | Implementado |
-| Estoque parado, excesso e valor estimado imobilizado | Implementado |
-| Comparação das médias de 30 e 90 dias e Curva ABC por consumo a custo | Implementado |
-| Dados fictícios e reprodutíveis | Implementado |
-| Importação CSV normalizado, SQLite e snapshots diários | Implementado |
-| Histórico local de decisões (sem criar compra) | Implementado |
-| Função de backup SQLite | Implementado, sem agendamento |
-| API do GestãoClick | Planejada para após a conclusão e validação |
-| Machine Learning, RFM, chat e expedição | Futuro |
-| Integração com outro projeto de automação de NF-e | Futuro |
+| produtos.csv | codigo, nome, estoque |
+| vendas.csv | data, codigo, quantidade |
 
-## Como funciona o cálculo
+O catálogo aceita fornecedor, custo_unitario, prazo_entrega_dias, estoque_seguranca, pedidos_pendentes, reservas e cobertura_alvo_dias. Cada arquivo aceita até 10 MiB e 200 mil linhas. Datas usam AAAA-MM-DD ou DD/MM/AAAA. SKUs como 001 e NA permanecem texto. Valores inválidos, datas futuras, duplicidades ambíguas e referências desconhecidas são rejeitados.
 
-**Cobertura** = estoque físico ÷ média de venda diária (indefinida quando média é zero).
+Informe a data real do saldo e a abrangência completa do histórico. **Não importe um CSV parcial como se estivesse completo.** O sistema não consegue provar sozinho a abrangência declarada. Um relatório mensal exige saldo do último dia e vendas cobrindo todo o mês; não usa o saldo de hoje para representar um mês passado.
 
-**Ponto de pedido** = teto(média diária × prazo de entrega + estoque de segurança).
+O banco também limita cada lista normalizada de produtos ou vendas a 20 MiB. Código aceita até 120 caracteres; nome e fornecedor, até 300. Esses limites podem ser atingidos antes dos limites do arquivo CSV.
 
-**Posição de estoque** = estoque atual + pedidos pendentes − reservas.
+Dias comprovadamente sem estoque não são tratados automaticamente como demanda zero. Dias sem snapshot permanecem desconhecidos e sinalizados. Venda positiva com snapshot zero é preservada e gera aviso de conflito. Custos ausentes não viram zero; unidades vendidas não são faturamento. As [regras de negócio](docs/regras-de-negocio.md) explicam as fórmulas e limites.
 
-**Estoque-alvo** = teto(média diária × maior entre prazo e cobertura desejada + segurança).
+A exportação neutraliza textos que poderiam executar fórmulas em planilhas. Dados, backups e arquivos comerciais não devem ser versionados.
 
-**Quantidade sugerida** = máximo(0, estoque-alvo − posição).
+## Organização do código
 
-Exemplo fictício: 35 unidades, 8 vendas por dia, prazo 6 dias, segurança 20 unidades, 10 pendentes e 5 reservadas, cobertura-alvo de 6 dias: ponto de pedido 68, posição 40, sugestão **28 unidades**.
+| Arquivo ou diretório | Responsabilidade |
+| --- | --- |
+| app.py / web/ui.py | Entrada única e interface |
+| web/auth.py / web/api.py | Sessões, Auth e chamadas autorizadas |
+| web/service.py | Coordenação, validação e autorização por operação |
+| dados.py / motor.py / config.py | Validação e cálculos auditados |
+| web/insights.py / web/reports.py | Insights e relatórios determinísticos |
+| web/email_delivery.py | Fila, simulação e adaptador de envio opcional |
+| supabase/migrations/ | Schema, funções, grants, RLS e histórico de migrações |
+| scripts/run_monthly_reports.py | Agendador externo |
+| tests/ | Regressões, serviços, interface e segurança |
+| tests/sql/ | Testes PostgreSQL com rollback |
+| tests/live_supabase.py | Integração com Auth e PostgREST reais em ambiente descartável |
 
-O semáforo usa dias de cobertura: ruptura com estoque zerado e demanda recente positiva, crítico até 7 dias, alto até 15, atenção até 30, OK até 90, excesso acima de 90 e parado quando a última venda registrada ocorreu há pelo menos 60 dias. O **risco antes da próxima entrega** é destacado separadamente: um produto pode estar OK por cobertura, mas ainda assim ter risco devido ao prazo.
+## Desenvolvimento e testes
 
-**Limite importante:** dias em que o estoque comprovadamente esteve zerado são excluídos da média. Quando não há foto do estoque no dia, a disponibilidade é desconhecida. Isso não recupera demanda perdida nem prova que não houve ruptura. A tendência de 30 versus 90 dias não comprova sazonalidade e não utiliza ML.
-
-## Arquitetura e estrutura
-
-Separei o código em arquivos com responsabilidades diferentes para ficar mais fácil de entender, testar e manter.
-
-- app.py: interface em Streamlit, filtros, tabelas e gráficos.
-- config.py: valores padrão e políticas.
-- dados.py: dados simulados, importação CSV e validação.
-- motor.py: regras de cobertura, classificação, tendências, reposição e ABC.
-- storage.py: banco SQLite, snapshots, histórico de decisões e backup.
-- integracoes/gestaoclick.py: contrato reservado para a futura API, sem conexão ativa.
-- tests/: testes automatizados de lógica, dados e persistência.
-- docs/regras-de-negocio.md: premissas e limitações.
-- requirements.txt: dependências gratuitas.
-
-## Instalar e executar
-
-Requer Python 3.11+.
+Python 3.11 ou 3.12. A execução local serve ao desenvolvimento da mesma aplicação web:
 
 ~~~bash
-git clone https://github.com/ruanviana6/gerente_inteligente_estoque.git
-cd gerente_inteligente_estoque
 python -m venv .venv
-~~~
-
-Ative o ambiente no Windows com o comando abaixo:
-
-~~~powershell
-.\.venv\Scripts\Activate.ps1
-~~~
-
-Em Linux/macOS: source .venv/bin/activate
-
-~~~bash
 python -m pip install -r requirements.txt
+python -m pytest
+ruff check .
 streamlit run app.py
 ~~~
 
-O navegador abrirá o endereço local indicado pelo Streamlit (normalmente http://localhost:8501). Selecione **Demonstração fictícia** para explorar o projeto sem utilizar dados comerciais.
+Ative o ambiente virtual antes de instalar. Configure os Secrets localmente, fora do Git, para acessar o Supabase autorizado. Sem configuração, o aplicativo apresenta instruções e não oferece uma demonstração pública sem login.
 
-A configuração de desenvolvimento restringe o servidor a `127.0.0.1`. Isso reduz exposição acidental, mas não implementa autenticação. Não remova essa restrição para publicar o MVP como versão web privada.
+O GitHub Actions executa Python 3.11/3.12, Ruff, auditoria de dependências, PostgreSQL 17, backup/restauração e integração local com Supabase. Os resultados comprovados, as limitações e as pendências estão no [registro da entrega](docs/ENTREGA_WEB.md) e nos checks do PR #5. As fixtures do MVP preservam testes anteriores; não são outra aplicação para operação diária.
 
-### CSV (importação completa, não incremental)
+## Limites e próximos passos
 
-Envie dois arquivos UTF-8 com campos normalizados:
+A implantação ainda precisa ser verificada pela URL real. O envio de e-mail permanece em simulação até autorização e configuração do provedor. O cadastro público deve ser desligado no painel Auth; os testes do ambiente descartável não alteram automaticamente essa configuração externa.
 
-**produtos.csv**: obrigatórios: codigo, nome, estoque. Opcionais: fornecedor, custo_unitario, prazo_entrega_dias, estoque_seguranca, pedidos_pendentes, reservas, cobertura_alvo_dias.
+Depois da implementação e da ativação, será feita a auditoria independente da Issue #3. Dados empresariais só podem ser usados com autorização e validação apropriadas. GestãoClick, NF-e, compras automáticas, associação de produtos e previsão sazonal avançada continuam fora desta etapa.
 
-**vendas.csv**: obrigatórios: data, codigo, quantidade.
-
-O separador padrão é ponto e vírgula, decimal com vírgula. O código agrega múltiplas vendas do mesmo SKU/dia. CSVs nativos do GestãoClick podem ter outros nomes: precisam de adaptação verificada, que ainda não foi implementada.
-
-Datas devem usar `AAAA-MM-DD` ou `DD/MM/AAAA`, sem horário. Códigos como `001` e `NA` são preservados como texto. Cada arquivo aceita até 10 MiB e 200 mil linhas; números inválidos, datas futuras e cabeçalhos ambíguos são rejeitados. Textos perigosos nas exportações recebem um apóstrofo para impedir interpretação como fórmula em planilhas.
-
-Uma nova importação substitui atomicamente o catálogo e as vendas importadas, evitando vendas duplicadas; registra uma fotografia do estoque atual e conserva fotos anteriores dos SKUs presentes. **Importe sempre catálogo e histórico completos.** Os registros permanecem somente em data/gerente.db, fora do repositório.
-
-SKUs ausentes no catálogo completo são removidos, junto com seus snapshots e decisões locais. Confira a abrangência do arquivo antes de importar. O sistema ainda não identifica sozinho um CSV parcial que parece completo.
-
-## Qualidade, segurança e limites
-
-~~~bash
-python -m pytest
-ruff check .
-~~~
-
-- Nenhuma credencial é necessária no MVP.
-- O programa **não acessa nem altera o GestãoClick**.
-- Não publique CSVs, banco SQLite, backups, preços reais nem dados de clientes no GitHub.
-- Este aplicativo local não possui login próprio: mantenha o computador protegido e não exponha a porta na internet.
-- Use dados da empresa somente com autorização; respeite LGPD quando aplicável.
-- A função de backup está disponível em storage.backup(), mas agendamento e restauração automatizados não foram construídos.
-- O backup recusa um destino existente. A restauração foi exercitada abrindo uma cópia independente, sem substituir o banco em uso.
-- Os avisos de qualidade distinguem ausência de histórico, snapshots conflitantes e demanda não estimável. Uma venda positiva é preservada mesmo quando o snapshot do dia informa saldo zero.
-- A Curva ABC mede participação no consumo a custo, não receita; sem custos não informa valores inventados.
-- Não existe ainda política para lote mínimo, múltiplos de embalagem, calendário de fornecedor, demanda perdida nem datas específicas de pedidos em trânsito.
-- Previsão sazonal e ML são **evoluções futuras**, não funcionalidades concluídas.
-- Comprar continua sendo uma decisão humana, após conferência de valores, fornecedores e disponibilidade.
-
-## Próximas etapas
-
-1. Concluir a Issue #2: aplicativo web único, Supabase, login, Master, permissões e RLS.
-2. Implementar insights e relatórios mensais com dados confiáveis e envio inicialmente simulado.
-3. Reexecutar os testes negativos de acesso e a auditoria dos controles da Issue #3 antes de publicar.
-4. Após aprovar esses controles, publicar com dados fictícios e concluir a auditoria da URL verdadeira, antes de qualquer uso empresarial autorizado.
-5. Só após a validação e autorização, integrar a API GestãoClick **sempre somente por leitura, sem qualquer escrita no ERP**.
-6. Estudar sazonalidade, ML e outras análises apenas quando houver histórico suficiente e benefício demonstrado.
-7. Manter a automação de NF-e como projeto separado, sem antecipar integração fiscal.
-
-## O que espero desse projeto
-
-Quero ganhar tempo para acompanhar o estoque e planejar as reposições, enquanto aprendo e melhoro o código aos poucos.
-
+Quero que o projeto economize tempo na rotina e continue simples de entender e manter, sem transformar uma necessidade pessoal em uma infraestrutura desnecessária.
