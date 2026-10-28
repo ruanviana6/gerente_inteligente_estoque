@@ -32,6 +32,12 @@
 - Não alegue que testes ou execução visual passaram sem executá-los. Se não puder executar, informe o impedimento e o comando de validação.
 - Preserve a autoria e a transparência do uso de **Vibe Coding com IA** no README.
 
+## Regras de pedidos e análises futuras, não implementar nesta fase
+- O usuário informou os status de pedido **em andamento**, **em separação** e **concretizada**. `em andamento` **não baixa estoque**; os demais já têm impacto no estoque do GestãoClick.
+- Não tratar `em andamento` como venda fechada; mostrar impacto **potencial** em cenários separados, sem alterar o saldo oficial ou registrar baixas.
+- Ao mudar de `em separação` para `concretizada`, não efetuar nova baixa. Se o saldo do ERP já reflete o movimento, não subtrair novamente.
+- Somente depois da versão web estável, login/permissões e validação dos dados reais da integração, estudar cenários de conversão, análise de cesta de produtos comprados juntos e sazonalidade.
+- Não inventar taxa de conversão, recomendação sazonal ou associação sem histórico, amostra e validação adequados. Consulte `docs/PEDIDOS_E_PADROES_FUTUROS.md` para o escopo.
 ## Invariantes de estoque
 - Cobertura depende de demanda diária **elegível**; não trate ruptura comprovada como zero de demanda. Ausência de snapshot não prova disponibilidade e não autoriza inventar demanda perdida.
 - Sem histórico de vendas não significa automaticamente produto parado. Separe **status por cobertura** de **risco de faltar antes do prazo do fornecedor**.
