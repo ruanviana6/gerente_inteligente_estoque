@@ -1,113 +1,89 @@
-# Plano de continuidade: aplicativo único na web com acesso por usuário
+# Aplicativo único na web: acesso por usuário e permissões
 
-## Decisão de produto (28/10/2026)
+> Decisão de requisitos de 28/10/2026. Este documento é o escopo de segurança para o Codex; **não significa que os controles já foram implementados ou testados**.
 
-O usuário quer **uma única aplicação oficial acessível pela web**, tanto no
-computador quanto no celular. **Não** quer manter uma instalação local de uso
-paralela a uma demo pública. O software permanece uma ferramenta pessoal,
-gratuita, não comercial, para apoiar decisões de estoque no trabalho.
+## Objetivo e arquitetura
 
-A página principal terá um **flash/carrossel de insights explicáveis** baseado
-nos indicadores reais do motor: falta antes da entrega, reposição, crescimento
-e estoque parado/excesso. Não são textos inventados por um modelo generativo.
+Um único Gerente Inteligente de Estoque, acessível no navegador por computador ou celular, para uso pessoal no trabalho e sem serviços pagos. A primeira tela após o login mostra um flash rotativo de **insights calculados** pelo motor: riscos, reposição, tendências e produtos parados.
 
-## Arquitetura-alvo de custo zero
+- Interface: Streamlit Community Cloud.
+- Login: Supabase Auth por **e-mail e senha** (com nome de usuário de exibição). Não inventar autenticação própria por apelido e senha nem gravar hashes/senhas em tabelas caseiras.
+- Banco persistente: Supabase PostgreSQL Free, com Row Level Security (RLS) e privilégios mínimos.
+- Repositório GitHub: apenas código e documentação. Dados reais, banco, chaves e backups nunca podem ser publicados.
+- GestãoClick: integração futura e inicialmente só leitura autorizada, após validação do aplicativo. Automação NF-e é outro projeto para integração posterior.
 
-- **GitHub:** código e documentação. O repositório pode continuar público,
-  mas NENHUM arquivo comercial, senha ou banco real deve ser versionado.
-- **Streamlit Community Cloud:** aplicativo único. Configurar privacidade
-  **Only specific people can view this app** e convidar usuários autorizados.
-- **Autenticação na aplicação:** para controle efetivo por usuário/roles,
-  usar OIDC via `st.login()` com provedor verificado (ex.: Google) e uma
-  allowlist de identidades autorizadas, ou mecanismo equivalente com
-  autenticação e autorização reais. Não confiar apenas em `st.user` sem
-  configuração OIDC. O acesso aos dados deve ser verificado em cada operação.
-- **Supabase Postgres (Free):** persistência dos produtos, vendas importadas,
-  snapshots, configurações e histórico de decisões. Conectar somente no
-  servidor com credenciais em Secrets do Streamlit. Não usar SQLite no
-  Community Cloud como banco oficial, pois armazenamento local não é
-  persistente.
-- **Backend:** manter Python/Streamlit e módulos separados. Não adicionar
-  React/FastAPI/microsserviços sem necessidade.
-- **GestãoClick:** integração oficial SOMENTE após concluir e validar o
-  aplicativo web, começando com acesso de leitura autorizado.
-- **Automação NF-e:** permanece um sistema separado, integração futura.
+O endereço do app pode exibir publicamente apenas a página de login, com toda consulta e operação bloqueada até autenticação e autorização. Privacidade adicional no Streamlit Cloud pode ser utilizada, mas o convite de viewers na plataforma não substitui as permissões internas. Não utilizar SQLite efêmero do host como banco oficial.
 
-## Acesso por usuário: questões a considerar
+## Identidade Master e cadastro
 
-1. O Streamlit Cloud permite app privada com convidados identificados por
-   e-mail, mas **viewers podem convidar outras pessoas** no workspace.
-   Para restrições administradas exclusivamente pelo responsável, adotar
-   autorização própria por identidade/role, além da privacidade da plataforma.
-2. Login via OIDC exige criar/configurar um cliente junto ao provedor, colocar
-   `client_id`, `client_secret`, `redirect_uri` e `cookie_secret`
-   nos Secrets, nunca no Git. A aplicação deve negar acesso por padrão
-   se faltarem configurações.
-3. Não expor dados em consultas, uploads, caches ou logs antes de autenticar;
-   as consultas devem ter filtros/autorização adequados.
-4. Definir permissões simples: administrador (gerenciar acessos e parâmetros)
-   e usuário (consultar/analisar). Permissões de escrita devem ser explícitas.
-5. Autenticação é diferente de autorização. Um login bem-sucedido não implica
-   automaticamente direito de consultar dados internos.
-6. O Streamlit Community Cloud permite uma aplicação privada por vez no
-   plano gratuito, e há limites operacionais. O Supabase Free pode pausar por
-   inatividade. Não prometer disponibilidade 24 horas nem backup empresarial.
-7. Dados reais da empresa no serviço cloud exigem autorização expressa,
-   avaliação de segurança e LGPD quando aplicável.
+- Criar **uma conta Master inicial** em procedimento administrativo protegido, identificada pelo UUID imutável do Supabase Auth. Não usar senha padrão, role editável no navegador ou cadastro automático de Master.
+- Cadastro público deve ficar DESATIVADO. Somente contas autorizadas são criadas por fluxo administrativo.
+- Master acessa a tela Administração / Usuários para cadastrar, ativar, desativar contas, definir perfis, marcar permissões e consultar auditoria.
+- Perfis básicos: Master, Administrador, Operador e Visualizador. Perfil define opções iniciais; o Master pode ajustar cada permissão individualmente. Ninguém se torna Master pela própria interface.
+- O Master pode gerenciar acesso a qualquer módulo, mas operações críticas permanecem auditáveis. Evitar conceder gerenciamento de Master ou configuração de credenciais.
+- Criar usuário via API administrativa somente no servidor; chaves administrativas nunca vão para o navegador nem são usadas indiscriminadamente nas consultas normais.
+- Recuperação e criação de senhas devem ser seguras, com troca de senha e tratamento correto das sessões. Atenção: o SMTP padrão do Supabase tem envio restrito aos endereços autorizados da equipe. Convites e recuperação por e-mail para outras pessoas exigem SMTP próprio ou outro fluxo seguro e validado. Não prometer que o envio está pronto ou automaticamente gratuito.
 
-## Fluxo de execução previsto
+## Permissões por função
 
-Navegador → página de login → verificação de identidade e autorização →
-Streamlit → motor de cálculo → PostgreSQL Supabase.
+Padrão: **tudo negado até liberação explícita**. As permissões são verificadas no frontend e novamente no backend/banco. Ocultar botões não é um controle de segurança.
 
-A entrada da aplicação deve bloquear usuários não autorizados **antes**
-de montar painéis e abrir conexões que consultem dados empresariais.
+| Permissão | Funcionalidade |
+| --- | --- |
+| dashboard.view | Ver painel e flash de insights |
+| inventory.view | Consultar saldos, produtos e histórico |
+| replenishment.view | Consultar recomendações de reposição |
+| replenishment.export | Exportar lista de compras |
+| finance.view | Consultar custos e indicadores financeiros |
+| trends.view | Consultar tendência e ABC |
+| inventory.import | Importar ou atualizar dados de estoque/vendas |
+| parameters.edit | Editar lead time, estoque de segurança e parâmetros |
+| decisions.write | Registrar avaliações e decisões |
+| audit.view | Ver trilha de auditoria |
+| users.manage | Criar e desativar usuários autorizados |
+| permissions.manage | Conceder ou retirar permissões |
+| integrations.manage | Futuro controle de sincronização com GestãoClick |
 
-## Etapas de implementação para o Codex
+Exemplos: um Operador pode consultar reposições sem enxergar custos ou exportar. Um Visualizador pode ter acesso apenas ao painel. Master controla concessões e revogações.
 
-1. Auditoria do código atual e execução real dos testes. Corrigir erros
-   antes de construir autenticação ou migrar dados.
-2. Refatorar a persistência para um repositório abstrato, sem mudar as
-   fórmulas de estoque. Criar backend PostgreSQL com migrações/constraints,
-   testes transacionais e scripts de criação. Migrar o uso atual de SQLite.
-3. Criar autenticação OIDC e autorização por allowlist/roles, com testes de
-   acesso negado. Manter segredos em Streamlit Secrets.
-4. Criar página inicial com flash de insights usando indicadores calculados.
-   Não mostrar dados de outros usuários sem permissão.
-5. Preparar configuração de deploy e instruções do Streamlit Cloud.
-6. Executar testes de fluxo completo com dados fictícios no ambiente web.
-7. Somente após as verificações, configurar acesso privado na conta do
-   Streamlit e conectar o Supabase autorizado.
-8. Só depois, estudar importações de dados comerciais e a API GestãoClick.
+## Persistência e proteção técnica
 
-## Ações manuais necessárias do dono da conta
+- Supabase Auth gerencia senhas e tokens; nunca armazenar senhas no SQLite, Postgres de aplicação, Git ou logs.
+- Estruturar tabelas de perfis, catálogo de permissões, permissões de perfis, concessões individuais e eventos de auditoria. Cada conta usa o UUID do Supabase Auth.
+- Aplicar **RLS em todas as tabelas expostas** e grants mínimos para anon e authenticated. Nenhum dado interno fica acessível anonimamente.
+- Usar identidade do usuário nas consultas e políticas do banco. A service key administrativa ignora RLS e só pode participar de ações administrativas pontuais com checagem de permissão.
+- A desativação deve impedir NOVAS consultas/operações, mesmo com sessão antiga, com checagem de status/permissão atual no servidor/banco; planejar expiração e revogação de tokens.
+- Não compartilhar tokens, sessões, caches ou resultados entre usuários do Streamlit. Testar duas sessões simultâneas.
+- Registrar alterações relevantes com autor, data, função, alvo e resultado; nunca registrar segredos.
+- Implementar logout, expiração/renovação segura de sessão, senhas fortes, limitação de tentativas, mensagens de erro genéricas, fluxos seguros de recuperação e testes de permissão negada.
+- Guardar segredos apenas em Streamlit Secrets ou serviço equivalente. Não enviar credenciais em chat.
+- Não hospedar informações reais da empresa sem autorização e avaliação de segurança/LGPD.
 
-- Criar projeto **Supabase Free** e obter dados da conexão; inserir segredos
-  diretamente no painel do Streamlit, nunca compartilhar chaves no chat ou
-  colocar no GitHub.
-- Definir o provedor de login e configurar seu cliente OAuth/OIDC e URI de
-  retorno para o endereço final `*.streamlit.app`, se for usado login interno.
-- Configurar privacidade do Streamlit para convidados selecionados.
-- Informar/gerenciar os e-mails autorizados na configuração privada do
-  sistema, sem precisar divulgá-los no repositório público.
-- Autorizar qualquer armazenamento de dados reais da empresa em cloud.
+## Custos e limitações
 
-## Limites do estado atual
+Objetivo de custo zero dentro dos planos gratuitos. O Supabase Free oferece 500 MB e pode pausar por baixa atividade; também não possui os mesmos backups automáticos dos planos pagos. Projetar backups exportáveis e testes de restauração. Não prometer SLA, disponibilidade 24/7 ou recuperação de senha via e-mail antes de configurar o envio.
 
-**O repositório ainda contém a implementação local com SQLite e não possui
-autenticação/controle de acesso próprio**, portanto o app atual NÃO deve ser
-publicado como sistema interno de dados reais. Este documento é um plano,
-não comprova que a migração ou o deploy já foram feitos.
+## Sequência para o Codex
 
-A branch experimental `feat/demo-publica-streamlit` foi iniciada antes
-desta decisão, apenas com uma proposta inicial de insights. **Não mesclar
-automaticamente essa branch**, porque propunha um aplicativo público de demo
-separado, contrário à decisão mais recente.
+1. Auditoria do MVP e execução efetiva dos testes existentes.
+2. PostgreSQL, migrações, contratos e RLS; testes de segurança de dados.
+3. Supabase Auth por e-mail/senha e bootstrap seguro do Master, sem cadastro público.
+4. Painel Master com gestão de usuários e permissões por função.
+5. Migração de todo fluxo operacional para o banco persistente e autorização por operação.
+6. Flash de insights explicáveis na página inicial.
+7. Testes de login, acesso negado, revogação, sessão expirada, isolamento de usuários e dados fictícios.
+8. Publicação única no Streamlit Cloud. Dados empresariais somente com autorização.
+9. Integração GestãoClick após a conclusão e validação. NF-e continua planejado para depois.
 
-## Fontes oficiais
+O estado atual da branch main ainda é um MVP local com SQLite sem login. A branch experimental feat/demo-publica-streamlit foi criada antes da decisão de aplicação única: não mesclar automaticamente.
 
+## Documentação oficial
+
+- https://supabase.com/docs/guides/auth/passwords
+- https://supabase.com/docs/guides/auth/general-configuration
+- https://supabase.com/docs/reference/python/auth-admin-createuser
+- https://supabase.com/docs/guides/auth/auth-smtp
+- https://supabase.com/docs/guides/api/custom-claims-and-role-based-access-control-rbac
+- https://supabase.com/docs/guides/database/postgres/row-level-security
 - https://docs.streamlit.io/deploy/streamlit-community-cloud/share-your-app
-- https://docs.streamlit.io/develop/concepts/connections/authentication
-- https://docs.streamlit.io/develop/api-reference/user/st.user
-- https://docs.streamlit.io/develop/concepts/connections/connecting-to-data
-- https://supabase.com/docs/guides/platform/free-project-pausing
+- https://docs.streamlit.io/deploy/concepts/secrets
