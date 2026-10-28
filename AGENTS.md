@@ -6,6 +6,13 @@
 - A futura integração com o outro projeto de automação de NF-e é apenas planejada; **não implemente emissão ou alteração fiscal** por iniciativa própria.
 - Mantenha a solução simples, local e sem mensalidades: Python, Streamlit, pandas, SQLite e testes. Evite infraestrutura, dependências e serviços pagos sem justificativa e aprovação.
 
+## Estilo de comunicação e apresentação
+- Escreva **sempre em português brasileiro**, em tom simples, direto, natural e amigável.
+- No `README.md`, apresente a motivação de forma humana, preferencialmente em primeira pessoa. Não faça o projeto parecer grandioso, corporativo, uma startup ou um produto comercial.
+- **Não use travessão (—) no README**. Prefira ponto, vírgula, dois-pontos ou frases separadas.
+- Explique o uso de Vibe Coding e IA com transparência, sem exageros ou autopromoção.
+- Mantenha o README bem estruturado, mas com frases curtas, sem linguagem excessivamente formal e sem promessas de funcionalidades ainda não validadas.
+
 ## Onde consultar o contexto
 - `README.md`: propósito, funcionalidades e uso público.
 - `docs/CONTEXTO_CODEX.md`: visão do produto, prioridades, histórico de decisões e plano de evolução. Consulte ao planejar novas funcionalidades.
