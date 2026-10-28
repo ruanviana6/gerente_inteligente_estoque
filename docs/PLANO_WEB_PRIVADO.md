@@ -1,5 +1,19 @@
 # Aplicativo único na web: acesso por usuário e permissões
 
+## Regra permanente: GestãoClick SEMPRE somente leitura
+
+**Regra do proprietário, inclusive depois da integração com a API:** o Gerente Inteligente de Estoque **nunca pode modificar nada no GestãoClick**. A integração será **unidirecional**: GestãoClick → Gerente (consulta/sincronização de dados), sem envio de comandos operacionais de volta ao ERP.
+
+- Permitido: autenticar-se na API autorizada, consultar produtos, saldo, vendas, pedidos, fornecedores e histórico que a API realmente disponibilizar; armazenar cópia analítica e snapshots no **próprio banco Supabase** do gerente.
+- Proibido em qualquer fase: criar, editar ou excluir produtos, preços, clientes, vendas, pedidos, status, reservas, movimentações, saldos, compras, notas fiscais ou qualquer outro objeto do GestãoClick. Não realizar baixa nem estorno no ERP.
+- Não implementar endpoints de escrita, rotinas de sincronização reversa, callbacks/webhooks que alterem o ERP, nem botões administrativos de "aplicar sugestão" no GestãoClick. Recomendações e simulações só geram informações e ações **internas ao gerente**.
+- Usar credencial de API com escopo somente leitura **se o GestãoClick disponibilizar**; em qualquer caso restringir o cliente de integração aos métodos/endpoints comprovadamente de consulta. Operações de escrita HTTP (POST/PUT/PATCH/DELETE para mutação) ficam bloqueadas na camada de integração.
+- Os status `em andamento`, `em separação` e `concretizada` são **observados**, nunca modificados pelo gerente. Quando a operação do ERP já descontou o estoque, o gerente não realiza segunda baixa.
+- Criar testes que verifiquem que as rotinas de importação/sincronização/relatórios/simulações **não disparam mutações na API**. Registrar erros e divergências no banco interno, para conferência humana no sistema oficial.
+- O sistema pode criar/alterar **seus próprios** usuários, permissões, indicadores, relatórios e histórico no Supabase. A proibição de escrita aplica-se ao **GestãoClick**, não ao banco interno do gerente.
+- Não interpretar "integração futura" como autorização futura para escrita. Nenhum componente deve prever escrita no GestãoClick como requisito ou atalho.
+
+
 > Decisão de requisitos de 28/10/2026. Este documento é o escopo de segurança para o Codex; **não significa que os controles já foram implementados ou testados**.
 
 ## Execução completa autorizada (28/10/2026)
@@ -30,7 +44,7 @@ Um único Gerente Inteligente de Estoque, acessível no navegador por computador
 - Login: Supabase Auth por **e-mail e senha** (com nome de usuário de exibição). Não inventar autenticação própria por apelido e senha nem gravar hashes/senhas em tabelas caseiras.
 - Banco persistente: Supabase PostgreSQL Free, com Row Level Security (RLS) e privilégios mínimos.
 - Repositório GitHub: apenas código e documentação. Dados reais, banco, chaves e backups nunca podem ser publicados.
-- GestãoClick: integração futura e inicialmente só leitura autorizada, após validação do aplicativo. Automação NF-e é outro projeto para integração posterior.
+- GestãoClick: integração futura e sempre somente leitura autorizada, sem qualquer alteração no ERP, após validação do aplicativo. Automação NF-e é outro projeto para integração posterior.
 
 O endereço do app pode exibir publicamente apenas a página de login, com toda consulta e operação bloqueada até autenticação e autorização. Privacidade adicional no Streamlit Cloud pode ser utilizada, mas o convite de viewers na plataforma não substitui as permissões internas. Não utilizar SQLite efêmero do host como banco oficial.
 
