@@ -2,7 +2,7 @@
 \set ON_ERROR_STOP on
 begin;
 create schema audit_test;
-grant usage on schema audit_test to anon,authenticated;
+grant usage on schema audit_test to anon,authenticated,service_role;
 create function audit_test.check(p_ok boolean,p_name text) returns void language plpgsql as $$
 begin
   if p_ok is distinct from true then raise exception 'FALHOU: %',p_name; end if;
@@ -44,6 +44,14 @@ select audit_test.denied($q$select private.bootstrap_master('00000000-0000-4000-
 insert into public.organizations(id,name) values('20000000-0000-4000-8000-000000000002','Outra organização fictícia');
 insert into public.app_users(user_id,organization_id,display_name,role,active) values
  ('00000000-0000-4000-8000-000000000006','20000000-0000-4000-8000-000000000002','Outra organização','Master',true);
+-- Segredos exclusivamente fictícios; credenciais reais nunca pertencem a fixtures.
+select private.configure_backend_secret(organization_id,'backend-ficticio-organizacao-principal-123456789')
+  from public.app_users where user_id='00000000-0000-4000-8000-000000000001';
+select private.configure_backend_secret('20000000-0000-4000-8000-000000000002','backend-ficticio-outra-organizacao-987654321');
+select audit_test.denied($q$select private.configure_backend_secret('20000000-0000-4000-8000-000000000002','curto')$q$,
+  '22023','segredo de backend curto rejeitado');
+select audit_test.check(to_regprocedure('public.load_inventory(text,date)') is null
+  and to_regprocedure('private.load_inventory(text,date)') is null,'assinaturas antigas sem segredo foram removidas');
 
 set local role authenticated;
 select audit_test.login(1);
@@ -97,7 +105,25 @@ select public.save_decision('001','Avaliar compra',4,'Conferir fornecedor');
 select audit_test.check(jsonb_array_length(public.list_decisions())=1,'decisão pertence ao autor');
 
 select audit_test.login(3);
-select audit_test.check(jsonb_array_length(public.load_inventory('dashboard.view')->'products')=1,'Visualizador pode abrir dashboard');
+select audit_test.check((select count(*)=0 from public.inventory_products),'dashboard.view não expõe catálogo bruto por RLS');
+select audit_test.check((select count(*)=0 from public.inventory_sales),'dashboard.view não expõe vendas brutas por RLS');
+select audit_test.check((select count(*)=0 from public.inventory_snapshots),'dashboard.view não expõe snapshots por RLS');
+select audit_test.check((select count(*)=0 from public.inventory_imports),'dashboard.view não expõe lotes por RLS');
+select audit_test.check((select count(*)=0 from public.product_parameters),'dashboard.view não expõe parâmetros por RLS');
+select audit_test.denied($q$select public.load_inventory('dashboard.view')$q$,'42501','dashboard sem backend não expõe dados brutos');
+select audit_test.denied($q$select public.load_inventory('dashboard.view',null,'segredo-errado-mesmo-com-mais-de-32-caracteres')$q$,
+  '42501','backend com segredo incorreto é negado');
+select audit_test.denied($q$select public.load_inventory('dashboard.view',null,'backend-ficticio-outra-organizacao-987654321')$q$,
+  '42501','segredo de outra organização não autoriza backend');
+select audit_test.check(jsonb_array_length(public.load_inventory('dashboard.view',null,'backend-ficticio-organizacao-principal-123456789')->'products')=1,
+  'backend autorizado calcula o dashboard do Visualizador');
+select audit_test.check(not (public.load_inventory('dashboard.view',null,'backend-ficticio-organizacao-principal-123456789')->'products'->0 ? 'custo_unitario'),
+  'segredo backend não libera custo sem finance.view');
+select audit_test.denied($q$select public.load_inventory('inventory.view',null,'backend-ficticio-organizacao-principal-123456789')$q$,
+  '42501','segredo backend não concede permissão do módulo');
+select audit_test.denied($q$select * from private.backend_credentials$q$,'42501','hash de backend não é consultável');
+select audit_test.denied($q$select private.configure_backend_secret('20000000-0000-4000-8000-000000000002','backend-ficticio-outra-organizacao-987654321')$q$,
+  '42501','authenticated não pode configurar segredo backend');
 select audit_test.denied($q$select public.load_inventory('inventory.view')$q$,'42501','Visualizador sem inventory.view é negado');
 select audit_test.denied($q$select public.load_inventory('reports.view','2020-01-01')$q$,'42501','Visualizador sem reports.view é negado');
 select audit_test.denied($q$select public.save_decision('001','Ignorar',0,'')$q$,'42501','Visualizador não registra decisão');
@@ -151,6 +177,8 @@ set local role anon;
 select audit_test.denied($q$select public.app_context()$q$,'42501','anon não consulta contexto');
 select audit_test.denied($q$select * from public.inventory_products$q$,'42501','anon não consulta tabelas');
 select audit_test.denied($q$select public.report_job_claim('segredo-errado','2020-01-01',true)$q$,'42501','job recusa segredo inválido');
+select audit_test.denied($q$select public.load_inventory('dashboard.view',null,'backend-ficticio-organizacao-principal-123456789')$q$,
+  '42501','anon com segredo backend continua sem acesso');
 reset role;
 
 -- O segredo abaixo é exclusivamente fictício e jamais é usado fora desta transação.
@@ -212,5 +240,27 @@ select public.admin_set_user('00000000-0000-4000-8000-000000000002','Operador fi
 select audit_test.login(2);
 select audit_test.denied($q$select public.import_inventory(audit_test.products(),'[]','2020-02-29','2020-01-01','2020-02-29')$q$,
   '42501','permissão de importação não libera gravação de custos');
+select audit_test.login(1);
+select public.admin_set_user('00000000-0000-4000-8000-000000000003','Visualizador fictício','Visualizador',true,
+  '{"reports.view":true,"parameters.edit":true,"decisions.write":true,"replenishment.view":true,"trends.view":true,"finance.view":true}');
+select audit_test.login(3);
+select audit_test.denied($q$select public.load_inventory('reports.view','2020-01-01')$q$,'42501','relatório sem inventory.view exige backend');
+select audit_test.denied($q$select public.load_inventory('parameters.edit')$q$,'42501','editor de parâmetros exige backend sem inventory.view');
+select audit_test.denied($q$select public.load_inventory('decisions.write')$q$,'42501','decisões exigem backend sem inventory.view');
+select audit_test.denied($q$select public.load_inventory('replenishment.view')$q$,'42501','reposição exige backend sem inventory.view');
+select audit_test.denied($q$select public.load_inventory('trends.view')$q$,'42501','tendências exigem backend sem inventory.view');
+select audit_test.check(public.load_inventory('reports.view','2020-01-01','backend-ficticio-organizacao-principal-123456789')->'products'->0->>'estoque'='10',
+  'relatório autorizado usa backend e preserva fechamento');
+select audit_test.check(public.load_inventory('parameters.edit',null,'backend-ficticio-organizacao-principal-123456789')->'products'->0->>'prazo_entrega_dias'='12',
+  'editor autorizado usa backend sem exigir inventory.view');
+select audit_test.check(jsonb_array_length(public.load_inventory('decisions.write',null,'backend-ficticio-organizacao-principal-123456789')->'products')=1,
+  'decisões autorizadas usam backend sem exigir inventory.view');
+select audit_test.check((select count(*)=0 from public.inventory_costs),'finance.view sem inventory.view não abre tabela financeira bruta');
+select audit_test.check(public.load_inventory('reports.view','2020-01-01','backend-ficticio-organizacao-principal-123456789')->'products'->0 ? 'custo_unitario',
+  'backend inclui custo somente com finance.view e módulo autorizado');
+reset role;
+set local role service_role;
+select audit_test.denied($q$select private.configure_backend_secret('20000000-0000-4000-8000-000000000002','backend-ficticio-outra-organizacao-987654321')$q$,
+  '42501','service_role não configura segredo backend');
 reset role;
 rollback;

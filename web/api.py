@@ -135,7 +135,15 @@ class SupabaseAPI:
             raise AppError("Nome de operação inválido.")
         if not access_token:
             raise AuthenticationError("Entre para continuar.")
-        return self._request("POST", "/rest/v1/rpc/" + name, payload or {}, access_token)
+        if payload is not None and not isinstance(payload, dict):
+            raise AppError("Os parâmetros da operação devem formar um objeto.")
+        parameters = dict(payload or {})
+        # Somente a configuração do servidor pode identificar este backend. O
+        # segredo não concede permissões; o banco também exige identidade ativa.
+        parameters.pop("p_backend_secret", None)
+        if name == "load_inventory":
+            parameters["p_backend_secret"] = self.settings.backend_secret
+        return self._request("POST", "/rest/v1/rpc/" + name, parameters, access_token)
 
     def _create_auth_user(self, email: str, password: str) -> dict:
         """Usa a chave administrativa somente neste endpoint, após autorização no AuthService."""

@@ -53,6 +53,7 @@ class Settings:
     service_role_key: str | None = field(default=None, repr=False)
     auth_email_enabled: bool = False
     timeout_seconds: int = 20
+    backend_secret: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         """Valida origem HTTPS e separação de chaves antes de qualquer conexão."""
@@ -75,6 +76,10 @@ class Settings:
             raise ConfigurationError("A autorização de e-mail deve ser booleana.")
         if type(self.timeout_seconds) is not int or not 1 <= self.timeout_seconds <= 60:
             raise ConfigurationError("O tempo limite HTTP deve ficar entre 1 e 60 segundos.")
+        if self.backend_secret is not None and (
+            not isinstance(self.backend_secret, str) or not 32 <= len(self.backend_secret) <= 512
+        ):
+            raise ConfigurationError("O segredo dedicado do backend deve ter entre 32 e 512 caracteres.")
         object.__setattr__(self, "supabase_url", PROJECT_URL)
 
     @classmethod
@@ -85,4 +90,5 @@ class Settings:
             publishable_key=str(values.get("SUPABASE_PUBLISHABLE_KEY") or values.get("SUPABASE_ANON_KEY", "")),
             service_role_key=str(values["SUPABASE_SERVICE_ROLE_KEY"]) if values.get("SUPABASE_SERVICE_ROLE_KEY") else None,
             auth_email_enabled=_boolean(values.get("AUTH_EMAIL_ENABLED", False)),
+            backend_secret=values.get("SUPABASE_BACKEND_SECRET"),
         )

@@ -65,6 +65,70 @@ def test_mapping_desabilita_email_por_padrao_e_string_false():
         Settings.from_mapping({**source, "AUTH_EMAIL_ENABLED": "qualquer texto"})
 
 
+def test_segredo_backend_opcional_nao_altera_configuracao_de_login():
+    """Sem segredo de dados, a configuração de Auth continua disponível para ativação."""
+    source = {"SUPABASE_URL": PROJECT_URL, "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_ficticio"}
+    assert Settings.from_mapping(source).backend_secret is None
+    secret = "segredo_backend_exclusivo_ficticio_123456789"
+    config = Settings.from_mapping({**source, "SUPABASE_BACKEND_SECRET": secret})
+    assert config.backend_secret == secret
+    assert secret not in repr(config)
+    assert secret not in repr(SupabaseAPI(config))
+
+
+@pytest.mark.parametrize("length", [32, 512])
+def test_segredo_backend_aceita_limites_validos(length):
+    """Os limites do cliente correspondem ao procedimento administrativo do banco."""
+    assert settings(backend_secret="x" * length).backend_secret == "x" * length
+
+
+@pytest.mark.parametrize("secret", ["", "x" * 31, "x" * 513, 32, True, b"x" * 32])
+def test_segredo_backend_invalido_nao_expoe_valor(secret):
+    """Configuração inválida é recusada sem interpolar o segredo na mensagem."""
+    with pytest.raises(ConfigurationError) as failure:
+        settings(backend_secret=secret)
+    assert str(failure.value) == "O segredo dedicado do backend deve ter entre 32 e 512 caracteres."
+
+
+def test_rpc_load_inventory_injeta_segredo_protegido_sem_aceitar_override():
+    """Somente a RPC de dados recebe o segredo configurado, sem alterar entrada ou headers."""
+    calls = []
+
+    def transport(*args):
+        """Captura a chamada fictícia para conferir o limite da informação protegida."""
+        calls.append(args)
+        return HTTPResponse(200, b"{}")
+
+    secret = "segredo_backend_exclusivo_ficticio_123456789"
+    api = SupabaseAPI(settings(backend_secret=secret), transport)
+    payload = {"p_module": "dashboard.view", "p_backend_secret": "override_nao_confiavel"}
+    api.rpc("load_inventory", payload, "token_usuario")
+    assert json.loads(calls[0][3])["p_backend_secret"] == secret
+    assert payload["p_backend_secret"] == "override_nao_confiavel"
+    assert secret not in calls[0][1]
+    assert secret not in repr(calls[0][2])
+    assert calls[0][2]["Authorization"] == "Bearer token_usuario"
+    assert calls[0][2]["apikey"] == "sb_publishable_ficticio"
+    api.rpc("app_context", {"p_backend_secret": "override_nao_confiavel"}, "token_usuario")
+    assert json.loads(calls[1][3]) == {}
+    api.auth("POST", "token?grant_type=password", {"email": "ficticio@example.test", "password": "ficticia"})
+    assert "p_backend_secret" not in json.loads(calls[2][3])
+
+
+def test_rpc_sem_segredo_configurado_descarta_override_do_payload():
+    """A ausência de configuração nunca é suprida por um valor recebido do chamador."""
+    calls = []
+
+    def transport(*args):
+        """Registra o JSON gerado sem executar rede."""
+        calls.append(args)
+        return HTTPResponse(200, b"{}")
+
+    api = SupabaseAPI(settings(), transport)
+    api.rpc("load_inventory", {"p_module": "inventory.view", "p_backend_secret": "forjado"}, "token_usuario")
+    assert json.loads(calls[0][3]) == {"p_module": "inventory.view", "p_backend_secret": None}
+
+
 def test_rpc_transmite_somente_chave_publica_e_jwt_do_usuario():
     """A presença de service key não influencia consultas normais."""
     calls = []

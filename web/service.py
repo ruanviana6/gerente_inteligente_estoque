@@ -250,7 +250,7 @@ def create_service(state: MutableMapping, settings_mapping: dict | None = None) 
 
         settings_mapping = {nome: os.environ[nome] for nome in (
             "SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_ANON_KEY",
-            "SUPABASE_SERVICE_ROLE_KEY", "AUTH_EMAIL_ENABLED",
+            "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_BACKEND_SECRET", "AUTH_EMAIL_ENABLED",
         ) if nome in os.environ}
         try:
             settings_mapping.update(dict(st.secrets))

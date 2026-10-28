@@ -25,7 +25,7 @@ O código da versão web está no [PR #5](https://github.com/ruanviana6/gerente_
 - Relatórios de mês fechado, visualização e exportação autorizadas, com comparação anterior quando há dados comparáveis.
 - Agendador separado do Streamlit, com simulação, destinatários controlados, histórico, limite de tentativas e proteção contra duplicidade. E-mail real exige configuração e autorização adicionais.
 
-Custos ficam em tabela separada e exigem **finance.view**. O navegador não concede permissões por conta própria. As consultas comuns usam o JWT individual, sem chave administrativa. Sessões e dados não são compartilhados em cache global.
+Custos ficam em tabela separada e exigem **finance.view**. O navegador não concede permissões por conta própria. As consultas comuns usam o JWT individual, sem chave administrativa. Usuários sem **inventory.view** acessam seus módulos pelo backend, protegido também por um segredo exclusivo da organização. Esse segredo fica no servidor e não concede permissões ao usuário. Sessões e dados não são compartilhados em cache global.
 
 ## Começar com segurança
 
@@ -33,10 +33,11 @@ Siga o [guia de configuração e publicação](docs/CONFIGURACAO_WEB.md). Ele de
 
 1. Desligar cadastro público e acesso anônimo no Supabase Auth.
 2. Criar sua conta e ativar o Master pelo UUID, no painel administrativo.
-3. Configurar Streamlit Secrets e publicar a branch autorizada no Streamlit Community Cloud.
-4. Validar com dados e usuários fictícios, incluindo as restrições de acesso.
+3. Gerar um segredo aleatório em um gerenciador de senhas, configurá-lo com `private.configure_backend_secret` e guardar o mesmo valor em `SUPABASE_BACKEND_SECRET` nos Secrets do Streamlit. O guia explica o procedimento protegido e os limites de 32 a 512 caracteres.
+4. Configurar os demais Secrets e publicar a branch autorizada no Streamlit Community Cloud.
+5. Validar com dados e usuários fictícios, incluindo as restrições de acesso.
 
-Não cole credenciais no chat nem no GitHub. O arquivo .streamlit/secrets.example.toml contém somente o modelo. Relatórios por e-mail têm [instruções separadas](docs/ATIVAR_RELATORIOS.md), porque não usam o SMTP do login automaticamente.
+Não cole credenciais no chat nem no GitHub. O arquivo .streamlit/secrets.example.toml contém somente o modelo. O segredo do backend é diferente de `REPORT_JOB_SECRET` e precisa ser configurado mesmo que o primeiro login Master funcione sem ele. Relatórios por e-mail têm [instruções separadas](docs/ATIVAR_RELATORIOS.md), porque não usam o SMTP do login automaticamente.
 
 A aplicação foi pensada para uso dentro dos limites gratuitos. Não há contratação de serviço pago, garantia de disponibilidade contínua nem autorização implícita para dados empresariais.
 

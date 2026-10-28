@@ -31,7 +31,7 @@ select private.bootstrap_master(
 );
 ```
 
-A função exige conta confirmada, cria a organização e registra auditoria. Recusa uma segunda inicialização e não pode ser chamada por `anon`, `authenticated` ou `service_role`. Não há senha padrão, promoção por formulário nem atribuição por `user_metadata`.
+A função exige conta confirmada, cria a organização e registra auditoria. Guarde o UUID da organização devolvido pelo comando para a configuração seguinte. Recusa uma segunda inicialização e não pode ser chamada por `anon`, `authenticated` ou `service_role`. Não há senha padrão, promoção por formulário nem atribuição por `user_metadata`.
 
 Depois do primeiro login, a área **Administração** permite autorizar contas por UUID, ativar/desativar, escolher perfil e sobrescrever permissões individuais. Operações de gestão permanecem exclusivas do Master. A alteração de acesso vale nas consultas seguintes, inclusive para tokens antigos.
 
@@ -39,11 +39,31 @@ O Visualizador começa somente com o painel. O Operador recebe painel, estoque, 
 
 Para criar novas identidades dentro do app, há uma opção de criação via Auth Admin API. Ela exige a chave administrativa opcional nos Secrets e uma sessão Master validada. A chave não participa das consultas de estoque. Se preferir não armazená-la no Streamlit, crie identidades no painel Supabase e autorize seus UUIDs na aplicação.
 
+### Configurar o segredo protegido do backend
+
+Conclua esta configuração antes de validar os perfis. O Master consegue fazer login e iniciar a administração sem esse segredo, mas usuários sem `inventory.view`, como o Visualizador, precisam dele para acessar seus módulos pela aplicação.
+
+1. Gere um segredo aleatório exclusivo em um gerenciador de senhas. Use, por exemplo, 64 caracteres entre letras e números; o limite aceito é de 32 a 512 caracteres. Não use um dos textos de exemplo como segredo.
+2. No SQL Editor do projeto, como `postgres`, substitua os valores abaixo pelo UUID da organização e pelo segredo gerado. O segredo deve ser informado somente nesse ambiente administrativo protegido e nos Secrets do Streamlit, nunca no chat, Git ou logs compartilhados:
+
+```sql
+select private.configure_backend_secret(
+  'UUID_DA_ORGANIZACAO'::uuid,
+  'SEGREDO_GERADO_NO_GERENCIADOR'
+);
+```
+
+3. Nos **Secrets** da aplicação Streamlit, defina `SUPABASE_BACKEND_SECRET` com exatamente o mesmo valor. Ele fica no servidor e não deve ser enviado ao navegador. O banco armazena somente seu hash SHA-256, associado à organização.
+
+Esse segredo permite que o backend carregue a base necessária para calcular os módulos autorizados. A função continua exigindo sessão e perfil ativos, a organização correta e a permissão da funcionalidade; custos continuam exigindo `finance.view`. Não concede acesso administrativo nem substitui o JWT individual. A leitura direta das tabelas de estoque exige `inventory.view`, impedindo que um Visualizador use sua sessão para obter o catálogo por fora do dashboard.
+
+Mantenha esse segredo separado de `REPORT_JOB_SECRET`, utilizado exclusivamente pelo agendador. Para trocá-lo, atualize a configuração privada do banco e os Secrets do Streamlit, depois reinicie a aplicação para renovar os clientes de sessão. Até ambos receberem o mesmo valor, os módulos de usuários sem `inventory.view` recusam o carregamento.
+
 ## 3. Publicar no Streamlit Community Cloud
 
 1. Acesse `https://share.streamlit.io` com a conta autorizada ao GitHub.
 2. Escolha **Create app / Deploy an app**, repositório `ruanviana6/gerente_inteligente_estoque`, branch `implementacao/web-supabase` e arquivo `app.py`.
-3. Em **Advanced settings**, selecione Python 3.12 e preencha **Secrets** com o modelo de `.streamlit/secrets.example.toml`. Copie a chave **publishable** do projeto no painel Supabase. Chave `anon` legada também é aceita; chave administrativa é recusada como chave comum.
+3. Em **Advanced settings**, selecione Python 3.12 e preencha **Secrets** com o modelo de `.streamlit/secrets.example.toml`. Copie a chave **publishable** do projeto no painel Supabase e configure `SUPABASE_BACKEND_SECRET` conforme a etapa anterior. Chave `anon` legada também é aceita; chave administrativa é recusada como chave comum.
 4. Faça o deploy. Use uma única aplicação; não publique a fixture de testes nem o antigo MVP SQLite.
 5. Acesse a URL HTTPS gerada e faça login com a conta Master. Uma sessão sem login deve mostrar apenas o formulário de autenticação. Sem Secrets, o app mostra instrução de configuração e não consulta dados.
 6. Se desejar restringir também quem abre o endereço, configure os viewers da plataforma. Essa restrição é adicional à autorização do app e à RLS.

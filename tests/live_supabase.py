@@ -23,6 +23,7 @@ from web.service import Service
 from web.settings import PROJECT_URL, Settings
 
 SENHA = "Senha-ficticia-local-2026!"
+SEGREDO_BACKEND = "segredo-exclusivo-do-backend-ficticio-2026"
 
 
 @pytest.fixture(scope="module")
@@ -61,7 +62,8 @@ def ambiente():
             # Preserva somente o identificador público do erro, nunca o corpo original.
             return HTTPResponse(codigo, json.dumps({"error_code": seguro}).encode())
 
-    config = Settings(PROJECT_URL, status["ANON_KEY"], status["SERVICE_ROLE_KEY"])
+    config = Settings(PROJECT_URL, status["ANON_KEY"], status["SERVICE_ROLE_KEY"],
+                      backend_secret=SEGREDO_BACKEND)
     api = SupabaseAPI(config, transporte)
     conta = api._create_auth_user("master@example.invalid", SENHA)
     uid = conta.get("user", conta)["id"]
@@ -71,7 +73,10 @@ def ambiente():
     from uuid import UUID
 
     uid = str(UUID(uid))
-    sql = f"select private.bootstrap_master('{uid}'::uuid,'Master fictício','Estoque do CI');"
+    sql = f"""select private.bootstrap_master('{uid}'::uuid,'Master fictício','Estoque do CI');
+    select private.configure_backend_secret(
+      (select organization_id from public.app_users where user_id='{uid}'::uuid),
+      '{SEGREDO_BACKEND}');"""
     processo = subprocess.run(["psql", "-v", "ON_ERROR_STOP=1", "-c", sql], env=variaveis,
                               capture_output=True, text=True)
     assert processo.returncode == 0, "O bootstrap do banco local falhou."
@@ -142,3 +147,36 @@ def test_refresh_e_logout_invalidam_acesso_real(ambiente):
     assert auth.session is None
     with pytest.raises((AuthenticationError, AuthorizationError)):
         ambiente["api"].rpc("app_context", {}, token)
+
+
+def test_painel_sem_estoque_nao_le_base_bruta_pela_api(ambiente):
+    """O backend calcula o painel, mas a identidade não acessa o catálogo pela API."""
+    Service(ambiente["master"]).import_csv(
+        b"codigo;nome;estoque\n001;Produto ficticio;10\n",
+        b"data;codigo;quantidade\n2020-01-15;001;30\n",
+        "2020-01-31", "2020-01-01", "2020-01-31",
+    )
+    ambiente["master"].create_user(
+        "visualizador@example.invalid", SENHA, "Visualizador fictício", "Visualizador",
+    )
+    auth = AuthService(SupabaseAPI(ambiente["api"].settings, ambiente["transport"]))
+    auth.login("visualizador@example.invalid", SENHA)
+    assert auth.context().can("dashboard.view")
+    assert not auth.context().can("inventory.view")
+    assert not Service(auth).load_inventory("dashboard.view")["panel"].empty
+    headers = {"apikey": ambiente["anon"], "Authorization": "Bearer " + auth.session.access_token,
+               "Content-Type": "application/json"}
+    resposta = ambiente["transport"](
+        "GET", PROJECT_URL + "/rest/v1/inventory_products?select=codigo", headers, None, 20,
+    )
+    assert resposta.status == 200
+    assert json.loads(resposta.body) == []
+    for segredo in (None, "segredo-invalido-nao-concede-base-operacional"):
+        parametros = {"p_module": "dashboard.view", "p_backend_secret": segredo}
+        resposta = ambiente["transport"](
+            "POST", PROJECT_URL + "/rest/v1/rpc/load_inventory", headers,
+            json.dumps(parametros).encode(), 20,
+        )
+        assert resposta.status == 403
+    with pytest.raises(AuthorizationError):
+        auth.rpc("load_inventory", {"p_module": "inventory.view"}, "inventory.view")

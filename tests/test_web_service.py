@@ -310,3 +310,21 @@ def test_duas_sessoes_nao_compartilham_cliente_nem_identidade():
     assert service_a.auth.api is not service_b.auth.api
     assert service_a.auth.session is None
     assert service_b.auth.session is None
+
+
+@pytest.mark.parametrize("usar_secrets", [False, True])
+def test_fabrica_carrega_segredo_backend_com_precedencia_dos_secrets(monkeypatch, usar_secrets):
+    """O servidor recebe o segredo pelo ambiente ou pela configuração protegida."""
+    import streamlit as st
+
+    segredo_ambiente = "segredo_backend_ficticio_ambiente_12345"
+    segredo_secrets = "segredo_backend_ficticio_streamlit_67890"
+    monkeypatch.setenv("SUPABASE_URL", "https://csiqpzoudruzppfbpqqx.supabase.co")
+    monkeypatch.setenv("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_exemplo_ficticio_nao_utilizavel")
+    monkeypatch.setenv("SUPABASE_BACKEND_SECRET", segredo_ambiente)
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+    monkeypatch.delenv("AUTH_EMAIL_ENABLED", raising=False)
+    monkeypatch.setattr(st, "secrets", {"SUPABASE_BACKEND_SECRET": segredo_secrets} if usar_secrets else {})
+
+    servico = create_service({})
+    assert servico.auth.api.settings.backend_secret == (segredo_secrets if usar_secrets else segredo_ambiente)
