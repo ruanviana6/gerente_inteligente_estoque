@@ -220,7 +220,7 @@ def _calcular_abc(
     ).all():
         raise ValueError("Custos da Curva ABC devem ser finitos e não negativos.")
     valores = pd.Series([
-        float(quantidade) * float(custo)
+        float(quantidade) * float(custo) if pd.notna(custo) else float("nan")
         for quantidade, custo in zip(
             unidades.reindex(tabela.index, fill_value=0), tabela["custo_unitario"],
         )
@@ -338,7 +338,7 @@ def gerar_painel(
     painel["quantidade_sugerida"] = [r.quantidade for r in calculos]
     painel["risco_prazo"] = [r.risco_antes_entrega for r in calculos]
     capital_bruto = pd.Series([
-        float(estoque) * float(custo)
+        float(estoque) * float(custo) if pd.notna(custo) else float("nan")
         for estoque, custo in zip(painel["estoque"], painel["custo_unitario"])
     ], index=painel.index, dtype=float)
     capital_finito = capital_bruto.map(math.isfinite)

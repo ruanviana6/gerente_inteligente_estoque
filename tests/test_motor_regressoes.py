@@ -303,9 +303,13 @@ def test_limiar_financeiro_finito_continua_calculavel():
     assert somar_valores_financeiros([limite / 2, limite / 2]) == limite
 
 
-def test_sem_custo_nao_produz_total_zero_nem_falso_overflow():
-    """Ausência de custo e estouro numérico são limitações diferentes."""
-    linha = gerar_painel(produtos(), vendas_vazias(), hoje=HOJE).iloc[0]
+@pytest.mark.parametrize("custo_ausente", [None, pd.NA, float("nan")], ids=["sqlite-null", "pandas-na", "nan"])
+def test_sem_custo_nao_produz_total_zero_nem_falso_overflow(custo_ausente):
+    """NULL do SQLite e ausências do pandas preservam indicadores não calculáveis."""
+    catalogo = produtos()
+    catalogo["custo_unitario"] = pd.Series([custo_ausente], dtype=object)
+    vendas = pd.DataFrame({"codigo": ["A"], "data": [HOJE], "quantidade": [2]})
+    linha = gerar_painel(catalogo, vendas, hoje=HOJE).iloc[0]
     assert math.isnan(linha["capital_estoque"])
     assert linha["classe_abc"] == "Não calculável"
     assert not linha["financeiro_limite_excedido"]

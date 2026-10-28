@@ -60,6 +60,7 @@ A separação é adequada ao tamanho do projeto. Os principais riscos eram contr
 | P2 | Tolerância fixa apagava demanda positiva muito pequena | Arredondamento limitado à precisão de ponto flutuante |
 | P2 | ABC mudava com a ordem de importação em empates | Desempate estável por SKU |
 | P2 | Custos finitos extremos produziam capital infinito e ABC arbitrária | Indicadores fora do limite ficam não calculáveis com aviso; somas protegidas |
+| P2 | A proteção numérica introduzida na auditoria falhou com todos os custos NULL vindos do SQLite | Regressão detectada na reexecução; ausência preservada em capital e ABC, com testes para None, pd.NA e NaN |
 | P2 | Configurações inválidas e tendência com limiar zero | Validação e tratamento de estabilidade |
 | P2 | Ruff/CI divergiam e falhavam | Mesma configuração completa, imports e nomes corrigidos |
 | P2 | Exceções SQLite chegavam à interface sem orientação | Mensagens genéricas, teste de não exposição do detalhe técnico |
@@ -108,7 +109,9 @@ O CI anterior foi conferido nos logs da [execução 40635730309](https://github.
 
 A primeira execução das correções, commit `90ed078`, [execução 40692779175](https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/40692779175), executou **153 testes com sucesso em Python 3.11 e 3.12**. Identificou dois ajustes I001 nos testes antigos e dois FutureWarnings de pandas; ambos foram corrigidos para a rodada seguinte. O resultado final é registrado no PR #4 após a execução do commit mais recente.
 
-A rodada do commit `182fa4ab` aprovou **157 testes, Ruff e pip check nos dois interpretadores** e detectou as vulnerabilidades do ferramental. Depois da correção, o commit `6d535980`, [execução 40704934677](https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/40704934677), teve o CI completo **aprovado**: 157 testes em Python 3.11 (7,40 s) e 3.12 (7,90 s), Ruff e pip check sem erros, e `pip-audit` reportando nenhuma vulnerabilidade conhecida. A rodada posterior acrescenta regressões da regra permanente de ausência de chamadas externas; consulte o commit mais recente no PR para o resultado final.
+A rodada do commit `182fa4ab` aprovou **157 testes, Ruff e pip check nos dois interpretadores** e detectou as vulnerabilidades do ferramental. Depois da correção, o commit `6d535980`, [execução 40704934677](https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/40704934677), teve o CI completo **aprovado**: 157 testes em Python 3.11 (7,40 s) e 3.12 (7,90 s), Ruff e pip check sem erros, e `pip-audit` reportando nenhuma vulnerabilidade conhecida.
+
+A rodada `7b14ea3e` acrescentou três regressões de ausência de chamadas externas e encontrou uma falha, com 159 testes aprovados: o cálculo financeiro não aceitava `None` quando todos os custos voltavam como NULL do SQLite. A correção preserva custos desconhecidos e acrescenta cobertura das três representações de ausência. O teste de integração mantém o caminho CSV → SQLite → motor, com rede proibida. Consulte o commit mais recente e o resultado final de todas as verificações no PR #4.
 
 Comandos do CI:
 
