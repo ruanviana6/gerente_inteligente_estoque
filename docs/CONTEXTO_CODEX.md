@@ -3,6 +3,20 @@
 > Documento de passagem entre planejamento em ChatGPT e implementação no Codex.
 > Atualização inicial: 28/10/2026. Este arquivo descreve **intenção e decisões**, não comprova testes executados.
 
+## Atualização de direção (28/10/2026)
+
+O usuário esclareceu que deseja **somente um aplicativo na web**, acessível
+por computador e celular, **com controle de acesso por usuário**, e não duas
+versões para trabalhar e demonstrar. A arquitetura-alvo passa a ser Streamlit
+Cloud com aplicativo privado e PostgreSQL gratuito no Supabase, com autenticação
+e autorização implementadas antes do uso de dados empresariais. A preferência
+por custo zero permanece. Consulte `docs/PLANO_WEB_PRIVADO.md` para detalhes.
+
+**Esta atualização substitui referências anteriores à versão local como destino
+final.** SQLite continua descrevendo o MVP atual, mas não será a persistência
+oficial do serviço web. A branch `feat/demo-publica-streamlit` não deve ser
+mesclada como proposta de duas aplicações.
+
 ## 1. O que queremos resolver
 
 O **Gerente Inteligente de Estoque** nasceu de um problema real da rotina: o ERP registra vendas, quantidades e outros dados, mas é difícil visualizar rapidamente o que corre risco, o que precisa ser reposto, o que está parado e **quanto pedir e por quê**.
