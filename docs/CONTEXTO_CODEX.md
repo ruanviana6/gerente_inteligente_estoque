@@ -3,6 +3,19 @@
 > Documento de passagem entre planejamento em ChatGPT e implementação no Codex.
 > Atualização inicial: 28/10/2026. Este arquivo descreve **intenção e decisões**, não comprova testes executados.
 
+## Decisão de segurança (28/10/2026)
+
+O usuário escolheu **login com senha e permissões controladas por ele como Master**.
+Implementar nativamente **Supabase Auth com e-mail/senha** e nome de usuário
+para exibição, com cadastro público desativado. Criar tela administrativa para
+ativar/desativar usuários e conceder/revogar permissões individualmente por
+função. Quatro perfis base: Master, Administrador, Operador e Visualizador.
+Validar acesso no banco com RLS e privilégios mínimos, além de ocultar controles
+na interface. O aplicativo atual ainda NÃO implementa essa segurança.
+
+O plano mais recente, com detalhes e riscos de SMTP/convites, está em
+docs/PLANO_WEB_PRIVADO.md. Esta decisão **substitui a sugestão inicial de OIDC**.
+
 ## Atualização de direção (28/10/2026)
 
 O usuário esclareceu que deseja **somente um aplicativo na web**, acessível
