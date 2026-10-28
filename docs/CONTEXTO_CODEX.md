@@ -3,6 +3,19 @@
 > Documento de passagem entre planejamento em ChatGPT e implementação no Codex.
 > Atualização inicial: 28/10/2026. Este arquivo descreve **intenção e decisões**, não comprova testes executados.
 
+## Evolução futura de pedidos e padrões (28/10/2026)
+
+O usuário solicitou registrar, para **somente depois de o aplicativo web
+funcionar**, o fluxo dos pedidos: `em andamento` não baixa estoque, pois a
+compra ainda não está fechada; `em separação` e `concretizada` já baixam.
+O gerente deverá avaliar cenários de demanda potencial dos pedidos em
+andamento **sem alterar o estoque oficial**, identificar riscos adicionais
+e impedir baixa duplicada na transição dos status.
+
+Em etapas mais avançadas, deseja descobrir **produtos geralmente vendidos
+juntos** usando pedidos fechados e investigar **sazonalidade** quando
+existir histórico suficiente. Não implementar agora. Escopo completo em
+`docs/PEDIDOS_E_PADROES_FUTUROS.md`.
 ## Planejamento de relatórios por e-mail (28/10/2026)
 
 Foi adicionada uma etapa futura de **envio mensal automático** dos indicadores
