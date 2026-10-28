@@ -1,5 +1,17 @@
 # Instruções para agentes de programação — Gerente Inteligente de Estoque
 
+## Diretiva de execução integral aprovada em 28/10/2026
+
+O proprietário autorizou o **desenvolvimento da versão web completa** antes de conectar a API GestãoClick. O Codex deve ler e executar:
+1. `docs/EXECUCAO_CODEX.md`: implementação, migração, login Master, permissões, painel web, insights, relatórios, deploy com dados fictícios e correções.
+2. `docs/REVISAO_FINAL_CODEX.md`: **segunda tarefa independente**, revisão do projeto atualizado, testes funcionais, de integração e de segurança, correção dos defeitos e verificação da URL publicada.
+
+Supabase aprovado: projeto `gerente-inteligente-estoque`, ref `csiqpzoudruzppfbpqqx`, região `sa-east-1` (São Paulo), plano gratuito desejado. **Não criar outro projeto**. O banco estava vazio no diagnóstico.
+
+A implementação deverá ocorrer em branch/PR própria, verificando tanto a `main` quanto os requisitos mais recentes na branch `docs/web-unica-privada`. Não executar trabalho simultâneo que conflite com outro agente. O proprietário quer o app funcionando, mas segredos e operações nos painéis externos podem exigir sua participação. Não prometer deploy/testes concluídos sem evidência.
+
+**Integração GestãoClick fica expressamente FORA desta entrega.** O proprietário fornecerá acesso à API somente após o web estar validado. Pedidos em andamento, cestas de produtos e sazonalidade avançada continuam no backlog posterior. Não alterar ERP nem usar dados reais nesta fase.
+
 ## Objetivo e limites permanentes
 - Ferramenta **pessoal e gratuita** para apoiar a rotina de estoque dentro de uma empresa; **não** é um ERP, SaaS nem produto comercial.
 - **Decisão mais recente: a aplicação oficial será única, acessível via web e com acesso autorizado por usuário.** Não manter duas instalações operacionais (local + demo pública). Consulte `docs/PLANO_WEB_PRIVADO.md` antes de alterar hospedagem, autenticação, dados ou interface.
@@ -66,7 +78,7 @@
 - Para a futura API, consultar primeiro a documentação oficial e permissões da conta; leitura antes de qualquer escrita, e segredos sempre fora do Git.
 - Antes de mudanças amplas, fazer diagnóstico e plano curto; preferir alterações pequenas em branch/PR, preservar comportamento validado e explicar trade-offs.
 - Rodar quando aplicável: `python -m pytest`, `ruff check .` e `streamlit run app.py`. Testar com dados fictícios.
-- Não fazer deploy, mesclar na `main`, executar integrações externas nem operações com dados reais sem aprovação explícita.
+- O proprietário autorizou desenvolver e preparar/publicar o único app web **com dados fictícios**, após testes; publicar depende de acesso real à conta Streamlit e secrets configurados. Não mesclar na `main`, usar dados reais ou operar integrações externas/ERP sem aprovação explícita. Evitar tarefas com cobrança.
 
-## Primeira tarefa recomendada
-Ao iniciar com este projeto, priorize uma **auditoria read-only** do estado real do repositório, validação dos testes e inicialização do Streamlit, antes de propor novas funcionalidades. Consulte `docs/CONTEXTO_CODEX.md` e `docs/PLANO_WEB_PRIVADO.md` para as decisões vigentes. O projeto web privado exige migração/segurança antes de operar com dados reais.
+## Tarefa atual recomendada
+Realizar a **implementação integral em etapas**, com diagnóstico/testes antes de cada modificação, seguindo `docs/EXECUCAO_CODEX.md`. Ao finalizar, solicitar execução da auditoria separada `docs/REVISAO_FINAL_CODEX.md`. Verificar URL e CI; não apresentar um trabalho incompleto como concluído.
