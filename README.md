@@ -1,0 +1,1 @@
+# gerente_inteligente_estoque
