@@ -9,6 +9,7 @@ import os
 import re
 import subprocess
 import time
+from dataclasses import replace
 from urllib.error import HTTPError
 from urllib.parse import urlsplit
 from urllib.request import ProxyHandler, Request, build_opener
@@ -35,10 +36,12 @@ def ambiente():
     assert urlsplit(destino).hostname in {"127.0.0.1", "localhost"}
     assert banco.hostname in {"127.0.0.1", "localhost"}
     cliente = build_opener(ProxyHandler({}))
+    chamadas = []
 
     def transporte(method, url, headers, payload, timeout):
         """Redireciona apenas a origem aprovada para o serviço local deste teste."""
         assert url.startswith(PROJECT_URL + "/")
+        chamadas.append((method, urlsplit(url).path, urlsplit(url).query))
         pedido = Request(destino + url.removeprefix(PROJECT_URL), data=payload,
                          headers=dict(headers), method=method)
         try:
@@ -49,13 +52,14 @@ def ambiente():
             codigo = erro.code
             try:
                 detalhe = json.loads(erro.read())
-                identificador = detalhe.get("code", detalhe.get("error_code", ""))
+                identificador = detalhe.get("error_code", detalhe.get("code", ""))
             except (ValueError, AttributeError):
                 identificador = ""
             seguro = identificador if isinstance(identificador, str) and re.fullmatch(r"[A-Za-z0-9_]{1,40}", identificador) else ""
             print("HTTP local:", method, urlsplit(url).path, codigo, seguro)
             erro.close()
-            return HTTPResponse(codigo, b"")
+            # Preserva somente o identificador público do erro, nunca o corpo original.
+            return HTTPResponse(codigo, json.dumps({"error_code": seguro}).encode())
 
     config = Settings(PROJECT_URL, status["ANON_KEY"], status["SERVICE_ROLE_KEY"])
     api = SupabaseAPI(config, transporte)
@@ -75,7 +79,7 @@ def ambiente():
     master.login("master@example.invalid", SENHA)
     operador_id = master.create_user("operador@example.invalid", SENHA, "Operador fictício", "Operador")
     return {"api": api, "master": master, "operador_id": operador_id, "transport": transporte,
-            "anon": status["ANON_KEY"]}
+            "anon": status["ANON_KEY"], "chamadas": chamadas}
 
 
 def operador(ambiente):
@@ -113,6 +117,7 @@ def test_senha_invalida_e_cadastro_publico_bloqueados(ambiente):
                                      {"apikey": ambiente["anon"], "Content-Type": "application/json"},
                                      json.dumps({"email": "publico@example.invalid", "password": SENHA}).encode(), 20)
     assert resposta.status in {400, 403, 422}
+    assert json.loads(resposta.body)["error_code"] == "signup_disabled"
 
 
 def test_desativacao_nega_jwt_ainda_valido(ambiente):
@@ -127,11 +132,12 @@ def test_desativacao_nega_jwt_ainda_valido(ambiente):
 def test_refresh_e_logout_invalidam_acesso_real(ambiente):
     """Renova pelo endpoint Auth real e prova a revogação do JWT após logout."""
     auth = operador(ambiente)
-    # Aproxima o relógio do vencimento para exercitar refresh sem esperar uma hora.
-    auth._clock = lambda: time.time() + 3550
+    # Aproxima somente o vencimento local, sem presumir a duração do JWT do servidor.
+    auth._session = replace(auth.session, expires_at=time.time() + 30)
+    inicio = len(ambiente["chamadas"])
     auth.context()
+    assert ("POST", "/auth/v1/token", "grant_type=refresh_token") in ambiente["chamadas"][inicio:]
     token = auth.session.access_token
-    auth._clock = time.time
     auth.logout()
     assert auth.session is None
     with pytest.raises((AuthenticationError, AuthorizationError)):

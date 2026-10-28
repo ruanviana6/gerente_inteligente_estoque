@@ -53,6 +53,8 @@ O catálogo aceita fornecedor, custo_unitario, prazo_entrega_dias, estoque_segur
 
 Informe a data real do saldo e a abrangência completa do histórico. **Não importe um CSV parcial como se estivesse completo.** O sistema não consegue provar sozinho a abrangência declarada. Um relatório mensal exige saldo do último dia e vendas cobrindo todo o mês; não usa o saldo de hoje para representar um mês passado.
 
+O banco também limita cada lista normalizada de produtos ou vendas a 20 MiB. Código aceita até 120 caracteres; nome e fornecedor, até 300. Esses limites podem ser atingidos antes dos limites do arquivo CSV.
+
 Dias comprovadamente sem estoque não são tratados automaticamente como demanda zero. Dias sem snapshot permanecem desconhecidos e sinalizados. Venda positiva com snapshot zero é preservada e gera aviso de conflito. Custos ausentes não viram zero; unidades vendidas não são faturamento. As [regras de negócio](docs/regras-de-negocio.md) explicam as fórmulas e limites.
 
 A exportação neutraliza textos que poderiam executar fórmulas em planilhas. Dados, backups e arquivos comerciais não devem ser versionados.
@@ -87,7 +89,7 @@ streamlit run app.py
 
 Ative o ambiente virtual antes de instalar. Configure os Secrets localmente, fora do Git, para acessar o Supabase autorizado. Sem configuração, o aplicativo apresenta instruções e não oferece uma demonstração pública sem login.
 
-O GitHub Actions executa Python 3.11/3.12, Ruff, auditoria de dependências, PostgreSQL 17, backup/restauração e integração local com Supabase. Os resultados comprovados, as limitações e as pendências da entrega ficam no PR #5. As fixtures do MVP preservam testes anteriores; não são outra aplicação para operação diária.
+O GitHub Actions executa Python 3.11/3.12, Ruff, auditoria de dependências, PostgreSQL 17, backup/restauração e integração local com Supabase. Os resultados comprovados, as limitações e as pendências estão no [registro da entrega](docs/ENTREGA_WEB.md) e nos checks do PR #5. As fixtures do MVP preservam testes anteriores; não são outra aplicação para operação diária.
 
 ## Limites e próximos passos
 

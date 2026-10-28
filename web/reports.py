@@ -76,8 +76,12 @@ def _validar_fechamento(payload: dict, inicio: date, fim: date) -> dict:
 
 
 def _registros(tabela: pd.DataFrame, colunas: list[str]) -> list[dict[str, Any]]:
-    """Seleciona explicitamente campos permitidos e converte NaN em null JSON."""
-    return json.loads(tabela.loc[:, colunas].to_json(orient="records", date_format="iso"))
+    """Seleciona campos permitidos e preserva a precisão dos indicadores."""
+    selecionada = tabela.loc[:, colunas].replace([math.inf, -math.inf], float("nan"))
+    registros = selecionada.astype(object).where(pd.notna(selecionada), None).to_dict(orient="records")
+    # to_json do pandas arredonda casas decimais, inclusive coberturas pequenas.
+    # JSON padrão conserva o float calculado; ausentes e infinitos viram null.
+    return json.loads(json.dumps(registros, allow_nan=False))
 
 
 def _numero_finito(valor: float) -> float | None:

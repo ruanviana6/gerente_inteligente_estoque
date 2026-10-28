@@ -1,11 +1,14 @@
 """Exercita fechamento mensal, origem histórica e autorização de relatórios."""
 
+import csv
 from copy import deepcopy
 from datetime import date, datetime, timezone
+from io import StringIO
 
+import pandas as pd
 import pytest
 
-from web.reports import exportar_relatorio_csv, gerar_relatorio_mensal, mes_anterior
+from web.reports import _registros, exportar_relatorio_csv, gerar_relatorio_mensal, mes_anterior
 
 MES = date(2026, 9, 1)
 HOJE = date(2026, 10, 15)
@@ -154,6 +157,38 @@ def test_financeiro_autorizado_usa_custo_do_fechamento():
     assert resultado["financeiro"]["capital_estoque"] == 706
     assert resultado["financeiro"]["capital_parado"] == 56
     assert not resultado["financeiro"]["custos_parciais"]
+
+
+@pytest.mark.parametrize("quantidade_diaria", [3, 2_147_483_647])
+def test_relatorio_e_csv_preservam_cobertura_e_capital_sem_arredondar(quantidade_diaria):
+    """A serialização não altera a cobertura calculada nem zera custos pequenos."""
+    payload = base_mensal()
+    payload["products"] = [dict(payload["products"][0], estoque=1, custo_unitario=1e-12)]
+    payload["sales"] = [
+        {"codigo": "001", "data": f"2026-09-{dia:02d}", "quantidade": quantidade_diaria}
+        for dia in range(1, 31)
+    ]
+    payload["snapshots"] = [{"codigo": "001", "data": "2026-09-30", "estoque": 1}]
+    resultado = gerar(payload)
+    cobertura = 1 / quantidade_diaria
+    assert resultado["estoque"][0]["cobertura_dias"] == cobertura
+    assert resultado["financeiro"]["capital_estoque"] == 1e-12
+
+    conteudo = exportar_relatorio_csv(resultado, PERMISSOES).decode("utf-8-sig")
+    linhas = list(csv.DictReader(StringIO(conteudo), delimiter=";"))
+    estoque = next(linha for linha in linhas if linha["bloco"] == "estoque")
+    financeiro = next(linha for linha in linhas if linha["indicador"] == "capital_estoque")
+    assert float(estoque["cobertura_dias"].replace(",", ".")) == cobertura
+    assert float(financeiro["valor"].replace(",", ".")) == 1e-12
+
+
+def test_indicadores_indefinidos_viram_nulos_sem_alterar_tabela():
+    """A conversão mantém o contrato de ausência para NaN e infinitos."""
+    tabela = pd.DataFrame({"cobertura_dias": [float("inf"), float("-inf"), float("nan")]})
+    original = tabela.copy(deep=True)
+    resultado = _registros(tabela, ["cobertura_dias"])
+    assert resultado == [{"cobertura_dias": None}] * 3
+    pd.testing.assert_frame_equal(tabela, original)
 
 
 def test_custos_ausentes_nao_viram_capital_zero():

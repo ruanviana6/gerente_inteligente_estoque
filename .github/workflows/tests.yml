@@ -143,15 +143,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
-      - name: Versionar proteção de cadastro concorrente
-        run: |
-          npx --yes supabase@2.122.0 migration new proteger_cadastro_concorrente
-          python - <<'PY'
-          from pathlib import Path
-          destino = sorted(Path('supabase/migrations').glob('*_proteger_cadastro_concorrente.sql'))[-1]
-          destino.write_text(Path('supabase/pendentes/proteger_cadastro_concorrente.sql').read_text())
-          print('MIGRACAO_GERADA=' + str(destino))
-          PY
       - name: Preparar Auth fictício e aplicar schema
         run: |
           psql -v ON_ERROR_STOP=1 -f tests/sql/bootstrap.sql

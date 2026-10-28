@@ -1,8 +1,7 @@
 # Relatórios mensais automáticos por e-mail
 
-> Funcionalidade incluída no escopo de desenvolvimento web, ainda **não implementada nem agendada** no estado documentado.
-> Implementar somente depois das dependências de login, RLS e dados mensais estarem validadas. O envio real depende de provedor, remetente e autorização dos destinatários.
-> Faz parte do **aplicativo web único**, não de um programa separado.
+> Estado em 28/10/2026: geração mensal, exportação, fila e simulação implementadas no PR #5. Agendamento preparado no GitHub Actions, sem ativação externa nem envio real. Consulte [ATIVAR_RELATORIOS.md](ATIVAR_RELATORIOS.md) para configuração e [ENTREGA_WEB.md](ENTREGA_WEB.md) para evidências.
+> O texto abaixo preserva os requisitos do planejamento. A implementação usa aviso por e-mail com link autenticado, sem anexar dados empresariais. O relatório completo fica no aplicativo web único. Provedor, remetente e destinatários ainda exigem configuração e autorização.
 
 ## Objetivo
 
