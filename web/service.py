@@ -203,6 +203,8 @@ class Service:
         self.auth.require("reports.export")
         relatorio = self.monthly_report(month)
         contexto = self.auth.require("reports.export")
+        if not contexto.can("reports.view"):
+            raise AuthorizationError("O acesso ao relatório foi revogado.")
         return exportar_relatorio_csv(relatorio, contexto.permissions)
 
     def admin_list_users(self):

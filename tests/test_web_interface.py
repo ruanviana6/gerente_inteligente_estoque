@@ -158,17 +158,48 @@ def test_master_edita_usuario_sem_enviar_permissoes_reservadas(monkeypatch):
 
 
 def test_master_pode_definir_concessoes_individuais(monkeypatch):
-    """Desmarcar herança mantém só as funcionalidades selecionadas, sem gestão Master."""
+    """Permitir e negar funções mantém as demais concessões herdadas do perfil."""
     servico = MasterFicticio()
     app, _ = abrir(monkeypatch, servico=servico)
     app.sidebar.radio[0].set_value("Administração").run()
-    next(c for c in app.checkbox if c.label == "Usar permissões iniciais do perfil").set_value(False)
-    next(m for m in app.multiselect if m.label == "Permissões concedidas").set_value(["inventory.view"])
+    next(c for c in app.selectbox if c.label == "Estoque e histórico (inventory.view)").set_value("Permitir")
+    next(c for c in app.selectbox if c.label == "Custos e indicadores financeiros (finance.view)").set_value("Negar")
     next(b for b in app.button if b.label == "Salvar acesso").click().run()
     assert not app.exception
     permissoes = servico.alteracoes[-1][-1]
     assert permissoes["inventory.view"] is True
     assert permissoes["finance.view"] is False
+    assert "dashboard.view" not in permissoes
+
+
+def test_master_preserva_heranca_ao_editar_usuario_com_override_parcial(monkeypatch):
+    """Salvar um nome não revoga funcionalidades que continuam herdadas do perfil."""
+    servico = MasterFicticio()
+    usuario = servico.admin_list_users()[0]
+    usuario["permissions"] = {"finance.view": False}
+    servico.admin_list_users = lambda: [usuario]
+    app, _ = abrir(monkeypatch, servico=servico)
+    app.sidebar.radio[0].set_value("Administração").run()
+    assert not app.exception
+    next(c for c in app.text_input if c.label == "Nome de exibição").set_value("Nome atualizado")
+    next(b for b in app.button if b.label == "Salvar acesso").click().run()
+    assert not app.exception
+    assert servico.alteracoes[-1][1] == "Nome atualizado"
+    assert servico.alteracoes[-1][-1] == {"finance.view": False}
+
+
+def test_master_pode_restaurar_heranca_de_uma_permissao(monkeypatch):
+    """Remover uma exceção individual não concede explicitamente outras funções."""
+    servico = MasterFicticio()
+    usuario = servico.admin_list_users()[0]
+    usuario["permissions"] = {"finance.view": False, "inventory.view": True}
+    servico.admin_list_users = lambda: [usuario]
+    app, _ = abrir(monkeypatch, servico=servico)
+    app.sidebar.radio[0].set_value("Administração").run()
+    next(c for c in app.selectbox if c.label == "Custos e indicadores financeiros (finance.view)").set_value("Herdar do perfil")
+    next(b for b in app.button if b.label == "Salvar acesso").click().run()
+    assert not app.exception
+    assert servico.alteracoes[-1][-1] == {"inventory.view": True}
 
 
 def test_sem_login_nao_consulta_dados_e_nao_oferece_cadastro(monkeypatch):

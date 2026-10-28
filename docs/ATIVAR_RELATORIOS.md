@@ -12,10 +12,10 @@ O worker não usa sessão Master nem `service_role`. Ele recebe um segredo aleat
 2. Cadastre-o em **GitHub → Settings → Environments → relatorios → Environment secrets**, nome `REPORT_JOB_SECRET`.
 3. Configure o mesmo valor via conexão administrativa protegida usando `private.configure_job_secret(UUID_DA_ORGANIZACAO, SEGREDO)`. Evite salvar consultas contendo o valor no histórico do SQL Editor; prefira uma consulta parametrizada em ferramenta local com secret carregado do ambiente. A função só pode ser executada administrativamente.
 4. Nesse environment, adicione `SUPABASE_PUBLISHABLE_KEY`. Não adicione chave administrativa do Supabase.
-5. Em variables, configure `REPORT_SCHEDULER_ENABLED=true` e mantenha `REPORT_ALLOW_REAL_EMAIL=false`. O workflow usa environment protegido e permissões de GitHub somente para leitura do código.
+5. Em **Settings → Secrets and variables → Actions → Variables**, crie a **repository variable** `REPORT_SCHEDULER_ENABLED=true`. Ela precisa existir no repositório, pois é avaliada antes de iniciar o job. No environment `relatorios`, mantenha `REPORT_ALLOW_REAL_EMAIL=false`. O workflow usa environment protegido e permissões de GitHub somente para leitura do código.
 6. Na aplicação, habilite a rotina em **Administração**, mantenha o modo de simulação e selecione contas ativas com `reports.view` e `reports.receive`.
 
-O workflow `.github/workflows/relatorios.yml` roda diariamente às 09h UTC, equivalentes a 06h em Fortaleza. O banco respeita o dia escolhido para envio real, inicialmente dia 1. Simulações podem rodar fora desse dia. Schedules do GitHub só passam a operar na branch padrão após a revisão e merge pelo proprietário; podem sofrer atraso ou suspensão por inatividade. A interface não é responsável pelo agendamento.
+O workflow `.github/workflows/relatorios.yml` tem oportunidades diárias às 09h, 12h e 15h UTC, equivalentes a 06h, 09h e 12h em Fortaleza. O banco respeita o dia escolhido para envio real, inicialmente dia 1, e não repete entregas concluídas. As oportunidades adicionais permitem até três tentativas em caso de falha clara. Simulações podem rodar fora desse dia. Schedules do GitHub só passam a operar na branch padrão após a revisão e merge pelo proprietário; podem sofrer atraso ou suspensão por inatividade. A interface não é responsável pelo agendamento.
 
 O comando de execução manual, com as variáveis protegidas configuradas, é:
 

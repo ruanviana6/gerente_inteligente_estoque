@@ -1,8 +1,8 @@
 name: Relatórios mensais controlados
 on:
   schedule:
-    # 09h UTC = 06h de Fortaleza. O banco respeita o dia escolhido pelo Master.
-    - cron: '0 9 * * *'
+    # 06h, 09h e 12h de Fortaleza. O banco respeita dia, idempotência e até 3 tentativas.
+    - cron: '0 9,12,15 * * *'
   workflow_dispatch:
 permissions:
   contents: read

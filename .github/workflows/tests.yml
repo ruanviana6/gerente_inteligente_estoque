@@ -21,8 +21,20 @@ jobs:
           npx --yes supabase@2.122.0 init
           python - <<'PY'
           from pathlib import Path
+          import tomllib
           config = Path('supabase/config.toml')
-          config.write_text(config.read_text().replace('enable_signup = true', 'enable_signup = false'))
+          linhas = []
+          secao = ''
+          for linha in config.read_text().splitlines():
+              if linha.startswith('['):
+                  secao = linha.strip()
+              if secao == '[auth]' and linha.strip().startswith('enable_signup ='):
+                  linha = 'enable_signup = false'
+              linhas.append(linha)
+          config.write_text('\n'.join(linhas) + '\n')
+          valores = tomllib.loads(config.read_text())
+          assert valores['auth']['enable_signup'] is False
+          assert valores['auth']['email']['enable_signup'] is True
           PY
           npx --yes supabase@2.122.0 start --help
           npx --yes supabase@2.122.0 start > /tmp/supabase-start.log 2>&1
@@ -131,6 +143,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
+      - name: Versionar proteção de cadastro concorrente
+        run: |
+          npx --yes supabase@2.122.0 migration new proteger_cadastro_concorrente
+          python - <<'PY'
+          from pathlib import Path
+          destino = sorted(Path('supabase/migrations').glob('*_proteger_cadastro_concorrente.sql'))[-1]
+          destino.write_text(Path('supabase/pendentes/proteger_cadastro_concorrente.sql').read_text())
+          print('MIGRACAO_GERADA=' + str(destino))
+          PY
       - name: Preparar Auth fictício e aplicar schema
         run: |
           psql -v ON_ERROR_STOP=1 -f tests/sql/bootstrap.sql
@@ -147,6 +168,10 @@ jobs:
           createdb estoque_restaurado
           pg_restore --dbname=estoque_restaurado /tmp/estoque-teste.dump
           PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/security.sql
+      - name: Testar vínculo concorrente de usuário
+        env:
+          GERENTE_DISPOSABLE_DATABASE: '1'
+        run: python tests/sql/concorrencia.py
       - name: Guardar evidências do banco
         if: always()
         uses: actions/upload-artifact@v7.0.2

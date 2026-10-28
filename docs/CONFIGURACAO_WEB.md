@@ -35,6 +35,8 @@ A função exige conta confirmada, cria a organização e registra auditoria. Re
 
 Depois do primeiro login, a área **Administração** permite autorizar contas por UUID, ativar/desativar, escolher perfil e sobrescrever permissões individuais. Operações de gestão permanecem exclusivas do Master. A alteração de acesso vale nas consultas seguintes, inclusive para tokens antigos.
 
+O Visualizador começa somente com o painel. O Operador recebe painel, estoque, reposição, tendências, decisões e visualização de relatórios. O Administrador recebe as funções operacionais, inclusive finanças e importação, mas não gerencia usuários, permissões ou destinatários. Em cada funcionalidade, o Master pode escolher **Herdar do perfil**, **Permitir** ou **Negar**, sem alterar as demais concessões ao editar o nome da conta.
+
 Para criar novas identidades dentro do app, há uma opção de criação via Auth Admin API. Ela exige a chave administrativa opcional nos Secrets e uma sessão Master validada. A chave não participa das consultas de estoque. Se preferir não armazená-la no Streamlit, crie identidades no painel Supabase e autorize seus UUIDs na aplicação.
 
 ## 3. Publicar no Streamlit Community Cloud

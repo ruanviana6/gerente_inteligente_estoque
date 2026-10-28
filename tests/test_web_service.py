@@ -262,6 +262,41 @@ def test_relatorio_incompleto_e_rejeitado_pela_fachada():
         Service(AuthFalso({"reports.view"}, payload=payload)).monthly_report(MES)
 
 
+def test_revogacao_de_visualizacao_bloqueia_exportacao_com_erro_seguro(monkeypatch):
+    """Permissão de exportar sozinha não mantém acesso a um relatório revogado."""
+    auth = AuthFalso({"reports.view", "reports.export"})
+    servico = Service(auth)
+
+    def gerar_e_revogar(month):
+        """Simula revogação após cálculo, antes da autorização final de download."""
+        auth.permissions.discard("reports.view")
+        return {"periodo": {"inicio": "2020-03-01", "fim": "2020-03-31"},
+                "resumo": {"unidades_vendidas": 90}}
+
+    monkeypatch.setattr(servico, "monthly_report", gerar_e_revogar)
+    with pytest.raises(AuthorizationError):
+        servico.export_monthly_report(MES)
+
+
+def test_configuracao_relatorios_preserva_dia_blocos_e_destinatarios():
+    """A fachada não perde as escolhas do Master ao serializar a configuração."""
+    auth = AuthFalso({"reports.manage"}, role="Master")
+    Service(auth).save_reports_config(True, True, [USUARIO], blocks=["estoque"], send_day=17)
+    nome, parametros, permissao = auth.calls[-1]
+    assert nome == "admin_report_settings"
+    assert permissao == "reports.manage"
+    assert parametros == {"p_enabled": True, "p_real_enabled": False,
+                          "p_recipients": [USUARIO], "p_blocks": ["estoque"], "p_send_day": 17}
+
+
+def test_consulta_configuracao_reflete_modo_simulado_vigente():
+    """Uma configuração sem habilitação real continua sendo apresentada como simulação."""
+    auth = AuthFalso({"reports.manage"}, role="Master", payload={"enabled": True, "real_enabled": False})
+    configuracao = Service(auth).reports_config()
+    assert configuracao["enabled"] is True
+    assert configuracao["dry_run"] is True
+
+
 def test_duas_sessoes_nao_compartilham_cliente_nem_identidade():
     """A fábrica reutiliza apenas o estado do mesmo navegador, nunca um global."""
     configuracao = {"SUPABASE_URL": "https://csiqpzoudruzppfbpqqx.supabase.co",

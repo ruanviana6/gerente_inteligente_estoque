@@ -295,6 +295,23 @@ def test_nem_master_pode_criar_outro_master_pela_interface(backend):
     assert not transport.calls
 
 
+@pytest.mark.parametrize("permission", [
+    "users.manage", "permissions.manage", "reports.manage", "integrations.manage",
+])
+@pytest.mark.parametrize("allowed", [True, False])
+def test_permissao_reservada_nao_cria_conta_auth_orfa(backend, permission, allowed):
+    """Overrides não delegáveis são recusados antes de criar a conta, inclusive false."""
+    auth, transport = backend
+    transport.contexts[USER_A] = transport.make_context(
+        USER_A, ["users.manage", "permissions.manage"], "Master",
+    )
+    auth.login("operador@example.test", PASSWORD)
+    transport.calls.clear()
+    with pytest.raises(AppError, match="exclusiva do Master"):
+        auth.create_user("novo@example.test", PASSWORD, "Fictício", "Operador", {permission: allowed})
+    assert not transport.calls
+
+
 def test_recovery_envio_desabilitado_nao_acessa_auth(backend):
     """Sem configuração externa, não existe tentativa de envio real."""
     auth, transport = backend

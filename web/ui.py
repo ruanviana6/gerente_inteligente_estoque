@@ -465,14 +465,16 @@ def _decisoes(servico: Any) -> None:
 
 
 def _permissoes_formulario(atuais: Mapping[str, bool] | None = None) -> dict[str, bool]:
-    """Usa o perfil como ponto inicial ou permite concessões individuais explícitas."""
+    """Preserva herança e exceções individuais, sem revogar acessos ao editar o nome."""
     atuais = atuais or {}
-    herdar = st.checkbox("Usar permissões iniciais do perfil", value=not bool(atuais))
-    selecionadas = st.multiselect("Permissões concedidas", list(PERMISSOES),
-                                 default=[p for p in PERMISSOES if atuais.get(p, False)],
-                                 format_func=lambda p: f"{PERMISSOES[p]} ({p})")
-    st.caption("Desmarque a opção acima para aplicar a seleção individual. Administração permanece exclusiva do Master.")
-    return {} if herdar else {permissao: permissao in selecionadas for permissao in PERMISSOES}
+    resultado = {}
+    st.caption("Herdar usa a permissão do perfil escolhido. Permitir ou negar cria uma exceção individual. Administração é exclusiva do Master.")
+    for permissao, descricao in PERMISSOES.items():
+        indice = 0 if permissao not in atuais else (1 if atuais[permissao] else 2)
+        opcao = st.selectbox(f"{descricao} ({permissao})", ["Herdar do perfil", "Permitir", "Negar"], index=indice)
+        if opcao != "Herdar do perfil":
+            resultado[permissao] = opcao == "Permitir"
+    return resultado
 
 
 def _administracao(servico: Any, contexto: Any) -> None:

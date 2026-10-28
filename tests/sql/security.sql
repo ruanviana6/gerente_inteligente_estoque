@@ -76,6 +76,7 @@ select public.update_parameters('001','{"prazo_entrega_dias":12,"estoque_seguran
 select audit_test.check(public.load_inventory('inventory.view')->'products'->0->>'prazo_entrega_dias'='12','parâmetros atuais editáveis');
 select audit_test.check(public.load_inventory('reports.view','2020-01-01')->'products'->0->>'prazo_entrega_dias'='7','edição preserva parâmetro histórico');
 select audit_test.denied($q$select public.update_parameters('001','{"prazo_entrega_dias":-1,"estoque_seguranca":3,"cobertura_alvo_dias":40}')$q$,'22023','parâmetro negativo rejeitado');
+select audit_test.denied($q$select public.update_parameters('001','{"prazo_entrega_dias":12,"estoque_seguranca":3,"cobertura_alvo_dias":40,"organization_id":"20000000-0000-4000-8000-000000000002"}')$q$,'22023','parâmetros não aceitam troca de organização');
 
 select audit_test.login(2);
 select audit_test.check(public.app_context()->'profile'->>'role'='Operador','user_metadata Master é ignorado');
@@ -88,6 +89,8 @@ select audit_test.denied($q$select public.import_inventory(audit_test.products()
 select audit_test.denied($q$update public.app_users set role='Master' where user_id=auth.uid()$q$,'42501','DML direto não eleva papel');
 select audit_test.denied($q$insert into public.user_permissions values(auth.uid(),'finance.view',true)$q$,'42501','DML direto não concede permissão');
 select audit_test.denied($q$delete from public.inventory_products$q$,'42501','DELETE direto de estoque negado');
+select audit_test.denied($q$update public.inventory_costs set custo_unitario=0$q$,'42501','UPDATE direto financeiro negado');
+select audit_test.denied($q$select claim_token from public.report_jobs$q$,'42501','tokens de processamento não ficam expostos');
 select audit_test.denied($q$select private.bootstrap_master(auth.uid(),'Master falso')$q$,'42501','bootstrap não executável por authenticated');
 select audit_test.denied($q$select private.inventory_payload((select organization_id from public.app_users where user_id=auth.uid()),auth.uid(),null)$q$,'42501','helper interno não executável diretamente');
 select public.save_decision('001','Avaliar compra',4,'Conferir fornecedor');
@@ -133,6 +136,9 @@ select audit_test.login(1);
 select set_config('request.jwt.claims',jsonb_set(auth.jwt(),'{session_id}','"10000000-0000-4000-8000-999999999999"')::text,true);
 select audit_test.denied($q$select public.app_context()$q$,'42501','sessão encerrada não pode reutilizar JWT');
 select audit_test.login(1);
+select set_config('request.jwt.claims',jsonb_set(auth.jwt(),'{session_id}','"10000000-0000-4000-8000-000000000002"')::text,true);
+select audit_test.denied($q$select public.app_context()$q$,'42501','sessão de outra identidade não autentica Master');
+select audit_test.login(1);
 select set_config('request.jwt.claims',jsonb_set(auth.jwt(),'{is_anonymous}','true')::text,true);
 select audit_test.denied($q$select public.app_context()$q$,'42501','Auth anônimo não recebe privilégios de usuário');
 reset role;
@@ -161,6 +167,9 @@ insert into job_response select public.report_job_claim('teste-ficticio-nao-util
 select audit_test.check(jsonb_array_length(payload)=1,'job cria uma simulação autorizada') from job_response;
 select audit_test.check(jsonb_array_length(public.report_job_claim('teste-ficticio-nao-utilizar-em-producao-123456789','2020-01-01',true))=0,'lease impede processamento simultâneo');
 select audit_test.check((public.report_job_authorize('teste-ficticio-nao-utilizar-em-producao-123456789',(payload->0->>'id')::uuid,(payload->0->>'claim_token')::uuid)->>'allowed')::boolean,'destinatário autorizado antes do envio') from job_response;
+select audit_test.denied(format('select public.report_job_authorize(%L,%L::uuid,%L::uuid)',
+  'teste-ficticio-nao-utilizar-em-producao-123456789',payload->0->>'id','99999999-0000-4000-8000-000000000099'),
+  '42501','identificador de job sozinho não autoriza entrega') from job_response;
 reset role;
 set local role authenticated;
 select audit_test.login(1);
@@ -190,4 +199,18 @@ select audit_test.check(jsonb_array_length(public.report_job_claim('teste-fictic
 select audit_test.check(jsonb_array_length(public.report_job_claim('teste-ficticio-nao-utilizar-em-producao-123456789','2020-01-01',false))=0,'envio real desligado não cria entregas');
 reset role;
 select audit_test.check((select count(*)>10 from public.audit_events),'operações sensíveis têm trilha de auditoria');
+-- O vencimento registrado no Auth também invalida JWT ainda não expirado.
+update auth.sessions set not_after=now()-interval '1 second' where id='10000000-0000-4000-8000-000000000001';
+set local role authenticated;
+select audit_test.login(1);
+select audit_test.denied($q$select public.app_context()$q$,'42501','prazo da sessão Auth é respeitado');
+reset role;
+update auth.sessions set not_after=now()+interval '1 day' where id='10000000-0000-4000-8000-000000000001';
+set local role authenticated;
+select audit_test.login(1);
+select public.admin_set_user('00000000-0000-4000-8000-000000000002','Operador fictício','Operador',true,'{"inventory.import":true,"finance.view":false}');
+select audit_test.login(2);
+select audit_test.denied($q$select public.import_inventory(audit_test.products(),'[]','2020-02-29','2020-01-01','2020-02-29')$q$,
+  '42501','permissão de importação não libera gravação de custos');
+reset role;
 rollback;

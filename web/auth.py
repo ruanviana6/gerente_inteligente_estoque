@@ -25,6 +25,9 @@ PERMISSIONS = frozenset({
     "reports.export", "reports.receive", "reports.manage",
 })
 ROLES = ("Master", "Administrador", "Operador", "Visualizador")
+MASTER_ONLY_PERMISSIONS = frozenset({
+    "users.manage", "permissions.manage", "reports.manage", "integrations.manage",
+})
 
 
 def _uuid(value: object) -> str:
@@ -264,8 +267,11 @@ class AuthService:
         if not isinstance(display_name, str) or not 1 <= len(display_name.strip()) <= 120:
             raise AppError("Informe um nome de exibição com até 120 caracteres.")
         overrides = dict(permissions or {})
-        if any(key not in PERMISSIONS or type(value) is not bool for key, value in overrides.items()):
-            raise AppError("Uma permissão informada é inválida.")
+        # O banco recusa essas chaves mesmo quando o valor é false. Validar antes
+        # do Admin API evita criar uma identidade que não poderá receber o perfil.
+        if any(key not in PERMISSIONS or key in MASTER_ONLY_PERMISSIONS or type(value) is not bool
+               for key, value in overrides.items()):
+            raise AppError("Uma permissão informada é inválida ou exclusiva do Master.")
         context = self.require("users.manage")
         if context.profile.role != "Master" or not context.can("permissions.manage"):
             raise AuthorizationError("Somente o Master pode cadastrar e autorizar contas.")
