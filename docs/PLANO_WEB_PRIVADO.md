@@ -63,6 +63,24 @@ Exemplos: um Operador pode consultar reposições sem enxergar custos ou exporta
 
 Objetivo de custo zero dentro dos planos gratuitos. O Supabase Free oferece 500 MB e pode pausar por baixa atividade; também não possui os mesmos backups automáticos dos planos pagos. Projetar backups exportáveis e testes de restauração. Não prometer SLA, disponibilidade 24/7 ou recuperação de senha via e-mail antes de configurar o envio.
 
+## Relatório mensal automático por e-mail (etapa futura)
+
+Foi aprovado incluir no planejamento um **relatório mensal por e-mail** para
+usuários autorizados, com envio padrão no dia 1 de cada mês e números do mês
+anterior. O usuário Master decide quem recebe, o que pode ser incluído e se a
+rotina está ativa. O relatório deve conter, conforme dados e permissões,
+mais vendidos, volume vendido, variações, parados, rupturas, tendências e
+recomendações. Custos e indicadores financeiros exigem `finance.view`.
+
+Permissões adicionais: `reports.view`, `reports.export`, `reports.receive` e
+`reports.manage`. O usuário só recebe conteúdo autorizado no momento da
+geração **e novamente antes do envio**. Apenas o Master pode configurar
+destinatários por padrão. Não confundir e-mail de login com SMTP de envio.
+
+A rotina deve rodar fora do Streamlit e ter histórico, registro de falhas e
+proteção contra duplicidade. Prioridade de custo zero, sujeita à verificação
+dos limites de agendamento e da exigência de domínio/remetente do provedor.
+**Escopo detalhado:** `docs/RELATORIOS_EMAIL.md`. Nada disso está ativo.
 ## Sequência para o Codex
 
 1. Auditoria do MVP e execução efetiva dos testes existentes.
@@ -73,7 +91,8 @@ Objetivo de custo zero dentro dos planos gratuitos. O Supabase Free oferece 500 
 6. Flash de insights explicáveis na página inicial.
 7. Testes de login, acesso negado, revogação, sessão expirada, isolamento de usuários e dados fictícios.
 8. Publicação única no Streamlit Cloud. Dados empresariais somente com autorização.
-9. Integração GestãoClick após a conclusão e validação. NF-e continua planejado para depois.
+9. Relatório mensal por e-mail somente depois de login, permissões, banco persistente, dados mensais validados e segurança; seguir `docs/RELATORIOS_EMAIL.md`.
+10. Integração GestãoClick após a conclusão e validação. NF-e continua planejado para depois.
 
 O estado atual da branch main ainda é um MVP local com SQLite sem login. A branch experimental feat/demo-publica-streamlit foi criada antes da decisão de aplicação única: não mesclar automaticamente.
 
