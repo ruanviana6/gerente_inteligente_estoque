@@ -12,10 +12,23 @@ A implementação deverá ocorrer em branch/PR própria, verificando tanto a `ma
 
 **Integração GestãoClick fica expressamente FORA desta entrega.** O proprietário fornecerá acesso à API somente após o web estar validado. Pedidos em andamento, cestas de produtos e sazonalidade avançada continuam no backlog posterior. Não alterar ERP nem usar dados reais nesta fase.
 
+## Regra permanente: GestãoClick SEMPRE somente leitura
+
+**Regra do proprietário, inclusive depois da integração com a API:** o Gerente Inteligente de Estoque **nunca pode modificar nada no GestãoClick**. A integração será **unidirecional**: GestãoClick → Gerente (consulta/sincronização de dados), sem envio de comandos operacionais de volta ao ERP.
+
+- Permitido: autenticar-se na API autorizada, consultar produtos, saldo, vendas, pedidos, fornecedores e histórico que a API realmente disponibilizar; armazenar cópia analítica e snapshots no **próprio banco Supabase** do gerente.
+- Proibido em qualquer fase: criar, editar ou excluir produtos, preços, clientes, vendas, pedidos, status, reservas, movimentações, saldos, compras, notas fiscais ou qualquer outro objeto do GestãoClick. Não realizar baixa nem estorno no ERP.
+- Não implementar endpoints de escrita, rotinas de sincronização reversa, callbacks/webhooks que alterem o ERP, nem botões administrativos de "aplicar sugestão" no GestãoClick. Recomendações e simulações só geram informações e ações **internas ao gerente**.
+- Usar credencial de API com escopo somente leitura **se o GestãoClick disponibilizar**; em qualquer caso restringir o cliente de integração aos métodos/endpoints comprovadamente de consulta. Operações de escrita HTTP (POST/PUT/PATCH/DELETE para mutação) ficam bloqueadas na camada de integração.
+- Os status `em andamento`, `em separação` e `concretizada` são **observados**, nunca modificados pelo gerente. Quando a operação do ERP já descontou o estoque, o gerente não realiza segunda baixa.
+- Criar testes que verifiquem que as rotinas de importação/sincronização/relatórios/simulações **não disparam mutações na API**. Registrar erros e divergências no banco interno, para conferência humana no sistema oficial.
+- O sistema pode criar/alterar **seus próprios** usuários, permissões, indicadores, relatórios e histórico no Supabase. A proibição de escrita aplica-se ao **GestãoClick**, não ao banco interno do gerente.
+- Não interpretar "integração futura" como autorização futura para escrita. Nenhum componente deve prever escrita no GestãoClick como requisito ou atalho.
+
 ## Objetivo e limites permanentes
 - Ferramenta **pessoal e gratuita** para apoiar a rotina de estoque dentro de uma empresa; **não** é um ERP, SaaS nem produto comercial.
 - **Decisão mais recente: a aplicação oficial será única, acessível via web e com acesso autorizado por usuário.** Não manter duas instalações operacionais (local + demo pública). Consulte `docs/PLANO_WEB_PRIVADO.md` antes de alterar hospedagem, autenticação, dados ou interface.
-- O GestãoClick é e continuará sendo a fonte operacional oficial. No estado atual o aplicativo só utiliza demonstração fictícia ou CSV local. **Não conecte a API, não escreva no ERP e não crie compras automaticamente** sem solicitação explícita para uma etapa futura.
+- O GestãoClick é e continuará sendo a fonte operacional oficial. No estado atual o aplicativo só utiliza demonstração fictícia ou CSV local. **Não conecte a API antes da etapa autorizada e NUNCA escreva no ERP, inclusive após a integração.**
 - A futura integração com o outro projeto de automação de NF-e é apenas planejada; **não implemente emissão ou alteração fiscal** por iniciativa própria.
 - Mantenha a solução simples e gratuita. Arquitetura-alvo: Python + Streamlit Community Cloud privado + PostgreSQL Supabase Free + autenticação e autorização por usuário. O código atual usa SQLite local, mas **SQLite não é solução de persistência na nuvem**. Evite dependências, serviços pagos e múltiplos ambientes de uso sem justificativa.
 
@@ -75,7 +88,7 @@ A implementação deverá ocorrer em branch/PR própria, verificando tanto a `ma
 ## Segurança e controle de alterações
 - Repositório público e futuro app web: **nunca** versionar dados comerciais, CSV reais, SQLite, backups, dados pessoais, notas fiscais, tokens ou `.env`.
 - Usar informações reais da empresa requer autorização; o futuro aplicativo web deve ser privado, com autenticação, autorização e dados protegidos. Não publicar o aplicativo SQLite atual como serviço real.
-- Para a futura API, consultar primeiro a documentação oficial e permissões da conta; leitura antes de qualquer escrita, e segredos sempre fora do Git.
+- Para a futura API, consultar primeiro a documentação oficial e permissões da conta; leitura estrita e permanente, sem qualquer escrita no ERP; segredos sempre fora do Git.
 - Antes de mudanças amplas, fazer diagnóstico e plano curto; preferir alterações pequenas em branch/PR, preservar comportamento validado e explicar trade-offs.
 - Rodar quando aplicável: `python -m pytest`, `ruff check .` e `streamlit run app.py`. Testar com dados fictícios.
 - O proprietário autorizou desenvolver e preparar/publicar o único app web **com dados fictícios**, após testes; publicar depende de acesso real à conta Streamlit e secrets configurados. Não mesclar na `main`, usar dados reais ou operar integrações externas/ERP sem aprovação explícita. Evitar tarefas com cobrança.
