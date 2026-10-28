@@ -14,9 +14,9 @@ jobs:
         python: ['3.11', '3.12']
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
       - name: Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: ${{ matrix.python }}
           cache: pip
@@ -34,7 +34,7 @@ jobs:
         run: python -m pip freeze > dependencias-testadas.txt
       - name: Guardar evidências
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: evidencias-python-${{ matrix.python }}
           path: |
@@ -45,9 +45,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
       - name: Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: '3.11'
       - name: Instalar aplicativo e auditor
@@ -70,8 +70,64 @@ jobs:
           PY
       - name: Guardar resultado da auditoria de dependências
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: auditoria-dependencias
           path: auditoria-dependencias.json
+  banco:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: senha-exclusiva-do-teste-descartavel
+          POSTGRES_DB: estoque_testes
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: senha-exclusiva-do-teste-descartavel
+      PGDATABASE: estoque_testes
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+      - name: Gerar migração com a CLI oficial
+        run: |
+          npx --yes supabase@2.122.0 migration new --help
+          npx --yes supabase@2.122.0 migration new web_privada
+          python - <<'PY'
+          from pathlib import Path
+          arquivos = sorted(Path('supabase/migrations').glob('*_web_privada.sql'))
+          destino = arquivos[-1]
+          destino.write_text(Path('supabase/schema.sql').read_text())
+          print('MIGRACAO_GERADA=' + str(destino))
+          PY
+      - name: Preparar Auth fictício e aplicar schema
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/sql/bootstrap.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/schema.sql
+      - name: Testar PostgreSQL, RLS e autorização
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/security.sql 2>&1 | tee evidencias-banco.txt
+      - name: Verificar backup e restauração descartáveis
+        run: |
+          pg_dump --format=custom --file=/tmp/estoque-teste.dump
+          createdb estoque_restaurado
+          pg_restore --dbname=estoque_restaurado /tmp/estoque-teste.dump
+          PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/security.sql
+      - name: Guardar evidências do banco
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: evidencias-postgresql
+          path: |
+            evidencias-banco.txt
+            supabase/migrations/
 

@@ -1,6 +1,5 @@
-# O MVP auditado ainda não tem autenticação. Restrinja a execução de desenvolvimento.
+# Entrada única autenticada. A plataforma define endereço e porta no deploy.
 [server]
-address = "127.0.0.1"
 headless = true
 maxUploadSize = 10
 enableXsrfProtection = true
