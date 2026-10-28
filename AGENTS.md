@@ -39,6 +39,15 @@
 - Defina claramente se os valores financeiros são a custo ou receita; não invente custos ausentes.
 - Importações CSV do MVP são **completas**, não incrementais. Não presuma formato nativo específico do GestãoClick sem validar exemplos/autorização.
 
+## Autenticação e autorização aprovadas para a web
+- Login com **e-mail e senha via Supabase Auth**, nome de usuário apenas para exibição; não criar sistema próprio de senhas.
+- O usuário proprietário terá o papel **Master**, atribuído em procedimento administrativo seguro, sem permitir promoção pela UI.
+- Apenas o Master poderá gerenciar usuários, ativar/desativar contas e conceder/revogar **permissões individuais por funcionalidade**. Perfis possíveis: Master, Administrador, Operador e Visualizador.
+- Cadastro público desligado; padrão negar acesso. Verificar autorização tanto na tela quanto na operação com banco e testar RLS/grants de todas as tabelas expostas.
+- Não usar chave administrativa do Supabase para as consultas comuns. A Master UI deve manter auditoria de mudanças e impedir escalação de privilégio.
+- Atenção ao SMTP padrão do Supabase: não prometer envio de convites ou recuperação de senha para usuários externos sem configurar serviço compatível.
+- Consulte o plano atualizado em docs/PLANO_WEB_PRIVADO.md, que substitui a antiga sugestão de OIDC como login padrão.
+
 ## Segurança e controle de alterações
 - Repositório público e futuro app web: **nunca** versionar dados comerciais, CSV reais, SQLite, backups, dados pessoais, notas fiscais, tokens ou `.env`.
 - Usar informações reais da empresa requer autorização; o futuro aplicativo web deve ser privado, com autenticação, autorização e dados protegidos. Não publicar o aplicativo SQLite atual como serviço real.
