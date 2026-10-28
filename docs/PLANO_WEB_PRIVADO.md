@@ -81,6 +81,23 @@ A rotina deve rodar fora do Streamlit e ter histórico, registro de falhas e
 proteção contra duplicidade. Prioridade de custo zero, sujeita à verificação
 dos limites de agendamento e da exigência de domínio/remetente do provedor.
 **Escopo detalhado:** `docs/RELATORIOS_EMAIL.md`. Nada disso está ativo.
+## Após a estabilização: pedidos em andamento e padrões
+
+**Não implementar nesta fase.** Após o app web com login, Master, banco
+persistente e testes estar funcionando, estudar o status real dos pedidos no
+GestãoClick. O usuário informou:
+
+- **em andamento**: ainda não desconta o estoque; é demanda potencial.
+- **em separação** e **concretizada**: o estoque já é baixado.
+- Uma mudança de separação para concretizada não autoriza nova baixa.
+- O gerente deverá estimar possíveis riscos considerando a eventual
+  conversão de pedidos em andamento, com cenários separados do saldo
+  operacional, sem tratar hipóteses como vendas certas.
+- Mais adiante, analisar associação de produtos frequentemente vendidos
+  juntos e sazonalidade, somente com dados e histórico confiáveis.
+
+**Ver `docs/PEDIDOS_E_PADROES_FUTUROS.md` para requisitos, campos mínimos,
+testes e condicionantes.** Não altera o cronograma atual de entrega do MVP.
 ## Sequência para o Codex
 
 1. Auditoria do MVP e execução efetiva dos testes existentes.
