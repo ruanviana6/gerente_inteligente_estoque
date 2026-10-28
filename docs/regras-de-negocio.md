@@ -2,6 +2,8 @@
 
 O GestãoClick será a fonte da verdade após a integração; o MVP só trabalha com dados simulados e CSV normalizado.
 
+A integração futura será sempre somente leitura. Nenhum componente pode criar, editar ou excluir objetos ou movimentos no GestãoClick; consultas futuras também dependem de autorização. A regra permanente está no `AGENTS.md`.
+
 - Média diária: soma de unidades vendidas / dias elegíveis da janela.
 - Dias comprovadamente sem estoque não entram na média; dias sem foto de estoque contam, mas são sinalizados como disponibilidade desconhecida.
 - Cobertura: estoque / demanda média; quando média = 0, não há cobertura numérica.

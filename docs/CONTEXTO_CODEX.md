@@ -17,7 +17,7 @@ Não é negócio independente nem substituição do ERP. É um **apoio individua
 
 1. **Custo zero como prioridade:** não contratar hospedagem, banco gerenciado, API paga ou serviço externo apenas por conveniência.
 2. **Versão inicial local:** Streamlit + Python + pandas/NumPy + SQLite. Não migrar prematuramente para React, FastAPI, PostgreSQL, microsserviços ou nuvem.
-3. **GestãoClick como fonte oficial futuramente:** a integração só ocorre após concluir/testar o sistema independente; iniciar **somente com leitura** e credenciais autorizadas. Não presumir endpoints, movimentações disponíveis, histórico completo ou limites.
+3. **GestãoClick como fonte oficial futuramente:** a integração só ocorre após concluir/testar o sistema independente; operar **sempre somente por leitura, sem qualquer escrita no ERP**, com credenciais autorizadas. Não presumir endpoints, movimentações disponíveis, histórico completo ou limites. A regra permanente do `AGENTS.md` prevalece.
 4. **Demonstrar antes de conectar:** usar gerador fictício e importação CSV normalizada. Nunca colocar dados comerciais reais no GitHub.
 5. **Regras de estoque antes de Machine Learning:** as sugestões devem ser explicáveis, auditáveis e comparáveis com métodos simples.
 6. **A interface não calcula regras de negócio:** cálculos isolados no motor, dados em camada separada e persistência local.
@@ -131,3 +131,4 @@ O usuário quer um projeto ao mesmo tempo útil e didático, com práticas profi
 **Primeira tarefa recomendada: auditoria apenas de leitura** — revisar README, AGENTS.md, este contexto e regras de negócio; executar os testes e iniciar o Streamlit se o ambiente permitir; registrar achados por severidade e propor um plano curto para corrigir os problemas reais. Não implementar novas funcionalidades nem acessar GestãoClick nessa primeira tarefa.
 
 A cada tarefa posterior, use o repositório como fonte, formule escopo/critério de aceite claros e preserve um breve resumo das decisões para não depender de memória entre conversas.
+

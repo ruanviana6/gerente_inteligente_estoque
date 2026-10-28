@@ -140,13 +140,13 @@ ruff check .
 
 ## Próximas etapas
 
-1. Validar indicadores e cálculos com dados simulados e casos de borda.
-2. Conferir formatos de exportação CSV autorizados e reconciliação do estoque.
-3. Concluir testes operacionais da ferramenta independente.
-4. Integrar a API oficial do GestãoClick em **modo leitura**, com permissões e limites verificados.
-5. Estudar sazonalidade e comparar modelos ML com baseline simples usando validação temporal.
-6. Avaliar indicadores de clientes (RFM), chat numérico auditável e expedição.
-7. Futuramente integrar com o projeto separado de automação de NF-e, sem misturar lógica fiscal à lógica de compras.
+1. Concluir a Issue #2: aplicativo web único, Supabase, login, Master, permissões e RLS.
+2. Implementar insights e relatórios mensais com dados confiáveis e envio inicialmente simulado.
+3. Reexecutar a auditoria da Issue #3, incluindo os testes negativos de acesso e a URL verdadeira.
+4. Publicar e validar a versão privada com dados fictícios, antes de qualquer uso empresarial autorizado.
+5. Só após a validação e autorização, integrar a API GestãoClick **sempre somente por leitura, sem qualquer escrita no ERP**.
+6. Estudar sazonalidade, ML e outras análises apenas quando houver histórico suficiente e benefício demonstrado.
+7. Manter a automação de NF-e como projeto separado, sem antecipar integração fiscal.
 
 ## O que espero desse projeto
 

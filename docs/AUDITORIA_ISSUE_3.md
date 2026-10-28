@@ -7,7 +7,9 @@ Data: 28/10/2026, fuso America/Fortaleza.
 **A versão web não está aprovada.** O pré-requisito da Issue #3, a implementação da Issue #2, não foi encontrado no GitHub. A auditoria avançou sobre o código realmente disponível, reproduziu defeitos, corrigiu o MVP e acrescentou regressões. Não houve publicação, alteração da `main`, operação no GestãoClick, uso de dados comerciais ou envio de e-mail.
 
 - Referência auditada: `main`, commit `e65d66b05bbd9f6c8156113e25a3167f34d4b72e`.
+- Conferência final: a `main` avançou para `9cb0bfbc69f7f674117083b68e605a0b65bfa054` durante a auditoria, alterando somente `AGENTS.md`. A proibição permanente de escrita no GestãoClick foi lida e preservada nesta branch. O código da aplicação permaneceu igual à referência auditada.
 - Requisitos revisados: branch `docs/web-unica-privada`, commit `69a17d627d70d52ffdc3a9d9d832889483a17554`, PR #1 e documentos `AGENTS.md`, `CONTEXTO_CODEX.md`, `PLANO_WEB_PRIVADO.md`, `EXECUCAO_CODEX.md`, `RELATORIOS_EMAIL.md`, `REVISAO_FINAL_CODEX.md` e `regras-de-negocio.md`.
+- A atualização documental posterior `0e3a6cd2e309a89a5afa457dac9d1c9fc17ba37d` também foi conferida integralmente por comparação com os documentos lidos: acrescenta a mesma regra de leitura permanente, sem entregar implementação web.
 - Correções: [PR #4](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/4), branch `auditoria/issue-3-validacao`.
 - Os arquivos foram obtidos diretamente pelo conector GitHub. Alterações locais de uma tentativa anterior não foram presumidas como implementação entregue.
 - Revisões paralelas independentes examinaram domínio, importação, persistência e segurança; os resultados foram confrontados com execução e CI.
@@ -32,7 +34,7 @@ A separação é adequada ao tamanho do projeto. Os principais riscos eram contr
 | Painel, filtros, produto e decisões | `test_interface.py`, Streamlit AppTest | Verificado no runner de CI |
 | Inicialização do servidor | `test_streamlit_http.py`, processo real e HTTP loopback | Verificado no CI; não é deploy |
 | Login, Master e usuários desativados | Não há implementação de Auth | Não implementado; testes negativos não executáveis |
-| RLS, permissões e isolamento por identidade | Não há esquema PostgreSQL de aplicação nem políticas | Não implementado; não aprovado |
+| RLS, permissões e isolamento por identidade | Não há migrações versionadas; `public` não tem tabelas nem políticas de aplicação | Não implementado; não aprovado |
 | Restrição de custos por `finance.view` | Custos acessíveis pelo fluxo local sem identidade | Bloqueador de publicação |
 | Flash rotativo | Não integrado na main | Não implementado |
 | Relatórios mensais, fechamento e exportação autorizada | Nenhum módulo ou teste correspondente | Não implementado |
@@ -105,6 +107,8 @@ As consultas retornaram:
 O CI anterior foi conferido nos logs da [execução 40635730309](https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/40635730309): 11 testes passavam e Ruff falhava com dois imports sem uso e duas variáveis `l` ambíguas.
 
 A primeira execução das correções, commit `90ed078`, [execução 40692779175](https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/40692779175), executou **153 testes com sucesso em Python 3.11 e 3.12**. Identificou dois ajustes I001 nos testes antigos e dois FutureWarnings de pandas; ambos foram corrigidos para a rodada seguinte. O resultado final é registrado no PR #4 após a execução do commit mais recente.
+
+A rodada do commit `182fa4ab` aprovou **157 testes, Ruff e pip check nos dois interpretadores** e detectou as vulnerabilidades do ferramental. Depois da correção, o commit `6d535980`, [execução 40704934677](https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/40704934677), teve o CI completo **aprovado**: 157 testes em Python 3.11 (7,40 s) e 3.12 (7,90 s), Ruff e pip check sem erros, e `pip-audit` reportando nenhuma vulnerabilidade conhecida. A rodada posterior acrescenta regressões da regra permanente de ausência de chamadas externas; consulte o commit mais recente no PR para o resultado final.
 
 Comandos do CI:
 
