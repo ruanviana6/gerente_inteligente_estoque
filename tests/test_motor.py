@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+
 from config import Configuracao
 from dados import gerar_dados_exemplo
 from motor import calcular_reposicao, classificar_status, gerar_painel, medias_por_produto
@@ -33,3 +34,4 @@ def test_painel_simulado():
     assert len(result) == len(p)
     assert result["quantidade_sugerida"].ge(0).all()
     assert result.loc[result["codigo"]=="P009","status"].item() == "Ruptura"
+

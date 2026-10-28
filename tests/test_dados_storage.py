@@ -1,6 +1,8 @@
 import sqlite3
+
 import pandas as pd
 import pytest
+
 from dados import carregar_de_csv, gerar_dados_exemplo, validar_produtos
 from storage import backup, carregar_base, registrar_decisao, salvar_importacao
 
@@ -32,3 +34,4 @@ def test_importacao_idempotente_e_backup(tmp_path):
     copia = backup(caminho,tmp_path/"copia.db")
     with sqlite3.connect(copia) as db:
         assert db.execute("SELECT count(*) FROM decisoes").fetchone()[0] == 1
+

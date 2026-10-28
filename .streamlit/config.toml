@@ -1,0 +1,13 @@
+# O MVP auditado ainda não tem autenticação. Restrinja a execução de desenvolvimento.
+[server]
+address = "127.0.0.1"
+headless = true
+maxUploadSize = 10
+enableXsrfProtection = true
+enableCORS = true
+
+[client]
+showErrorDetails = "none"
+
+[browser]
+gatherUsageStats = false
