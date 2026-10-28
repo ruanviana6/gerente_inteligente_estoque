@@ -1,6 +1,7 @@
 # Relatórios mensais automáticos por e-mail
 
-> Funcionalidade **planejada**, sem implementação ou agendamento ativo.
+> Funcionalidade incluída no escopo de desenvolvimento web, ainda **não implementada nem agendada** no estado documentado.
+> Implementar somente depois das dependências de login, RLS e dados mensais estarem validadas. O envio real depende de provedor, remetente e autorização dos destinatários.
 > Faz parte do **aplicativo web único**, não de um programa separado.
 
 ## Objetivo
