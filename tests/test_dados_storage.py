@@ -6,6 +6,7 @@ import pytest
 from dados import carregar_de_csv, gerar_dados_exemplo, validar_produtos
 from storage import backup, carregar_base, registrar_decisao, salvar_importacao
 
+
 def test_duplicidade():
     with pytest.raises(ValueError, match="duplicados"):
         validar_produtos(pd.DataFrame([

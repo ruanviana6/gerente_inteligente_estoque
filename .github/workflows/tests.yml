@@ -39,4 +39,24 @@ jobs:
           path: |
             resultado-testes.xml
             dependencias-testadas.txt
+  dependencias:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Instalar aplicativo e auditor
+        run: python -m pip install -r requirements.txt pip-audit==2.9.0
+      - name: Consultar vulnerabilidades conhecidas
+        run: pip-audit --format=json --output=auditoria-dependencias.json
+      - name: Guardar resultado da auditoria de dependências
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auditoria-dependencias
+          path: auditoria-dependencias.json
 

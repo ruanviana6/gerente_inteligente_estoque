@@ -22,3 +22,7 @@ venv/
 coverage.xml
 .coverage
 htmlcov/
+resultado-testes.xml
+dependencias-testadas.txt
+auditoria-dependencias.json
+

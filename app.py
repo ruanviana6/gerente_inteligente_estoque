@@ -12,7 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from dados import carregar_de_csv, exportar_csv_seguro, gerar_dados_exemplo, hoje_local
-from motor import gerar_painel
+from motor import gerar_painel, somar_valores_financeiros
 from storage import carregar_base, listar_decisoes, registrar_decisao, salvar_importacao
 
 st.set_page_config(
@@ -101,15 +101,18 @@ def painel_geral(painel: pd.DataFrame, origem: str) -> None:
     n_pedidos = int((painel["quantidade_sugerida"] > 0).sum())
     n_risco = int(painel["risco_prazo"].sum())
     com_custo = painel["capital_estoque"].notna()
-    capital = painel.loc[com_custo, "capital_estoque"].sum()
-    parado = painel.loc[com_custo & painel["status"].isin(["Parado", "Excesso"]), "capital_estoque"].sum()
+    capital = somar_valores_financeiros(painel.loc[com_custo, "capital_estoque"])
+    valores_parados = painel.loc[painel["status"].isin(["Parado", "Excesso"]), "capital_estoque"]
+    parado = 0.0 if valores_parados.empty else somar_valores_financeiros(valores_parados)
     a, b, c, d = st.columns(4)
     a.metric("Produtos com sugestão", n_pedidos)
     b.metric("Risco antes da entrega", n_risco)
     c.metric("Capital conhecido em estoque", moeda(capital) if com_custo.any() else "Não informado")
     d.metric("Capital em parados/excesso", moeda(parado) if com_custo.any() else "Não informado")
     if not com_custo.all():
-        st.info("Capital parcial: alguns produtos não possuem custo unitário.")
+        st.info("Capital parcial: há custos ausentes ou valores não calculáveis.")
+    if painel["financeiro_limite_excedido"].any():
+        st.warning("Valores financeiros fora do limite de cálculo. Revise os custos importados; totais e ABC podem estar indisponíveis.")
     if painel["dias_disponibilidade_desconhecida"].gt(0).any():
         st.info(
             "Médias são estimativas: faltam snapshots de disponibilidade em parte "

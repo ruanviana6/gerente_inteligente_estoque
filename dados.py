@@ -121,7 +121,8 @@ def validar_produtos(bruto: pd.DataFrame) -> pd.DataFrame:
         if campo not in df:
             df[campo] = padrao
         else:
-            df[campo] = df[campo].replace(r"^\s*$", pd.NA, regex=True).fillna(padrao)
+            ausente = df[campo].isna() | df[campo].astype(str).str.strip().eq("")
+            df[campo] = df[campo].where(~ausente, padrao)
     df["fornecedor"] = df["fornecedor"].astype("string").str.strip()
     if df["fornecedor"].str.contains("\x00", regex=False).any():
         raise ValueError("Fornecedor com caractere nulo.")

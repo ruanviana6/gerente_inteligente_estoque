@@ -9,6 +9,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from numbers import Integral, Real
+from typing import Iterable
 
 import pandas as pd
 
@@ -183,11 +184,31 @@ def classificar_status(
     return "OK", "🟢", 4
 
 
-def classificar_abc(vendas: pd.DataFrame, produtos: pd.DataFrame, hoje: pd.Timestamp) -> pd.Series:
-    """Classifica por participação no valor estimado vendido nos últimos 90 dias.
+def somar_valores_financeiros(valores: Iterable[float]) -> float:
+    """Soma custos conhecidos sem permitir infinito como indicador monetário.
+
+    Custos ausentes continuam excluídos de um total explicitamente parcial.
+    Se a soma exceder a representação numérica, não há valor apresentável.
+    """
+    conhecidos = [float(valor) for valor in valores if pd.notna(valor)]
+    if not conhecidos or not all(math.isfinite(valor) for valor in conhecidos):
+        return float("nan")
+    try:
+        total = math.fsum(conhecidos)
+    except OverflowError:
+        return float("nan")
+    return total if math.isfinite(total) else float("nan")
+
+
+def _calcular_abc(
+    vendas: pd.DataFrame, produtos: pd.DataFrame, hoje: pd.Timestamp,
+) -> tuple[pd.Series, bool]:
+    """Calcula as classes e informa se houve estouro de representação financeira.
 
     Usamos custo unitário como aproximação financeira, não faturamento; produtos
     sem custo permanecem 'Não calculável', sem inventar valores monetários.
+    Um consumo ou total não finito invalida a participação de todos os SKUs,
+    pois retirar silenciosamente esse item mudaria o denominador da Curva ABC.
     """
     hoje = _normalizar_dia(hoje)
     inicio = hoje - pd.Timedelta(days=89)
@@ -198,11 +219,19 @@ def classificar_abc(vendas: pd.DataFrame, produtos: pd.DataFrame, hoje: pd.Times
         lambda custo: isinstance(custo, Real) and math.isfinite(custo) and custo >= 0
     ).all():
         raise ValueError("Custos da Curva ABC devem ser finitos e não negativos.")
-    valores = unidades.reindex(tabela.index, fill_value=0) * tabela["custo_unitario"]
+    valores = pd.Series([
+        float(quantidade) * float(custo)
+        for quantidade, custo in zip(
+            unidades.reindex(tabela.index, fill_value=0), tabela["custo_unitario"],
+        )
+    ], index=tabela.index, dtype=float)
     classes = pd.Series("Não calculável", index=tabela.index, dtype="object")
-    soma = valores[validos].sum()
+    soma = somar_valores_financeiros(valores[validos])
+    excedeu_limite = validos.any() and not math.isfinite(soma)
+    if excedeu_limite or not validos.any():
+        return classes, bool(excedeu_limite)
     if soma <= 0:
-        return classes
+        return classes, False
     # O SKU desempata valores iguais para a classificação não mudar só porque
     # o catálogo foi importado em outra ordem.
     ordenados = valores[validos].sort_index().sort_values(ascending=False, kind="stable")
@@ -211,7 +240,12 @@ def classificar_abc(vendas: pd.DataFrame, produtos: pd.DataFrame, hoje: pd.Times
         "A" if p < .80 else "B" if p < .95 else "C"
         for p in acumulado_antes
     ]
-    return classes
+    return classes, False
+
+
+def classificar_abc(vendas: pd.DataFrame, produtos: pd.DataFrame, hoje: pd.Timestamp) -> pd.Series:
+    """Classifica consumo a custo em 90 dias, sem classes arbitrárias após overflow."""
+    return _calcular_abc(vendas, produtos, hoje)[0]
 
 
 def _aviso_qualidade(linha: object) -> str:
@@ -227,6 +261,8 @@ def _aviso_qualidade(linha: object) -> str:
         avisos.append("Há dias sem snapshot; disponibilidade desconhecida.")
     if linha.dias_snapshots_conflitantes:
         avisos.append("Saldo zero com venda no mesmo dia: venda preservada, reconcilie o snapshot.")
+    if linha.financeiro_limite_excedido:
+        avisos.append("Limite numérico financeiro excedido; valores afetados não calculáveis. Revise os custos.")
     if pd.isna(linha.custo_unitario):
         avisos.append("Custo ausente; capital e ABC do produto não calculáveis.")
     elif linha.abc_parcial:
@@ -301,8 +337,17 @@ def gerar_painel(
     painel["estoque_alvo"] = [r.estoque_alvo for r in calculos]
     painel["quantidade_sugerida"] = [r.quantidade for r in calculos]
     painel["risco_prazo"] = [r.risco_antes_entrega for r in calculos]
-    painel["capital_estoque"] = painel["estoque"] * painel["custo_unitario"]
-    painel["classe_abc"] = classificar_abc(vendas, produtos, atual)
+    capital_bruto = pd.Series([
+        float(estoque) * float(custo)
+        for estoque, custo in zip(painel["estoque"], painel["custo_unitario"])
+    ], index=painel.index, dtype=float)
+    capital_finito = capital_bruto.map(math.isfinite)
+    capital_excedido = capital_bruto.notna() & ~capital_finito
+    painel["capital_estoque"] = capital_bruto.where(capital_finito)
+    total_capital = somar_valores_financeiros(painel["capital_estoque"])
+    total_excedido = painel["capital_estoque"].notna().any() and not math.isfinite(total_capital)
+    painel["classe_abc"], abc_excedido = _calcular_abc(vendas, produtos, atual)
+    painel["financeiro_limite_excedido"] = bool(capital_excedido.any() or total_excedido or abc_excedido)
     # Uma primeira venda recente não prova o início de comercialização. É um
     # aviso para verificar a abrangência do CSV; não encurta o denominador.
     primeira = pd.to_datetime(vendas_positivas.groupby("codigo")["data"].min().reindex(painel.index))
@@ -314,6 +359,7 @@ def gerar_painel(
         sem_estimativa | painel["historico_curto"] | painel["sem_historico_vendas"]
         | painel["dias_disponibilidade_desconhecida"].gt(0)
         | painel["dias_snapshots_conflitantes"].gt(0)
+        | painel["financeiro_limite_excedido"]
     )
     painel["aviso_qualidade"] = [_aviso_qualidade(linha) for linha in painel.itertuples(index=False)]
     # Apresentar risco de entrega primeiro, sem adulterar o status por cobertura.

@@ -5,6 +5,7 @@ from config import Configuracao
 from dados import gerar_dados_exemplo
 from motor import calcular_reposicao, classificar_status, gerar_painel, medias_por_produto
 
+
 def test_reposicao():
     r = calcular_reposicao(35, 8, 6, 20, 10, 5, 6)
     assert (r.ponto_pedido, r.posicao_estoque, r.quantidade) == (68, 40, 28)

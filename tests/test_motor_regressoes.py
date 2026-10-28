@@ -15,6 +15,7 @@ from motor import (
     classificar_tendencia,
     gerar_painel,
     medias_por_produto,
+    somar_valores_financeiros,
 )
 
 HOJE = pd.Timestamp("2026-10-20")
@@ -258,3 +259,56 @@ def test_data_de_referencia_vazia_e_rejeitada():
     """NaT não deve produzir silenciosamente janelas vazias e ausência de risco."""
     with pytest.raises(ValueError, match="data de referência"):
         gerar_painel(produtos(), vendas_vazias(), hoje=pd.NaT)
+
+
+def test_overflow_de_capital_e_consumo_nao_vira_infinito_ou_classe_abc():
+    """Custos finitos ainda podem produzir multiplicações impossíveis de representar."""
+    catalogo = validar_produtos(pd.DataFrame([
+        {"codigo": "A", "nome": "A", "estoque": 2, "custo_unitario": 1e308},
+        {"codigo": "B", "nome": "B", "estoque": 2, "custo_unitario": 10},
+    ]))
+    vendas = pd.DataFrame({"codigo": ["A", "B"], "data": [HOJE, HOJE], "quantidade": [2, 1]})
+    painel = gerar_painel(catalogo, vendas, hoje=HOJE).set_index("codigo")
+    assert math.isnan(painel.loc["A", "capital_estoque"])
+    assert painel.loc["B", "capital_estoque"] == 20
+    assert painel["classe_abc"].eq("Não calculável").all()
+    assert painel["financeiro_limite_excedido"].all()
+    assert painel["aviso_qualidade"].str.contains("Limite numérico financeiro").all()
+    assert painel["requer_revisao"].all()
+
+
+def test_soma_financeira_excede_limite_mesmo_com_produtos_individualmente_finitos():
+    """A soma de dois valores válidos pode invalidar os totais e a participação ABC."""
+    catalogo = validar_produtos(pd.DataFrame([
+        {"codigo": codigo, "nome": codigo, "estoque": 1, "custo_unitario": 1e308}
+        for codigo in ("A", "B")
+    ]))
+    vendas = pd.DataFrame({"codigo": ["A", "B"], "data": [HOJE, HOJE], "quantidade": [1, 1]})
+    painel = gerar_painel(catalogo, vendas, hoje=HOJE)
+    assert painel["capital_estoque"].map(math.isfinite).all()
+    assert math.isnan(somar_valores_financeiros(painel["capital_estoque"]))
+    assert painel["classe_abc"].eq("Não calculável").all()
+    assert painel["financeiro_limite_excedido"].all()
+
+
+def test_limiar_financeiro_finito_continua_calculavel():
+    """Valores representáveis no limite não são removidos por uma tolerância arbitrária."""
+    limite = float(np.finfo(float).max)
+    catalogo = produtos(estoque=2, custo_unitario=limite / 2)
+    vendas = pd.DataFrame({"codigo": ["A"], "data": [HOJE], "quantidade": [2]})
+    linha = gerar_painel(catalogo, vendas, hoje=HOJE).iloc[0]
+    assert linha["capital_estoque"] == limite
+    assert linha["classe_abc"] == "A"
+    assert not linha["financeiro_limite_excedido"]
+    assert somar_valores_financeiros([limite / 2, limite / 2]) == limite
+
+
+def test_sem_custo_nao_produz_total_zero_nem_falso_overflow():
+    """Ausência de custo e estouro numérico são limitações diferentes."""
+    linha = gerar_painel(produtos(), vendas_vazias(), hoje=HOJE).iloc[0]
+    assert math.isnan(linha["capital_estoque"])
+    assert linha["classe_abc"] == "Não calculável"
+    assert not linha["financeiro_limite_excedido"]
+    assert math.isnan(somar_valores_financeiros([float("nan"), None]))
+    assert math.isnan(somar_valores_financeiros([]))
+    assert somar_valores_financeiros([float("nan"), 10, 20]) == 30

@@ -4,6 +4,12 @@ Criei este projeto para facilitar algumas tarefas de estoque no meu dia a dia. A
 
 É uma ferramenta pessoal, gratuita e ainda em desenvolvimento. Por enquanto, funciona no computador com dados fictícios ou arquivos CSV. Mais para frente, quero integrá-la ao GestãoClick, que continuará sendo o sistema oficial da empresa.
 
+## Estado verificado na auditoria
+
+A auditoria da Issue #3 encontrou e corrigiu falhas do MVP local. A versão web planejada na Issue #2 ainda não foi entregue: este código não tem login, Master, permissões, persistência Supabase nem relatórios mensais. Não use esta versão como aplicativo privado na internet.
+
+As correções e as evidências estão no [PR #4](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/4) e no [relatório da auditoria](docs/AUDITORIA_ISSUE_3.md). A revisão inclui testes de cálculo, CSV, SQLite, backup e interface Streamlit. Testes do MVP não comprovam os controles de segurança da futura versão web.
+
 ## Por que comecei
 
 O GestãoClick já guarda informações de estoque, vendas e compras. O que eu queria era uma maneira mais prática de olhar para esses dados e decidir o que merece atenção.
@@ -94,6 +100,8 @@ streamlit run app.py
 
 O navegador abrirá o endereço local indicado pelo Streamlit (normalmente http://localhost:8501). Selecione **Demonstração fictícia** para explorar o projeto sem utilizar dados comerciais.
 
+A configuração de desenvolvimento restringe o servidor a `127.0.0.1`. Isso reduz exposição acidental, mas não implementa autenticação. Não remova essa restrição para publicar o MVP como versão web privada.
+
 ### CSV (importação completa, não incremental)
 
 Envie dois arquivos UTF-8 com campos normalizados:
@@ -104,7 +112,11 @@ Envie dois arquivos UTF-8 com campos normalizados:
 
 O separador padrão é ponto e vírgula, decimal com vírgula. O código agrega múltiplas vendas do mesmo SKU/dia. CSVs nativos do GestãoClick podem ter outros nomes: precisam de adaptação verificada, que ainda não foi implementada.
 
+Datas devem usar `AAAA-MM-DD` ou `DD/MM/AAAA`, sem horário. Códigos como `001` e `NA` são preservados como texto. Cada arquivo aceita até 10 MiB e 200 mil linhas; números inválidos, datas futuras e cabeçalhos ambíguos são rejeitados. Textos perigosos nas exportações recebem um apóstrofo para impedir interpretação como fórmula em planilhas.
+
 Uma nova importação substitui atomicamente o catálogo e as vendas importadas, evitando vendas duplicadas; registra uma fotografia do estoque atual e conserva fotos anteriores dos SKUs presentes. **Importe sempre catálogo e histórico completos.** Os registros permanecem somente em data/gerente.db, fora do repositório.
+
+SKUs ausentes no catálogo completo são removidos, junto com seus snapshots e decisões locais. Confira a abrangência do arquivo antes de importar. O sistema ainda não identifica sozinho um CSV parcial que parece completo.
 
 ## Qualidade, segurança e limites
 
@@ -119,6 +131,8 @@ ruff check .
 - Este aplicativo local não possui login próprio: mantenha o computador protegido e não exponha a porta na internet.
 - Use dados da empresa somente com autorização; respeite LGPD quando aplicável.
 - A função de backup está disponível em storage.backup(), mas agendamento e restauração automatizados não foram construídos.
+- O backup recusa um destino existente. A restauração foi exercitada abrindo uma cópia independente, sem substituir o banco em uso.
+- Os avisos de qualidade distinguem ausência de histórico, snapshots conflitantes e demanda não estimável. Uma venda positiva é preservada mesmo quando o snapshot do dia informa saldo zero.
 - A Curva ABC mede participação no consumo a custo, não receita; sem custos não informa valores inventados.
 - Não existe ainda política para lote mínimo, múltiplos de embalagem, calendário de fornecedor, demanda perdida nem datas específicas de pedidos em trânsito.
 - Previsão sazonal e ML são **evoluções futuras**, não funcionalidades concluídas.
@@ -137,3 +151,4 @@ ruff check .
 ## O que espero desse projeto
 
 Quero ganhar tempo para acompanhar o estoque e planejar as reposições, enquanto aprendo e melhoro o código aos poucos.
+
