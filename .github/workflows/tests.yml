@@ -131,15 +131,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
-      - name: Versionar ajustes revisados com a CLI
-        run: |
-          npx --yes supabase@2.122.0 migration new ajustes_validacao
-          python - <<'PY'
-          from pathlib import Path
-          destino = sorted(Path('supabase/migrations').glob('*_ajustes_validacao.sql'))[-1]
-          destino.write_text(Path('supabase/ajustes_validacao.sql').read_text())
-          print('MIGRACAO_GERADA=' + str(destino))
-          PY
       - name: Preparar Auth fictício e aplicar schema
         run: |
           psql -v ON_ERROR_STOP=1 -f tests/sql/bootstrap.sql

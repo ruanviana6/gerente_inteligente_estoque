@@ -538,13 +538,18 @@ def _configurar_relatorios(servico: Any, usuarios: list[dict]) -> None:
         selecionados = st.multiselect("Destinatários autorizados", list(candidatos),
                                       default=[u for u in configuracao.get("recipients", []) if u in candidatos],
                                       format_func=lambda uid: str(candidatos[uid].get("display_name", uid)))
+        dia = st.number_input("Dia do envio mensal", min_value=1, max_value=28,
+                              value=int(configuracao.get("send_day", 1)), step=1)
+        blocos = st.multiselect("Blocos autorizados do relatório", ["estoque", "reposicao", "tendencias", "financeiro"],
+                               default=configuracao.get("blocks", ["estoque", "reposicao", "tendencias"]))
         st.caption("A execução revalida conta ativa e reports.receive. Valores financeiros não são enviados por e-mail.")
         confirmado = st.checkbox("Autorizo estes destinatários para os envios reais quando o provedor estiver configurado.")
         if st.form_submit_button("Salvar rotina de relatórios"):
             if not simulado and not confirmado:
                 st.error("Confirme os destinatários antes de habilitar envios reais.")
             else:
-                servico.save_reports_config(enabled=habilitado, dry_run=simulado, recipients=selecionados)
+                servico.save_reports_config(enabled=habilitado, dry_run=simulado, recipients=selecionados,
+                                            blocks=blocos, send_day=int(dia))
                 st.success("Configuração salva. O agendador externo executa a rotina mensal.")
     st.caption("Padrão: dia 1, às 6h de America/Fortaleza. Provedor e remetente devem ser configurados fora do código.")
     _tabela(pd.DataFrame(servico.report_runs()))

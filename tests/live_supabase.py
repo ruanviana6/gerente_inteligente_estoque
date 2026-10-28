@@ -6,6 +6,7 @@ Execução separada: python -m pytest tests/live_supabase.py.
 
 import json
 import os
+import re
 import subprocess
 import time
 from urllib.error import HTTPError
@@ -42,9 +43,17 @@ def ambiente():
                          headers=dict(headers), method=method)
         try:
             with cliente.open(pedido, timeout=timeout) as resposta:
+                print("HTTP local:", method, urlsplit(url).path, resposta.status)
                 return HTTPResponse(resposta.status, resposta.read())
         except HTTPError as erro:
             codigo = erro.code
+            try:
+                detalhe = json.loads(erro.read())
+                identificador = detalhe.get("code", detalhe.get("error_code", ""))
+            except (ValueError, AttributeError):
+                identificador = ""
+            seguro = identificador if isinstance(identificador, str) and re.fullmatch(r"[A-Za-z0-9_]{1,40}", identificador) else ""
+            print("HTTP local:", method, urlsplit(url).path, codigo, seguro)
             erro.close()
             return HTTPResponse(codigo, b"")
 
