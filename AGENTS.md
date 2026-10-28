@@ -48,6 +48,12 @@
 - Atenção ao SMTP padrão do Supabase: não prometer envio de convites ou recuperação de senha para usuários externos sem configurar serviço compatível.
 - Consulte o plano atualizado em docs/PLANO_WEB_PRIVADO.md, que substitui a antiga sugestão de OIDC como login padrão.
 
+## Relatórios automáticos planejados
+- O plano futuro inclui relatório **mensal de vendas e estoque por e-mail**, com dados do mês anterior e controle do Master. Consulte `docs/RELATORIOS_EMAIL.md`.
+- Permissões específicas: `reports.view`, `reports.export`, `reports.receive`, `reports.manage`. Validar acesso do destinatário aos indicadores na geração e antes do envio; informação financeira exige `finance.view`.
+- Não enviar dados empresariais sem autorização. Não presumir que Supabase Auth envia e-mails de relatórios; exigir provedor de entrega e agendamento próprios, segredos protegidos, idempotência e histórico de falhas.
+- Não implementar nem ativar envios automáticos sem concluir autenticação, autorização e testes.
+
 ## Segurança e controle de alterações
 - Repositório público e futuro app web: **nunca** versionar dados comerciais, CSV reais, SQLite, backups, dados pessoais, notas fiscais, tokens ou `.env`.
 - Usar informações reais da empresa requer autorização; o futuro aplicativo web deve ser privado, com autenticação, autorização e dados protegidos. Não publicar o aplicativo SQLite atual como serviço real.
