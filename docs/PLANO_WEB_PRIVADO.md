@@ -2,6 +2,26 @@
 
 > Decisão de requisitos de 28/10/2026. Este documento é o escopo de segurança para o Codex; **não significa que os controles já foram implementados ou testados**.
 
+## Execução completa autorizada (28/10/2026)
+
+Foi solicitado **concluir todo o aplicativo web e colocar em funcionamento,
+com dados fictícios e segurança testada**, antes de fornecer a API GestãoClick.
+
+- Projeto Supabase **existente**, aprovado e na região certa:
+  `gerente-inteligente-estoque`, ref `csiqpzoudruzppfbpqqx`,
+  `sa-east-1` (São Paulo). Não criar segundo projeto.
+- O Codex deve seguir **`docs/EXECUCAO_CODEX.md`** para codificação,
+  migrações, login Master, UI Streamlit, insights, relatórios, CI e deploy.
+- Em seguida deve executar, como **tarefa independente**,
+  **`docs/REVISAO_FINAL_CODEX.md`**, revisando todo o código e novos
+  comportamentos com testes funcionais, negativos e de segurança.
+- A integração GestãoClick, envio/baixa de pedidos no ERP, NF-e e análises
+  avançadas de cestas e sazonalidade seguem **fora do escopo** até depois
+  da aprovação do web. O relatório mensal dentro do app deve funcionar
+  nesta fase; e-mail agendado exige provedor e remetente reais configurados.
+- Não declarar deploy concluído sem URL visitada e validada; etapas externas
+  bloqueadas exigem instruções mínimas ao proprietário, sem inventar êxito.
+
 ## Objetivo e arquitetura
 
 Um único Gerente Inteligente de Estoque, acessível no navegador por computador ou celular, para uso pessoal no trabalho e sem serviços pagos. A primeira tela após o login mostra um flash rotativo de **insights calculados** pelo motor: riscos, reposição, tendências e produtos parados.
