@@ -1,5 +1,19 @@
 # Contexto de continuidade para o Codex
 
+## Regra permanente: GestãoClick SEMPRE somente leitura
+
+**Regra do proprietário, inclusive depois da integração com a API:** o Gerente Inteligente de Estoque **nunca pode modificar nada no GestãoClick**. A integração será **unidirecional**: GestãoClick → Gerente (consulta/sincronização de dados), sem envio de comandos operacionais de volta ao ERP.
+
+- Permitido: autenticar-se na API autorizada, consultar produtos, saldo, vendas, pedidos, fornecedores e histórico que a API realmente disponibilizar; armazenar cópia analítica e snapshots no **próprio banco Supabase** do gerente.
+- Proibido em qualquer fase: criar, editar ou excluir produtos, preços, clientes, vendas, pedidos, status, reservas, movimentações, saldos, compras, notas fiscais ou qualquer outro objeto do GestãoClick. Não realizar baixa nem estorno no ERP.
+- Não implementar endpoints de escrita, rotinas de sincronização reversa, callbacks/webhooks que alterem o ERP, nem botões administrativos de "aplicar sugestão" no GestãoClick. Recomendações e simulações só geram informações e ações **internas ao gerente**.
+- Usar credencial de API com escopo somente leitura **se o GestãoClick disponibilizar**; em qualquer caso restringir o cliente de integração aos métodos/endpoints comprovadamente de consulta. Operações de escrita HTTP (POST/PUT/PATCH/DELETE para mutação) ficam bloqueadas na camada de integração.
+- Os status `em andamento`, `em separação` e `concretizada` são **observados**, nunca modificados pelo gerente. Quando a operação do ERP já descontou o estoque, o gerente não realiza segunda baixa.
+- Criar testes que verifiquem que as rotinas de importação/sincronização/relatórios/simulações **não disparam mutações na API**. Registrar erros e divergências no banco interno, para conferência humana no sistema oficial.
+- O sistema pode criar/alterar **seus próprios** usuários, permissões, indicadores, relatórios e histórico no Supabase. A proibição de escrita aplica-se ao **GestãoClick**, não ao banco interno do gerente.
+- Não interpretar "integração futura" como autorização futura para escrita. Nenhum componente deve prever escrita no GestãoClick como requisito ou atalho.
+
+
 > Documento de passagem entre planejamento em ChatGPT e implementação no Codex.
 > Atualização inicial: 28/10/2026. Este arquivo descreve **intenção e decisões**, não comprova testes executados.
 
@@ -89,7 +103,7 @@ Não é negócio independente nem substituição do ERP. É um **apoio individua
 
 1. **Custo zero como prioridade:** não contratar hospedagem, banco gerenciado, API paga ou serviço externo apenas por conveniência.
 2. **Versão inicial local:** Streamlit + Python + pandas/NumPy + SQLite. Não migrar prematuramente para React, FastAPI, PostgreSQL, microsserviços ou nuvem.
-3. **GestãoClick como fonte oficial futuramente:** a integração só ocorre após concluir/testar o sistema independente; iniciar **somente com leitura** e credenciais autorizadas. Não presumir endpoints, movimentações disponíveis, histórico completo ou limites.
+3. **GestãoClick como fonte oficial futuramente:** a integração só ocorre após concluir/testar o sistema independente; operar **exclusivamente por leitura, sem perspectiva de escrita** e credenciais autorizadas. Não presumir endpoints, movimentações disponíveis, histórico completo ou limites.
 4. **Demonstrar antes de conectar:** usar gerador fictício e importação CSV normalizada. Nunca colocar dados comerciais reais no GitHub.
 5. **Regras de estoque antes de Machine Learning:** as sugestões devem ser explicáveis, auditáveis e comparáveis com métodos simples.
 6. **A interface não calcula regras de negócio:** cálculos isolados no motor, dados em camada separada e persistência local.
