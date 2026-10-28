@@ -3,16 +3,23 @@
 import copy
 from datetime import date
 
+import pandas as pd
 import pytest
 
 from web.auth import AccessContext, Profile
 from web.errors import AuthorizationError, ServiceUnavailable
-from web.service import FINANCEIRO, Service, _dia, create_service, normalizar_payload
+from web.service import FINANCEIRO, Service, _dia, _registros, create_service, normalizar_payload
 
 MES = date(2020, 3, 1)
 FECHAMENTO = date(2020, 3, 31)
 USUARIO = "10000000-0000-0000-0000-000000000001"
 ORGANIZACAO = "20000000-0000-0000-0000-000000000001"
+
+
+def test_serializacao_preserva_custos_pequenos_sem_arredondar_para_zero():
+    """A serialização não altera os valores validados antes da persistência remota."""
+    tabela = pd.DataFrame({"custo_unitario": [1e-12, float("nan")]})
+    assert _registros(tabela) == [{"custo_unitario": 1e-12}, {"custo_unitario": None}]
 
 
 def payload_ficticio():

@@ -27,12 +27,9 @@ PERMISSOES = {
     "parameters.edit": "Editar parâmetros",
     "decisions.write": "Registrar decisões",
     "audit.view": "Consultar auditoria",
-    "users.manage": "Gerenciar usuários (Master)",
-    "permissions.manage": "Gerenciar permissões (Master)",
     "reports.view": "Consultar relatórios mensais",
     "reports.export": "Exportar relatórios",
     "reports.receive": "Receber relatórios autorizados",
-    "reports.manage": "Configurar relatórios (Master)",
 }
 
 COLUNAS_ESTOQUE = [
@@ -468,12 +465,14 @@ def _decisoes(servico: Any) -> None:
 
 
 def _permissoes_formulario(atuais: Mapping[str, bool] | None = None) -> dict[str, bool]:
-    """Explicita cada concessão; ausência de marcação revoga a funcionalidade."""
+    """Usa o perfil como ponto inicial ou permite concessões individuais explícitas."""
     atuais = atuais or {}
+    herdar = st.checkbox("Usar permissões iniciais do perfil", value=not bool(atuais))
     selecionadas = st.multiselect("Permissões concedidas", list(PERMISSOES),
                                  default=[p for p in PERMISSOES if atuais.get(p, False)],
                                  format_func=lambda p: f"{PERMISSOES[p]} ({p})")
-    return {permissao: permissao in selecionadas for permissao in PERMISSOES}
+    st.caption("Desmarque a opção acima para aplicar a seleção individual. Administração permanece exclusiva do Master.")
+    return {} if herdar else {permissao: permissao in selecionadas for permissao in PERMISSOES}
 
 
 def _administracao(servico: Any, contexto: Any) -> None:

@@ -3,7 +3,6 @@
 A fábrica é injetada no processo de teste, nunca por flag, URL ou segredo da
 aplicação. Os testes não consultam o Supabase nem disponibilizam login alternativo.
 """
-from types import SimpleNamespace
 from uuid import UUID
 
 import pandas as pd
@@ -111,6 +110,65 @@ def abrir(monkeypatch, servico=None, permissoes=("dashboard.view",), autenticado
     monkeypatch.setattr(web.service, "create_service", fabrica)
     app = AppTest.from_string(SCRIPT, default_timeout=30).run()
     return app, instancias
+
+
+class MasterFicticio(ServicoFicticio):
+    """Exercita os formulários administrativos com o contrato restritivo do banco."""
+
+    def __init__(self):
+        """Disponibiliza administração sem credenciais e registra as concessões."""
+        super().__init__({"dashboard.view", "users.manage", "permissions.manage", "reports.manage"})
+        self.alteracoes = []
+
+    def context(self):
+        """Retorna o papel protegido Master para esta sessão de teste."""
+        contexto = super().context()
+        return AccessContext(Profile(contexto.profile.user_id, ORGANIZACAO, "Master fictício", "Master", True),
+                             contexto.permissions)
+
+    def admin_list_users(self):
+        """Fornece uma conta administrável com permissões herdadas do perfil."""
+        return [{"user_id": str(UUID(int=102)), "display_name": "Operador fictício",
+                 "role": "Operador", "active": True, "permissions": {}}]
+
+    def admin_set_user(self, user_id, display_name, role, active, permissions):
+        """Rejeita as mesmas chaves reservadas que o banco não permite delegar."""
+        assert not {"users.manage", "permissions.manage", "reports.manage", "integrations.manage"} & permissions.keys()
+        self.alteracoes.append((user_id, display_name, role, active, permissions))
+
+    def reports_config(self):
+        """A configuração inicial não habilita nenhum envio."""
+        return {"enabled": False, "dry_run": True, "recipients": []}
+
+    def report_runs(self):
+        """Não houve trabalho externo de entrega nesta fixture."""
+        return []
+
+
+def test_master_edita_usuario_sem_enviar_permissoes_reservadas(monkeypatch):
+    """O formulário não envia nem mesmo false para as permissões não delegáveis."""
+    servico = MasterFicticio()
+    app, _ = abrir(monkeypatch, servico=servico)
+    app.sidebar.radio[0].set_value("Administração").run()
+    assert not app.exception
+    next(b for b in app.button if b.label == "Salvar acesso").click().run()
+    assert not app.exception
+    assert servico.alteracoes[-1][2] == "Operador"
+    assert servico.alteracoes[-1][-1] == {}
+
+
+def test_master_pode_definir_concessoes_individuais(monkeypatch):
+    """Desmarcar herança mantém só as funcionalidades selecionadas, sem gestão Master."""
+    servico = MasterFicticio()
+    app, _ = abrir(monkeypatch, servico=servico)
+    app.sidebar.radio[0].set_value("Administração").run()
+    next(c for c in app.checkbox if c.label == "Usar permissões iniciais do perfil").set_value(False)
+    next(m for m in app.multiselect if m.label == "Permissões concedidas").set_value(["inventory.view"])
+    next(b for b in app.button if b.label == "Salvar acesso").click().run()
+    assert not app.exception
+    permissoes = servico.alteracoes[-1][-1]
+    assert permissoes["inventory.view"] is True
+    assert permissoes["finance.view"] is False
 
 
 def test_sem_login_nao_consulta_dados_e_nao_oferece_cadastro(monkeypatch):
