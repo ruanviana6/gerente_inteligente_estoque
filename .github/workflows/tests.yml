@@ -21,7 +21,8 @@ jobs:
           python-version: ${{ matrix.python }}
           cache: pip
       - name: Dependencias
-        run: python -m pip install -r requirements.txt
+        # O runner traz setuptools antigo; a versão corrigida também é auditada.
+        run: python -m pip install -r requirements.txt setuptools==84.1.0
       - name: Testes
         run: python -m pytest -ra --junitxml=resultado-testes.xml
       - name: Lint principal
@@ -50,7 +51,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Instalar aplicativo e auditor
-        run: python -m pip install -r requirements.txt pip-audit==2.9.0
+        run: python -m pip install -r requirements.txt pip-audit==2.9.0 setuptools==84.1.0
       - name: Consultar vulnerabilidades conhecidas
         run: pip-audit --format=json --output=auditoria-dependencias.json
       - name: Resumir vulnerabilidades encontradas

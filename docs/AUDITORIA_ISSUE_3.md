@@ -115,7 +115,7 @@ ruff check .
 python -m pip check
 ```
 
-Um job separado consulta vulnerabilidades conhecidas com `pip-audit`. Os resultados e versões instaladas são artefatos do GitHub Actions. Não se presume ausência de vulnerabilidades antes de conferir esse job.
+Um job separado consulta vulnerabilidades conhecidas com `pip-audit`. Ele encontrou duas vulnerabilidades no ferramental pré-instalado do runner: `setuptools 79.0.1`, identificadores `PYSEC-2026-3447` (correção em 83.0.0) e `GHSA-xmj3-9gf7-h52w` (correção em 84.1.0). O CI passou a instalar explicitamente `setuptools==84.1.0`, sem ignorar alertas nem desativar a verificação. O pacote não é utilizado pelo código de estoque; a correção é no ambiente de construção/teste. Os resultados e versões instaladas são artefatos do GitHub Actions. O resultado da reexecução é registrado no PR.
 
 No ambiente local, pandas/NumPy estavam disponíveis; Pytest, Ruff e Streamlit não estavam instalados, e a tentativa de instalação não encontrou distribuições disponíveis no acesso permitido. As reproduções diretas Python, compilação e `git diff --check` foram executados ali. A suíte Pytest, AppTest e o servidor HTTP foram realmente executados **no GitHub Actions**, não no ambiente local.
 
