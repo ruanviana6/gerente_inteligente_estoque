@@ -6,13 +6,13 @@ estão em motor.py e persistência em storage.py. Não há acesso ao GestãoClic
 """
 from __future__ import annotations
 
-from datetime import date
+import sqlite3
 
 import pandas as pd
 import streamlit as st
 
-from dados import carregar_de_csv, gerar_dados_exemplo
-from motor import gerar_painel
+from dados import carregar_de_csv, exportar_csv_seguro, gerar_dados_exemplo, hoje_local
+from motor import gerar_painel, somar_valores_financeiros
 from storage import carregar_base, listar_decisoes, registrar_decisao, salvar_importacao
 
 st.set_page_config(
@@ -29,8 +29,8 @@ def moeda(valor: float) -> str:
 
 
 def exportar_csv(tabela: pd.DataFrame) -> bytes:
-    """Exporta lista usando separador brasileiro; não envia nada ao ERP."""
-    return tabela.to_csv(index=False, sep=";", decimal=",").encode("utf-8-sig")
+    """Exporta em formato brasileiro, neutralizando fórmulas vindas dos CSVs."""
+    return exportar_csv_seguro(tabela)
 
 
 def abrir_dados() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, str, bool]:
@@ -63,10 +63,16 @@ def abrir_dados() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, str, bool]:
                 p, v = carregar_de_csv(arquivo_p.getvalue(), arquivo_v.getvalue(), sep, decimal)
                 salvar_importacao(p, v)
                 st.sidebar.success("Importação concluída. Histórico diário registrado.")
-            except (ValueError, OSError) as erro:
+            except ValueError as erro:
                 st.sidebar.error(f"Importação rejeitada: {erro}")
+            except (sqlite3.Error, OSError):
+                st.sidebar.error("Não foi possível salvar a importação. Verifique o banco local e tente novamente.")
 
-    p, v, s, atualizado = carregar_base()
+    try:
+        p, v, s, atualizado = carregar_base()
+    except (sqlite3.Error, pd.errors.DatabaseError, OSError):
+        st.error("Não foi possível abrir o banco local. Verifique o arquivo e as permissões de acesso.")
+        st.stop()
     if p.empty:
         st.warning("Nenhum CSV importado. Selecione dois arquivos no menu lateral.")
         st.stop()
@@ -95,23 +101,30 @@ def painel_geral(painel: pd.DataFrame, origem: str) -> None:
     n_pedidos = int((painel["quantidade_sugerida"] > 0).sum())
     n_risco = int(painel["risco_prazo"].sum())
     com_custo = painel["capital_estoque"].notna()
-    capital = painel.loc[com_custo, "capital_estoque"].sum()
-    parado = painel.loc[com_custo & painel["status"].isin(["Parado", "Excesso"]), "capital_estoque"].sum()
+    capital = somar_valores_financeiros(painel.loc[com_custo, "capital_estoque"])
+    valores_parados = painel.loc[painel["status"].isin(["Parado", "Excesso"]), "capital_estoque"]
+    parado = 0.0 if valores_parados.empty else somar_valores_financeiros(valores_parados)
     a, b, c, d = st.columns(4)
     a.metric("Produtos com sugestão", n_pedidos)
     b.metric("Risco antes da entrega", n_risco)
     c.metric("Capital conhecido em estoque", moeda(capital) if com_custo.any() else "Não informado")
     d.metric("Capital em parados/excesso", moeda(parado) if com_custo.any() else "Não informado")
     if not com_custo.all():
-        st.info("Capital parcial: alguns produtos não possuem custo unitário.")
+        st.info("Capital parcial: há custos ausentes ou valores não calculáveis.")
+    if painel["financeiro_limite_excedido"].any():
+        st.warning("Valores financeiros fora do limite de cálculo. Revise os custos importados; totais e ABC podem estar indisponíveis.")
     if painel["dias_disponibilidade_desconhecida"].gt(0).any():
         st.info(
             "Médias são estimativas: faltam snapshots de disponibilidade em parte "
             "do histórico. Dias sem venda só são excluídos quando houve ruptura comprovada."
         )
+    if painel["requer_revisao"].any():
+        st.warning("Há produtos com histórico insuficiente ou disponibilidade incerta. Confira os avisos antes de decidir.")
+    if painel["abc_parcial"].any():
+        st.caption("A Curva ABC considera somente os custos conhecidos e pode estar incompleta.")
     st.markdown("**Atenções prioritárias**")
     cols = ["icone", "status", "nome", "fornecedor", "estoque",
-            "cobertura_dias", "prazo_entrega_dias", "risco_prazo", "quantidade_sugerida"]
+            "cobertura_dias", "prazo_entrega_dias", "risco_prazo", "quantidade_sugerida", "aviso_qualidade"]
     st.dataframe(
         painel.loc[painel["quantidade_sugerida"] > 0, cols].head(12),
         hide_index=True, use_container_width=True,
@@ -141,6 +154,7 @@ def lista_reposicao(painel: pd.DataFrame) -> None:
         "pedidos_pendentes", "venda_media_diaria", "cobertura_dias",
         "prazo_entrega_dias", "estoque_seguranca", "ponto_pedido",
         "posicao_estoque", "estoque_alvo", "risco_prazo", "quantidade_sugerida",
+        "demanda_estimavel", "requer_revisao", "aviso_qualidade",
     ]
     tabela = vista[colunas].rename(columns={
         "fornecedor": "Fornecedor", "codigo": "SKU", "nome": "Produto",
@@ -150,6 +164,8 @@ def lista_reposicao(painel: pd.DataFrame) -> None:
         "estoque_seguranca": "Segurança", "ponto_pedido": "Ponto de pedido",
         "posicao_estoque": "Posição", "estoque_alvo": "Alvo",
         "risco_prazo": "Risco no prazo", "quantidade_sugerida": "Pedir (un.)",
+        "demanda_estimavel": "Demanda estimável", "requer_revisao": "Revisão necessária",
+        "aviso_qualidade": "Limitações do cálculo",
     })
     st.dataframe(tabela, hide_index=True, use_container_width=True)
     st.download_button(
@@ -177,10 +193,12 @@ def detalhe_produto(
     item = painel.loc[painel["codigo"] == codigo].iloc[0]
     a, b, c, d = st.columns(4)
     a.metric("Estoque", int(item["estoque"]))
-    b.metric("Venda média/dia", f"{item['venda_media_diaria']:.2f}")
+    b.metric("Venda média/dia", f"{item['venda_media_diaria']:.2f}" if item["demanda_estimavel"] else "Não estimável")
     c.metric("Cobertura", f"{item['cobertura_dias']:.1f} dias"
              if pd.notna(item["cobertura_dias"]) else "Indefinida")
-    d.metric("Sugestão (un.)", int(item["quantidade_sugerida"]))
+    d.metric("Sugestão (un.)", int(item["quantidade_sugerida"]) if item["demanda_estimavel"] else "Revisar dados")
+    if item["requer_revisao"]:
+        st.warning(str(item["aviso_qualidade"]))
 
     st.markdown("**Explicação auditável da sugestão**")
     st.write(
@@ -210,7 +228,7 @@ def detalhe_produto(
     if int(item["dias_disponibilidade_desconhecida"]) > 0:
         st.caption("Há dias sem informação de disponibilidade. Previsão não é certeza.")
 
-    fim = pd.Timestamp.today().normalize()
+    fim = hoje_local()
     periodo = pd.date_range(fim - pd.Timedelta(days=89), fim)
     serie = (vendas.loc[vendas["codigo"] == codigo]
                   .groupby("data")["quantidade"].sum()
@@ -232,8 +250,13 @@ def detalhe_produto(
             acao = st.selectbox("Decisão", ["Avaliar compra", "Ignorar"])
             observacao = st.text_input("Observação opcional", max_chars=500)
             if st.form_submit_button("Registrar decisão"):
-                registrar_decisao(codigo, int(item["quantidade_sugerida"]), acao, observacao)
-                st.success("Feedback registrado localmente.")
+                try:
+                    registrar_decisao(codigo, int(item["quantidade_sugerida"]), acao, observacao)
+                    st.success("Feedback registrado localmente.")
+                except ValueError as erro:
+                    st.error(str(erro))
+                except (sqlite3.Error, OSError):
+                    st.error("Não foi possível registrar a decisão. Verifique o banco local e tente novamente.")
 
 
 def parados_excesso(painel: pd.DataFrame) -> None:
@@ -261,7 +284,7 @@ def tendencias(painel: pd.DataFrame) -> None:
     st.dataframe(
         painel[["nome", "venda_media_diaria", "media_longa",
                 "tendencia", "classe_abc", "dias_ruptura_conhecidos",
-                "dias_disponibilidade_desconhecida"]],
+                "dias_disponibilidade_desconhecida", "aviso_qualidade"]],
         hide_index=True, use_container_width=True,
     )
 
@@ -270,6 +293,7 @@ def main() -> None:
     """Monta a navegação do MVP; não executa operações no ERP."""
     st.title("📦 Gerente Inteligente de Estoque")
     st.caption("Entenda o risco. Saiba o que pedir. Decida com dados.")
+    st.warning("MVP local sem login ou permissões por usuário. Não publique esta versão com dados empresariais.")
     produtos, vendas, snapshots, origem, base_local = abrir_dados()
     painel = gerar_painel(produtos, vendas, snapshots)
     abas = st.tabs([
@@ -289,10 +313,14 @@ def main() -> None:
     with abas[5]:
         st.subheader("Histórico de decisões")
         if base_local:
-            st.dataframe(listar_decisoes(), hide_index=True, use_container_width=True)
+            try:
+                st.dataframe(listar_decisoes(), hide_index=True, use_container_width=True)
+            except (sqlite3.Error, pd.errors.DatabaseError, OSError):
+                st.error("Não foi possível consultar as decisões. Verifique o banco local e tente novamente.")
         else:
             st.info("O registro de decisões fica disponível no modo CSV local.")
 
 
 if __name__ == "__main__":
     main()
+

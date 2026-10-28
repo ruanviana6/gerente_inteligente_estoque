@@ -60,3 +60,4 @@
 
 ## Primeira tarefa recomendada
 Ao iniciar com este projeto, priorize uma **auditoria read-only** do estado real do repositório, validação dos testes e inicialização do Streamlit, antes de propor novas funcionalidades. Consulte `docs/CONTEXTO_CODEX.md` para o que já foi decidido.
+

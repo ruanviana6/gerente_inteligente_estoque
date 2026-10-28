@@ -6,14 +6,24 @@ do Git, com acesso restrito ao usuário autorizado.
 """
 from __future__ import annotations
 
-from contextlib import contextmanager
-from datetime import datetime
-from pathlib import Path
+import os
 import sqlite3
+from contextlib import closing, contextmanager
+from datetime import datetime
+from numbers import Integral
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from dados import COLUNAS_PRODUTOS, COLUNAS_VENDAS, COLUNAS_SNAPSHOTS
+from dados import (
+    COLUNAS_PRODUTOS,
+    COLUNAS_SNAPSHOTS,
+    COLUNAS_VENDAS,
+    validar_produtos,
+    validar_snapshots,
+    validar_vendas,
+)
 
 CAMINHO_PADRAO = Path("data/gerente.db")
 
@@ -85,17 +95,27 @@ def salvar_importacao(
     duplica quantidades. Exclui SKUs ausentes do novo catálogo explicitamente;
     o usuário deve importar o catálogo inteiro, nunca só uma página.
     """
+    # A camada de persistência também valida: scripts não precisam passar pela UI.
+    produtos = validar_produtos(produtos)
+    vendas = validar_vendas(vendas, produtos)
+    hoje = data_snapshot if data_snapshot is not None else datetime.now(ZoneInfo("America/Fortaleza")).date()
+    fotos = validar_snapshots(produtos[["codigo", "estoque"]].assign(data=hoje), produtos)
+    if not vendas.empty and vendas["data"].max() > fotos["data"].iloc[0]:
+        raise ValueError("O snapshot não pode ser anterior às vendas importadas.")
     inicializar(caminho)
-    hoje = pd.Timestamp(data_snapshot if data_snapshot is not None else pd.Timestamp.today()).normalize()
     with conexao(caminho) as db:
-        codigos = produtos["codigo"].tolist()
-        marcadores = ",".join(["?"] * len(codigos))
-        db.execute("DELETE FROM produtos WHERE codigo NOT IN (" + marcadores + ")", codigos)
+        # A tabela temporária evita o limite de parâmetros do SQLite em catálogos grandes.
+        db.execute("CREATE TEMP TABLE catalogo_importado (codigo TEXT PRIMARY KEY)")
+        db.executemany("INSERT INTO catalogo_importado VALUES (?)", [(c,) for c in produtos["codigo"]])
+        db.execute("DELETE FROM produtos WHERE codigo NOT IN (SELECT codigo FROM catalogo_importado)")
         for p in produtos.itertuples(index=False):
             valores = [None if pd.isna(getattr(p, c)) else getattr(p, c)
                        for c in COLUNAS_PRODUTOS]
             db.execute("""
-                INSERT INTO produtos VALUES (?,?,?,?,?,?,?,?,?,?)
+                INSERT INTO produtos (
+                  codigo,nome,estoque,fornecedor,custo_unitario,prazo_entrega_dias,
+                  estoque_seguranca,pedidos_pendentes,reservas,cobertura_alvo_dias
+                ) VALUES (?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(codigo) DO UPDATE SET
                   nome=excluded.nome, estoque=excluded.estoque,
                   fornecedor=excluded.fornecedor, custo_unitario=excluded.custo_unitario,
@@ -114,12 +134,12 @@ def salvar_importacao(
         db.executemany(
             """INSERT INTO snapshots(data,codigo,estoque) VALUES (?,?,?)
                ON CONFLICT(data,codigo) DO UPDATE SET estoque=excluded.estoque""",
-            [(str(hoje.date()), p.codigo, int(p.estoque))
-             for p in produtos.itertuples(index=False)],
+            [(str(f.data.date()), f.codigo, int(f.estoque))
+             for f in fotos.itertuples(index=False)],
         )
         db.execute(
             "INSERT OR REPLACE INTO metadados(chave,valor) VALUES ('importado_em',?)",
-            (datetime.now().astimezone().isoformat(timespec="seconds"),),
+            (datetime.now(ZoneInfo("America/Fortaleza")).isoformat(timespec="seconds"),),
         )
 
 
@@ -129,6 +149,8 @@ def carregar_base(
     """Carrega uma cópia independente dos dados para cálculos e interface."""
     inicializar(caminho)
     with conexao(caminho) as db:
+        # Todas as leituras pertencem à mesma versão, mesmo durante outra importação.
+        db.execute("BEGIN")
         p = pd.read_sql_query("SELECT * FROM produtos ORDER BY codigo", db)
         v = pd.read_sql_query("SELECT data,codigo,quantidade FROM vendas_diarias", db)
         s = pd.read_sql_query("SELECT data,codigo,estoque FROM snapshots", db)
@@ -147,15 +169,27 @@ def registrar_decisao(
     caminho: Path = CAMINHO_PADRAO,
 ) -> None:
     """Grava feedback humano; não efetua compra nem modifica o estoque."""
-    if acao not in ("Avaliar compra", "Ignorar") or quantidade < 0:
+    if (
+        acao not in ("Avaliar compra", "Ignorar")
+        or isinstance(quantidade, bool)
+        or not isinstance(quantidade, Integral)
+        or not 0 <= quantidade <= 2_147_483_647
+    ):
         raise ValueError("Decisão inválida.")
+    if not isinstance(codigo, str) or not codigo.strip():
+        raise ValueError("Informe um código de produto válido.")
+    if not isinstance(observacao, str) or len(observacao) > 500:
+        raise ValueError("A observação deve ser texto com até 500 caracteres.")
+    codigo = codigo.strip()
     inicializar(caminho)
     with conexao(caminho) as db:
+        if not db.execute("SELECT 1 FROM produtos WHERE codigo=?", (codigo,)).fetchone():
+            raise ValueError("Produto não encontrado para registrar a decisão.")
         db.execute(
             "INSERT INTO decisoes(data_hora,codigo,quantidade_sugerida,acao,observacao) "
             "VALUES (?,?,?,?,?)",
-            (datetime.now().astimezone().isoformat(timespec="seconds"),
-             codigo, quantidade, acao, observacao[:500]),
+            (datetime.now(ZoneInfo("America/Fortaleza")).isoformat(timespec="seconds"),
+             codigo, int(quantidade), acao, observacao),
         )
 
 
@@ -170,11 +204,29 @@ def listar_decisoes(caminho: Path = CAMINHO_PADRAO) -> pd.DataFrame:
 
 
 def backup(caminho: Path = CAMINHO_PADRAO, destino: Path | None = None) -> Path:
-    """Cria backup consistente pelo mecanismo nativo do SQLite."""
-    if not Path(caminho).exists():
+    """Cria cópia consistente, recusando sobrescrita e acesso amplo ao arquivo.
+
+    A origem é aberta em modo somente leitura. A criação exclusiva do destino
+    evita perder backups anteriores; em caso de falha, remove só a cópia nova.
+    """
+    caminho = Path(caminho)
+    if not caminho.is_file():
         raise FileNotFoundError("Banco inexistente.")
-    destino = destino or Path("backups") / ("estoque_" + datetime.now().strftime("%Y%m%d_%H%M%S") + ".db")
+    destino = Path(destino) if destino is not None else Path("backups") / (
+        "estoque_" + datetime.now().strftime("%Y%m%d_%H%M%S_%f") + ".db"
+    )
+    if caminho.resolve() == destino.resolve():
+        raise ValueError("O backup precisa de um destino diferente da origem.")
     destino.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(caminho) as origem, sqlite3.connect(destino) as copia:
-        origem.backup(copia)
+    # Não use exists() antes de abrir: outra execução poderia criar o arquivo nesse intervalo.
+    descritor = os.open(destino, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    os.close(descritor)
+    try:
+        with closing(sqlite3.connect(caminho.resolve().as_uri() + "?mode=ro", uri=True)) as origem:
+            with closing(sqlite3.connect(destino)) as copia:
+                origem.backup(copia)
+    except Exception:
+        destino.unlink(missing_ok=True)
+        raise
     return destino
+

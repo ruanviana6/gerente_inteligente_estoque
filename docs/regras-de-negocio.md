@@ -2,6 +2,8 @@
 
 O GestãoClick será a fonte da verdade após a integração; o MVP só trabalha com dados simulados e CSV normalizado.
 
+A integração futura será sempre somente leitura. Nenhum componente pode criar, editar ou excluir objetos ou movimentos no GestãoClick; consultas futuras também dependem de autorização. A regra permanente está no `AGENTS.md`.
+
 - Média diária: soma de unidades vendidas / dias elegíveis da janela.
 - Dias comprovadamente sem estoque não entram na média; dias sem foto de estoque contam, mas são sinalizados como disponibilidade desconhecida.
 - Cobertura: estoque / demanda média; quando média = 0, não há cobertura numérica.
@@ -16,3 +18,14 @@ O GestãoClick será a fonte da verdade após a integração; o MVP só trabalha
 - Uma sugestão de compra nunca cria um pedido automaticamente.
 - A importação é total; jamais importe CSV incremental como se fosse histórico completo.
 - Produtos novos, dias de estoque desconhecido e dados incompletos precisam de revisão humana.
+
+## Precisões validadas na auditoria da Issue #3
+
+- Snapshot diário zero não descreve necessariamente todas as horas: se existe venda positiva no mesmo dia, preservamos essa venda e mantemos o dia elegível, com aviso de conflito. Sem venda positiva, o saldo zero exclui o dia segundo o contrato atual.
+- Sem nenhum dia elegível, a demanda é **não estimável** e o status é **Dados insuficientes**. O zero interno mantido nas fórmulas não prova ausência de demanda ou de risco. A interface pede revisão; a exportação inclui a limitação.
+- Quantidade zero não é uma venda positiva e não altera a data da última venda real.
+- Uma primeira venda recente gera aviso de histórico curto. Não inferimos início da operação ou fechamento mensal a partir dela, nem inventamos demanda perdida.
+- Curva ABC parcial é relativa aos produtos com custo conhecido. Empates usam SKU para classificação estável. Ela mede consumo a custo, não faturamento.
+- Datas civis usam `America/Fortaleza`; CSV aceita datas ISO e brasileiras explicitamente, sem inferência de dia e mês.
+- Importação completa remove SKUs ausentes e seus registros dependentes no SQLite. Dados mensais históricos completos exigirão uma política própria na implementação web.
+

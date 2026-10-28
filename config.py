@@ -3,7 +3,9 @@
 Altere estas constantes para ajustar as políticas do protótipo. Os parâmetros
 individuais de cada produto (prazo, segurança, reservas etc.) têm prioridade.
 """
+import math
 from dataclasses import dataclass
+from numbers import Integral, Real
 
 JANELA_VENDA_DIAS = 30
 JANELA_TENDENCIA_DIAS = 90
@@ -34,12 +36,18 @@ class Configuracao:
 
     def __post_init__(self) -> None:
         """Impede parâmetros sem sentido antes de processar indicadores."""
-        if min(
+        inteiros = (
             self.janela_venda, self.janela_tendencia, self.dias_parado,
             self.excesso_dias, self.cobertura_alvo,
-        ) <= 0:
-            raise ValueError("Janelas e coberturas devem ser positivas.")
+        )
+        if any(isinstance(valor, bool) or not isinstance(valor, Integral)
+               or valor <= 0 for valor in inteiros):
+            raise ValueError("Janelas e coberturas devem ser inteiras e positivas.")
         if self.janela_tendencia <= self.janela_venda:
             raise ValueError("A janela longa deve superar a curta.")
-        if self.limite_tendencia_pct < 0:
-            raise ValueError("O limite de tendência não pode ser negativo.")
+        if (isinstance(self.limite_tendencia_pct, bool)
+                or not isinstance(self.limite_tendencia_pct, Real)
+                or not math.isfinite(self.limite_tendencia_pct)
+                or self.limite_tendencia_pct < 0):
+            raise ValueError("O limite de tendência deve ser finito e não negativo.")
+
