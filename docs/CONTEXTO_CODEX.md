@@ -3,6 +3,18 @@
 > Documento de passagem entre planejamento em ChatGPT e implementação no Codex.
 > Atualização inicial: 28/10/2026. Este arquivo descreve **intenção e decisões**, não comprova testes executados.
 
+## Planejamento de relatórios por e-mail (28/10/2026)
+
+Foi adicionada uma etapa futura de **envio mensal automático** dos indicadores
+de estoque e vendas. Usar o e-mail do usuário autorizado, com controle pelo
+Master dos destinatários, periodicidade e permissões. O mês anterior é o
+período padrão; o relatório deve destacar mais vendidos, riscos, parados e
+tendências. Custos apenas quando houver dados e acesso financeiro permitido.
+
+O agendamento e o provedor de envio são externos ao login Supabase Auth.
+Implementar apenas depois da migração para PostgreSQL, sistema de acesso e
+proteção de dados. **Consulte `docs/RELATORIOS_EMAIL.md` antes de codificar.**
+
 ## Decisão de segurança (28/10/2026)
 
 O usuário escolheu **login com senha e permissões controladas por ele como Master**.
