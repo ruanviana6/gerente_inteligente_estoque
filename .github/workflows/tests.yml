@@ -53,6 +53,20 @@ jobs:
         run: python -m pip install -r requirements.txt pip-audit==2.9.0
       - name: Consultar vulnerabilidades conhecidas
         run: pip-audit --format=json --output=auditoria-dependencias.json
+      - name: Resumir vulnerabilidades encontradas
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          arquivo = Path("auditoria-dependencias.json")
+          if arquivo.exists():
+              for pacote in json.loads(arquivo.read_text()).get("dependencies", []):
+                  for falha in pacote.get("vulns", []):
+                      print(pacote["name"], pacote["version"], falha["id"], "Correções:", falha.get("fix_versions", []))
+          else:
+              print("Auditor não produziu relatório; consultar a falha da etapa anterior.")
+          PY
       - name: Guardar resultado da auditoria de dependências
         if: always()
         uses: actions/upload-artifact@v4
