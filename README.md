@@ -10,7 +10,7 @@ O desenvolvimento acontece com apoio de IA e Vibe Coding: eu defini o problema e
 
 A aplicação tem uma única entrada, **app.py**, em Streamlit, com Supabase Auth e PostgreSQL. O projeto Supabase utilizado é o já existente em São Paulo, csiqpzoudruzppfbpqqx. SQLite fica apenas como referência técnica do MVP e suporte aos seus testes de regressão; não armazena os dados da web.
 
-O código da versão web está no [PR #5](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/5), incorporando as correções auditadas do PR #4. O endereço informado pelo proprietário é [estoqueinteligente-flatter.streamlit.app](https://estoqueinteligente-flatter.streamlit.app/). A reformulação Flatter da Issue #6 fica em branch própria para revisão, sem publicação automática. Testar a candidata em CI não comprova o funcionamento autenticado desse endereço.
+O código da versão web está no [PR #5](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/5), incorporando as correções auditadas do PR #4. O endereço informado pelo proprietário é [estoqueinteligente-flatter.streamlit.app](https://estoqueinteligente-flatter.streamlit.app/). A reformulação Flatter da Issue #6 está no [PR #7](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/7), em branch própria para revisão e sem publicação automática. Testar a candidata em CI não comprova o funcionamento autenticado desse endereço.
 
 ## O que o aplicativo faz
 
