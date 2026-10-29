@@ -10,19 +10,22 @@ O desenvolvimento acontece com apoio de IA e Vibe Coding: eu defini o problema e
 
 A aplicação tem uma única entrada, **app.py**, em Streamlit, com Supabase Auth e PostgreSQL. O projeto Supabase utilizado é o já existente em São Paulo, csiqpzoudruzppfbpqqx. SQLite fica apenas como referência técnica do MVP e suporte aos seus testes de regressão; não armazena os dados da web.
 
-O código da versão web está no [PR #5](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/5), incorporando as correções auditadas do PR #4. **A publicação e o login com a conta do proprietário dependem da configuração protegida descrita no guia. Não há URL publicada declarada como validada neste README.**
+O código da versão web está no [PR #5](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/5), incorporando as correções auditadas do PR #4. O endereço informado pelo proprietário é [estoqueinteligente-flatter.streamlit.app](https://estoqueinteligente-flatter.streamlit.app/). A reformulação Flatter da Issue #6 está no [PR #7](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/7), em branch própria para revisão e sem publicação automática. Testar a candidata em CI não comprova o funcionamento autenticado desse endereço.
 
 ## O que o aplicativo faz
 
 - Login por e-mail e senha, logout, renovação de sessão e fluxo de recuperação por código do Supabase.
 - Conta Master criada por procedimento administrativo, sem senha padrão e sem promoção pela interface.
 - Perfis Administrador, Operador e Visualizador, com concessões e revogações individuais. Desativação e permissões são verificadas no backend e no banco.
-- Painel com indicadores, avisos de qualidade e flash rotativo de insights calculados.
+- Interface Flatter para computador e celular, com menu recolhível, cartões e prioridades que levam aos filtros correspondentes.
+- Painel com indicadores, avisos de qualidade e insights com avanço manual, aproveitando a mesma base autorizada.
+- Tabelas paginadas e gráficos do produto carregados quando solicitados.
 - Estoque, filtros por fornecedor, histórico de vendas e snapshots, detalhes do produto e memória do cálculo.
 - Cobertura, risco durante o prazo do fornecedor, reposição, tendências e Curva ABC a custo quando autorizada.
 - Importação CSV completa e transacional. Cada lote preserva sua versão do catálogo, vendas e custos; uma repetição idêntica não duplica o histórico.
 - Parâmetros de reposição e registro de decisões internas, sem compras automáticas.
-- Relatórios de mês fechado, visualização e exportação autorizadas, com comparação anterior quando há dados comparáveis.
+- Relatórios de mês fechado gerados por ação explícita, com comparação anterior quando há dados comparáveis.
+- CSV preparado somente após o clique e nova autorização. O botão Salvar CSV entrega o arquivo já preparado, sem link remoto compartilhado entre sessões.
 - Agendador separado do Streamlit, com simulação, destinatários controlados, histórico, limite de tentativas e proteção contra duplicidade. E-mail real exige configuração e autorização adicionais.
 
 Custos ficam em tabela separada e exigem **finance.view**. O navegador não concede permissões por conta própria. As consultas comuns usam o JWT individual, sem chave administrativa. Usuários sem **inventory.view** acessam seus módulos pelo backend, protegido também por um segredo exclusivo da organização. Esse segredo fica no servidor e não concede permissões ao usuário. Sessões e dados não são compartilhados em cache global.
@@ -64,7 +67,10 @@ A exportação neutraliza textos que poderiam executar fórmulas em planilhas. D
 
 | Arquivo ou diretório | Responsabilidade |
 | --- | --- |
-| app.py / web/ui.py | Entrada única e interface |
+| app.py / web/ui.py | Entrada, sessão e navegação |
+| web/pages.py / web/theme.py | Páginas, componentes e identidade Flatter |
+| web/downloads.py | Entrega do CSV autorizado à página |
+| web/telemetry.py | Tempos opcionais sem dados identificáveis |
 | web/auth.py / web/api.py | Sessões, Auth e chamadas autorizadas |
 | web/service.py | Coordenação, validação e autorização por operação |
 | dados.py / motor.py / config.py | Validação e cálculos auditados |
@@ -92,9 +98,13 @@ Ative o ambiente virtual antes de instalar. Configure os Secrets localmente, for
 
 O GitHub Actions executa Python 3.11/3.12, Ruff, auditoria de dependências, PostgreSQL 17, backup/restauração e integração local com Supabase. Os resultados comprovados, as limitações e as pendências estão no [registro da entrega](docs/ENTREGA_WEB.md) e nos checks do PR #5. As fixtures do MVP preservam testes anteriores; não são outra aplicação para operação diária.
 
+## Interface e desempenho Flatter
+
+A [documentação da interface](docs/UX_FLATTER.md) explica as cores, a marca em texto e a organização das páginas. O [comparativo de desempenho](docs/DESEMPENHO_FLATTER.md) registra o método, os resultados e os limites das medições com dados fictícios. O motor foi otimizado preservando os resultados e as regras de estoque; nenhuma migração ou configuração produtiva do Supabase foi alterada nesta etapa.
+
 ## Limites e próximos passos
 
-A implantação ainda precisa ser verificada pela URL real. O envio de e-mail permanece em simulação até autorização e configuração do provedor. O cadastro público deve ser desligado no painel Auth; os testes do ambiente descartável não alteram automaticamente essa configuração externa.
+O acesso autenticado na URL publicada precisa de validação do proprietário após a revisão e publicação autorizadas da candidata. O envio de e-mail permanece em simulação até autorização e configuração do provedor. O cadastro público deve ser desligado no painel Auth; os testes do ambiente descartável não alteram automaticamente essa configuração externa.
 
 Depois da implementação e da ativação, será feita a auditoria independente da Issue #3. Dados empresariais só podem ser usados com autorização e validação apropriadas. GestãoClick, NF-e, compras automáticas, associação de produtos e previsão sazonal avançada continuam fora desta etapa.
 
