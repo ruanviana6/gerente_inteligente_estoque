@@ -1,0 +1,41 @@
+name: Desempenho e interface Flatter
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  desempenho:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Instalar dependências de teste
+        run: python -m pip install -r requirements.txt setuptools==84.1.0
+      - name: Preparar cópia imutável da versão publicada
+        run: |
+          mkdir -p /tmp/flatter-base evidencias/desempenho
+          git archive 5f4856384167d7100dfedc0f5d4fcefa94f28c03 | tar -x -C /tmp/flatter-base
+          python -m pip freeze > evidencias/desempenho/dependencias.txt
+      - name: Medir interface anterior com transporte fictício
+        run: >-
+          python scripts/benchmark_flatter.py --repository /tmp/flatter-base
+          --mode ui --sizes 100 1200 --iterations 5 --latency-ms 40
+          --output evidencias/desempenho/antes.json
+      - name: Medir interface candidata nas mesmas condições
+        run: >-
+          python scripts/benchmark_flatter.py --repository .
+          --mode ui --sizes 100 1200 --iterations 5 --latency-ms 40
+          --output evidencias/desempenho/depois.json
+      - name: Guardar medições reproduzíveis sem dados comerciais
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: desempenho-flatter
+          path: evidencias/desempenho/
