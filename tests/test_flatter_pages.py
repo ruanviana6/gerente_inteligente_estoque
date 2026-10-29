@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import copy
+from datetime import timedelta
 import re
 from dataclasses import replace
 
@@ -72,6 +73,19 @@ def test_relatorio_financeiro_parcial_mostra_limitacao(monkeypatch):
     next(b for b in app.button if b.label == "Gerar relatório").click().run()
     assert not app.exception
     assert any("Capital parcial" in aviso.value for aviso in app.warning)
+
+
+def test_csv_utiliza_mes_alterado_sem_gerar_visualizacao_antes(monkeypatch):
+    """Mudar a referência e preparar CSV não pode exportar o mês anterior do widget."""
+    servico = ServicoRelatoriosFicticio(["reports.view", "reports.export"])
+    app, _ = abrir(monkeypatch, servico)
+    mes = (app.date_input[0].value - timedelta(days=35)).replace(day=1)
+    app.date_input[0].set_value(mes).run()
+    next(b for b in app.button if b.label == "Preparar CSV do relatório").click().run()
+    assert not app.exception
+    assert servico.relatorios == 0
+    assert servico.exportacoes == 1
+    assert servico.callbacks[-1] == ("monthly", {"month": mes.isoformat()})
 
 
 def test_limpar_filtros_restaura_catalogo_visivel(monkeypatch):

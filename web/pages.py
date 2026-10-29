@@ -425,10 +425,12 @@ def _relatorios(servico: Any, contexto: Any) -> None:
     """Gera somente o mês solicitado, sem guardar relatório ou bytes na sessão."""
     page_header("Relatório mensal", "Fechamento confiável, comparação explicável e acesso controlado.")
     anterior = hoje_local().replace(day=1) - pd.Timedelta(days=1)
-    with st.form("gerar_relatorio_mensal"):
+    # A data fica fora de um formulário: preparar CSV deve receber também uma
+    # alteração de mês que ainda não foi usada para visualizar o relatório.
+    with surface("relatorio_filtros"):
         mes = st.date_input("Mês de referência", value=anterior.date(), max_value=anterior.date()).replace(day=1)
         st.caption("Exige histórico completo do período e fotografia de estoque no último dia do mês.")
-        gerar = st.form_submit_button("Gerar relatório", type="primary")
+        gerar = st.button("Gerar relatório", type="primary")
     # O botão de exportação é independente do resultado momentâneo do formulário.
     # Assim seu clique continua disponível no rerun, sem reter relatório ou CSV.
     if contexto.can("reports.export"):

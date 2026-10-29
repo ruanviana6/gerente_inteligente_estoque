@@ -171,7 +171,7 @@ def surface(key: str, *, tone: Tone = "neutral", width: Width = "stretch") -> An
 
 def metric_card(
     label: str, value: Any, *, key: str, help: str | None = None,
-    note: str | None = None, tone: Tone = "neutral", width: Width = 240,
+    note: str | None = None, tone: Tone = "neutral", width: Width = 220,
 ) -> None:
     """Mostra um indicador já calculado; o rótulo explica o significado da cor."""
     with st.container(border=False, key=_component_key("metric", key, tone), width=width):

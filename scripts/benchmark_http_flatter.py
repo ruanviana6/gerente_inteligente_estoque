@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from web.api import _HTTPTransport, _NoRedirect, _http_request  # noqa: E402
+from web.api import _http_request, _HTTPTransport, _NoRedirect  # noqa: E402
 from web.settings import PROJECT_URL  # noqa: E402
 
 

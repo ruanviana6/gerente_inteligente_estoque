@@ -103,8 +103,14 @@ def fechar_menu(pagina) -> None:
 
 def navegar(pagina, destino: str) -> None:
     """Aciona a navegação real da aplicação por rótulo acessível."""
+    from playwright.sync_api import expect
+
     abrir_menu(pagina)
-    pagina.get_by_role("radio", name=destino, exact=True).check()
+    grupo = pagina.get_by_role("radiogroup", name="Navegação", exact=True)
+    # O input nativo fica sob o alvo visual do React Aria. Clicar o rótulo
+    # reproduz o toque real e evita forçar uma interação em elemento encoberto.
+    grupo.get_by_text(destino, exact=True).click()
+    expect(grupo.get_by_role("radio", name=destino, exact=True)).to_be_checked()
     titulos = {"Painel": "Visão geral", "Estoque": "Estoque e histórico",
                "Reposição": "Reposição por fornecedor", "Relatórios": "Relatório mensal",
                "Administração": "Administração"}
@@ -187,6 +193,8 @@ def conferir_perfil(pagina, perfil: str) -> None:
 def verificar_fluxos(browser, base: str, destino: Path, controle: Path, estrito: bool,
                      miniaturas: bool) -> dict:
     """Exercita telas, dois tamanhos, quatro perfis e revogação em sessões independentes."""
+    from playwright.sync_api import expect
+
     resultados: dict = {"telas": {}, "fluxos": {}, "limitacoes": [
         "UI real com transporte fictício; Auth remoto e RLS são testados por suítes separadas.",
         "Contagem de alvos pequenos inclui controles nativos e não equivale a auditoria WCAG integral.",
@@ -217,7 +225,8 @@ def verificar_fluxos(browser, base: str, destino: Path, controle: Path, estrito:
             aguardar_tela(pagina)
             pagina.get_by_text("SKU FT-00002", exact=False).wait_for()
             graficos = pagina.get_by_label("Mostrar gráficos do produto", exact=True)
-            graficos.check()
+            pagina.get_by_text("Mostrar gráficos do produto", exact=True).click()
+            expect(graficos).to_be_checked()
             pagina.get_by_text("Snapshots registrados", exact=True).wait_for()
             aguardar_tela(pagina)
             pagina.get_by_role("heading", name="Produto fictício 0002", exact=True).scroll_into_view_if_needed()
