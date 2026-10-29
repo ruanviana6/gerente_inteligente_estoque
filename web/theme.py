@@ -101,6 +101,9 @@ STYLES = """
 [class*="st-key-flatter_"] [role="combobox"] {
     min-height: 2.75rem;
 }
+[class*="st-key-flatter_"] button {
+    min-width: 2.75rem;
+}
 [class*="st-key-flatter_"] button:focus-visible,
 [class*="st-key-flatter_"] input:focus-visible,
 [class*="st-key-flatter_"] [role="combobox"]:focus-visible {

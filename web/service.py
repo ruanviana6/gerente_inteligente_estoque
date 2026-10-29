@@ -4,9 +4,11 @@ from __future__ import annotations
 import json
 import os
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import date
+from functools import wraps
 from typing import Any, MutableMapping
 
 import pandas as pd
@@ -88,6 +90,16 @@ def normalizar_payload(payload: dict, financeiro: bool = False) -> dict:
             "imports": payload.get("imports", []), "metadata": payload.get("metadata", {})}
 
 
+def _operation(method: Callable) -> Callable:
+    """Impede troca de identidade local entre etapas de uma operação da fachada."""
+    @wraps(method)
+    def protected(self, *args, **kwargs):
+        """Usa o lock exclusivo da sessão, sem bloquear outros navegadores."""
+        with self.auth.operation():
+            return method(self, *args, **kwargs)
+    return protected
+
+
 class Service:
     """Fachada de uma sessão: cada operação consulta a autorização vigente."""
 
@@ -95,26 +107,42 @@ class Service:
         """Recebe uma instância exclusiva de autenticação, sem cache global."""
         self.auth = auth
 
-    def execution(self):
-        """Abre o escopo curto de Auth sem guardar dados ou permissões entre reruns."""
-        return self.auth.execution()
+    @contextmanager
+    def execution(self) -> Iterator[None]:
+        """Mantém a identidade estável até terminar o rerun ou fragmento atual.
+
+        O lock abrange consulta, cálculo e apresentação. Sem isso, um login em
+        outra thread poderia trocar a sessão entre a resposta RPC e a saída.
+        Não se guardam dados nem permissões entre execuções.
+        """
+        with self.auth.operation(), self.auth.execution():
+            yield
 
     def context(self):
         """Reconsulta identidade, estado da conta e permissões no servidor."""
         return self.auth.context()
 
+    @_operation
     def load_inventory(self, module: str, month: object | None = None) -> dict:
         """Obtém somente o lote permitido e calcula indicadores com o mesmo motor."""
         if module not in MODULOS:
             raise AuthorizationError("Funcionalidade não autorizada.")
         with measure("load_inventory"):
-            payload = self.auth.rpc("load_inventory", {
+            payload, original = self.auth.rpc_with_context("load_inventory", {
                 "p_module": module, "p_month": _dia(month).isoformat() if month is not None else None,
             }, module)
-        # A permissão do módulo também precisa continuar vigente após a leitura.
+        resultado = normalizar_payload(payload, original.can("finance.view"))
+        # A consulta final acontece depois do motor: não entregar dados cuja
+        # autorização mudou durante uma operação potencialmente demorada.
         contexto = self.auth.require(module)
-        return normalizar_payload(payload, contexto.can("finance.view"))
+        self._same_identity(original, contexto)
+        if not contexto.can("finance.view"):
+            for name in ("products", "panel"):
+                resultado[name] = resultado[name].drop(columns=list(FINANCEIRO), errors="ignore")
+        resultado["_access_context"] = contexto
+        return resultado
 
+    @_operation
     def _import_frames(self, produtos, vendas, snapshot_date, period_start, period_end):
         """Valida a abrangência declarada antes de enviar um lote transacional."""
         contexto = self.auth.require("inventory.import")
@@ -131,6 +159,7 @@ class Service:
             "p_period_end": fim.isoformat(),
         }, "inventory.import")
 
+    @_operation
     def import_csv(self, products: bytes, sales: bytes, snapshot_date, period_start, period_end,
                    separator: str = ";", decimal: str = ","):
         """Importa CSV completo usando as validações e limites aprovados no PR #4."""
@@ -138,6 +167,7 @@ class Service:
         produtos, vendas = carregar_de_csv(products, sales, separator, decimal)
         return self._import_frames(produtos, vendas, snapshot_date, period_start, period_end)
 
+    @_operation
     def import_demo(self, snapshot_date, period_start=None, period_end=None):
         """Gera um lote fictício apenas para um Master autenticado e autorizado."""
         contexto = self.auth.require("inventory.import")
@@ -165,9 +195,10 @@ class Service:
         """Lista decisões com escopo definido no banco, sem identificador manipulável."""
         return self.auth.rpc("list_decisions", {}, "decisions.write")
 
+    @_operation
     def export_replenishment(self, filters: dict | None = None) -> bytes:
         """Reconsulta a autorização e os dados antes de gerar um CSV permitido."""
-        self.auth.require("replenishment.export")
+        original = self.auth.require("replenishment.export")
         tabela = self.load_inventory("replenishment.view")["panel"]
         filtros = filters or {}
         if not tabela.empty and filtros.get("somente_sugestao", True):
@@ -189,20 +220,23 @@ class Service:
             elif prioridade == "qualidade":
                 tabela = tabela.loc[tabela["requer_revisao"]]
         contexto = self.auth.require("replenishment.export")
+        self._same_identity(original, contexto)
         if not contexto.can("replenishment.view"):
             raise AuthorizationError("O acesso à reposição foi revogado.")
         if not contexto.can("finance.view"):
             tabela = tabela.drop(columns=list(FINANCEIRO), errors="ignore")
         return exportar_csv_seguro(tabela)
 
+    @_operation
     def monthly_report(self, month):
         """Gera relatório de mês fechado com lotes históricos e permissões atuais."""
         from web.reports import filtrar_relatorio, gerar_relatorio_mensal
 
         mes = _dia(month).replace(day=1)
         with measure("load_inventory"):
-            payload = self.auth.rpc("load_inventory", {"p_module": "reports.view", "p_month": mes.isoformat()},
-                                    "reports.view")
+            payload, original = self.auth.rpc_with_context(
+                "load_inventory", {"p_module": "reports.view", "p_month": mes.isoformat()}, "reports.view",
+            )
         anterior = None
         # Um mês anterior ausente não impede o relatório: apenas a comparação.
         mes_anterior = (pd.Timestamp(mes) - pd.Timedelta(days=1)).date().replace(day=1)
@@ -218,18 +252,30 @@ class Service:
         with measure("motor"):
             relatorio = gerar_relatorio_mensal(payload, mes, contexto.permissions, anterior=anterior)
         atual = self.auth.require("reports.view")
-        return filtrar_relatorio(relatorio, atual.permissions)
+        self._same_identity(original, atual)
+        resultado = filtrar_relatorio(relatorio, atual.permissions)
+        resultado["_access_context"] = atual
+        return resultado
 
+    @_operation
     def export_monthly_report(self, month):
         """Não exporta conteúdo previamente armazenado sem revalidar permissões."""
         from web.reports import exportar_relatorio_csv
 
-        self.auth.require("reports.export")
+        original = self.auth.require("reports.export")
         relatorio = self.monthly_report(month)
         contexto = self.auth.require("reports.export")
+        self._same_identity(original, contexto)
         if not contexto.can("reports.view"):
             raise AuthorizationError("O acesso ao relatório foi revogado.")
         return exportar_relatorio_csv(relatorio, contexto.permissions)
+
+    @staticmethod
+    def _same_identity(original: AccessContext, current: AccessContext) -> None:
+        """Recusa mudança de organização ou identidade entre leitura e entrega."""
+        if (original.profile.user_id != current.profile.user_id
+                or original.profile.organization_id != current.profile.organization_id):
+            raise AuthorizationError("O acesso mudou durante a consulta. Atualize a página.")
 
     @staticmethod
     def _access_signature(context: AccessContext) -> tuple:
@@ -242,9 +288,10 @@ class Service:
     ) -> Callable[[], bytes]:
         """Prepara download por clique, vinculado à sessão e às permissões da tela.
 
-        O Streamlit executa o callback em outra thread. O fechamento contém
-        somente filtros e vínculo de autorização, nunca tabelas ou bytes prontos.
-        Cada clique recalcula e revalida Auth e banco antes e depois da geração.
+        A ação é executada pelo rerun autorizado, sem registrá-la no gerenciador
+        global de downloads do Streamlit. O fechamento contém somente filtros e
+        vínculo de autorização, nunca tabelas ou bytes prontos. Cada execução
+        recalcula e revalida Auth e banco antes e depois da geração.
         """
         permissions = {
             "replenishment": ("replenishment.view", "replenishment.export"),

@@ -57,6 +57,41 @@ def test_reposicao_nao_gera_exportacao_na_renderizacao(monkeypatch):
     assert scenario.calls["rpc_load_inventory"] == 1
 
 
+def test_csv_preparado_so_e_entregue_a_pagina_apos_clique(monkeypatch):
+    """A entrega usa o documento da sessão, sem arquivo remoto reutilizável."""
+    app, scenario = abrir_cenario(monkeypatch)
+    app.sidebar.radio[0].set_value("Relatórios").run()
+    assert not app.exception
+    assert not app.get("iframe")
+    scenario.reset_counts()
+    clicar(app, "Preparar CSV do relatório")
+    assert scenario.calls["rpc_load_inventory"] == 2
+    quadros = app.get("iframe")
+    assert len(quadros) == 1
+    documento = quadros[0].proto.srcdoc
+    assert "data:text/csv;charset=utf-8;base64," in documento
+    assert "Salvar CSV" in documento
+    assert "/media/" not in documento
+
+
+def test_revogacao_impede_preparar_csv_de_botao_antigo(monkeypatch):
+    """Um botão já visível não contorna a autorização renovada no novo rerun."""
+    from web.service import Service
+
+    def exportacao_proibida(*args, **kwargs):
+        """Reprova qualquer geração depois de retirar a concessão do cenário."""
+        raise AssertionError("Exportação executada depois de revogar a permissão.")
+
+    app, scenario = abrir_cenario(monkeypatch)
+    app.sidebar.radio[0].set_value("Relatórios").run()
+    assert not app.exception
+    scenario.permissions.discard("reports.export")
+    monkeypatch.setattr(Service, "export_monthly_report", exportacao_proibida)
+    clicar(app, "Preparar CSV do relatório")
+    assert not app.get("iframe")
+    assert all(botao.label != "Preparar CSV do relatório" for botao in app.button)
+
+
 def test_relatorio_exige_geracao_explicita(monkeypatch):
     """Visitar relatórios não consulta fechamentos; gerar carrega os dois meses."""
     app, scenario = abrir_cenario(monkeypatch)

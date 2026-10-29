@@ -91,7 +91,7 @@ class ServicoFicticio:
         if self.falhar_dados:
             raise ServiceUnavailable("DETALHE_INTERNO_FICTICIO")
         # O serviço real já remove custos; este fake testa também a defesa na UI.
-        return self.dados
+        return {**self.dados, "_access_context": self.context()}
 
     def list_decisions(self):
         """Fornece histórico vazio sem persistência externa."""

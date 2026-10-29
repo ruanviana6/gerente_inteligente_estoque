@@ -87,7 +87,7 @@ class AuthExecutionTests(unittest.TestCase):
 
     def test_thread_nova_precisa_validar_auth_novamente(self):
         """O worker de download não herda a validação da thread da interface."""
-        with self.service.execution():
+        with self.auth.execution():
             self.service.context()
             with ThreadPoolExecutor(max_workers=1) as pool:
                 pool.submit(self.service.context).result(timeout=5)
@@ -158,6 +158,119 @@ class AuthExecutionTests(unittest.TestCase):
 
         self.auth.api._transport = transport
         with self.service.execution(), self.assertRaises(AuthorizationError):
+            self.service.load_inventory("inventory.view")
+
+    def test_load_isolado_serializa_login_entre_rpc_e_saida(self):
+        """Sem escopo externo, um login concorrente não troca a identidade do lote."""
+        import json
+
+        ready, release, login_started, login_done = (threading.Event() for _ in range(4))
+        original_rpc = self.auth.rpc_with_context
+        original_transport = self.auth.api._transport
+        user_a = self.scenario.user_id
+        user_b = "00000000-0000-0000-0000-000000000002"
+
+        def transport(method, url, headers, payload, timeout):
+            """A troca fictícia de identidade ocorre dentro do endpoint real de login."""
+            parameters = json.loads(payload) if payload else {}
+            if "/auth/v1/token" in url and parameters.get("email") == "outro@example.test":
+                self.scenario.user_id = user_b
+            return original_transport(method, url, headers, payload, timeout)
+
+        def paused_rpc(*args, **kwargs):
+            """Pausa exatamente após soltar o lock individual da RPC."""
+            response = original_rpc(*args, **kwargs)
+            ready.set()
+            if not release.wait(5):
+                raise TimeoutError("Teste não liberou a consulta.")
+            return response
+
+        def login():
+            """Tenta trocar para outra conta enquanto o lote anterior está em trânsito."""
+            login_started.set()
+            self.auth.login("outro@example.test", "senha_ficticia")
+            login_done.set()
+
+        self.auth.api._transport = transport
+        with patch.object(self.auth, "rpc_with_context", side_effect=paused_rpc):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                load = pool.submit(self.service.load_inventory, "inventory.view")
+                self.assertTrue(ready.wait(5))
+                switch = pool.submit(login)
+                try:
+                    self.assertTrue(login_started.wait(5))
+                    self.assertFalse(login_done.wait(.05))
+                finally:
+                    release.set()
+                result = load.result(timeout=5)
+                switch.result(timeout=5)
+        self.assertEqual(result["_access_context"].profile.user_id, user_a)
+        self.assertEqual(self.auth.session.user_id, user_b)
+
+    def test_execucao_segura_identidade_ate_fim_da_apresentacao(self):
+        """Mesmo depois de carregar, a apresentação ocorre antes do login concorrente."""
+        ready, release, login_started, login_done = (threading.Event() for _ in range(4))
+        original_generation = self.auth.generation
+
+        def present():
+            """Representa a janela entre obter dados e enviá-los à interface."""
+            with self.service.execution():
+                self.service.load_inventory("inventory.view")
+                ready.set()
+                if not release.wait(5):
+                    raise TimeoutError("Teste não liberou a apresentação.")
+                return self.auth.generation
+
+        def login():
+            """Tenta reiniciar a sessão enquanto a tela ainda está sendo montada."""
+            login_started.set()
+            self.auth.login("ficticio@example.test", "senha_ficticia")
+            login_done.set()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            showing = pool.submit(present)
+            self.assertTrue(ready.wait(5))
+            signing = pool.submit(login)
+            try:
+                self.assertTrue(login_started.wait(5))
+                self.assertFalse(login_done.wait(.05))
+            finally:
+                release.set()
+            self.assertEqual(showing.result(timeout=5), original_generation)
+            signing.result(timeout=5)
+        self.assertGreater(self.auth.generation, original_generation)
+
+    def test_resposta_expoe_contexto_final_sem_financeiro_revogado(self):
+        """A UI recebe o contexto efetivo para rejeitar uma apresentação já desatualizada."""
+        from web.service import normalizar_payload
+
+        def calculate(*args, **kwargs):
+            """Revoga financeiro e inventário durante o cálculo do painel."""
+            result = normalizar_payload(*args, **kwargs)
+            self.scenario.permissions.discard("finance.view")
+            self.scenario.permissions.discard("inventory.view")
+            return result
+
+        with patch("web.service.normalizar_payload", side_effect=calculate):
+            result = self.service.load_inventory("dashboard.view")
+        self.assertFalse(result["_access_context"].can("finance.view"))
+        self.assertFalse(result["_access_context"].can("inventory.view"))
+        self.assertNotIn("capital_estoque", result["panel"])
+        self.assertNotIn("custo_unitario", result["products"])
+
+    def test_mudanca_remota_de_organizacao_nao_mistura_dados(self):
+        """O lock local não substitui comparar a organização remota antes e depois."""
+        original = self.auth.api._transport
+
+        def transport(method, url, headers, payload, timeout):
+            """Move a conta no servidor fictício logo depois de retornar o lote antigo."""
+            response = original(method, url, headers, payload, timeout)
+            if url.endswith("/load_inventory"):
+                self.scenario.organization_id = "00000000-0000-0000-0000-000000000999"
+            return response
+
+        self.auth.api._transport = transport
+        with self.assertRaises(AuthorizationError):
             self.service.load_inventory("inventory.view")
 
 

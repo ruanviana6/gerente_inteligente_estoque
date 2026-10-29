@@ -115,6 +115,59 @@ def install_probe() -> Probe:
     return probe
 
 
+def measure_actions(fixture, probe, size, iterations, latency):
+    """Mede trabalho solicitado, separado do simples acesso à página.
+
+    A geração usa o serviço real. Os CSVs executam o mesmo callback diferido
+    usado pelo botão, quando disponível; na base, executam o exportador imediato.
+    Esses tempos não incluem renderização, pintura ou transferência do navegador.
+    """
+    scenario = fixture.Scenario(size=size, latency_ms=latency)
+    service = scenario.service_factory({})
+    month = "2026-09-01"
+
+    def generate():
+        """Gera efetivamente um fechamento fictício e verifica o período retornado."""
+        with service.execution() if hasattr(service, "execution") else nullcontext():
+            report = service.monthly_report(month)
+            assert report["periodo"]["inicio"] == month
+            assert report["mais_vendidos"]
+
+    if hasattr(service, "deferred_export"):
+        # O vínculo nasce durante a renderização com o contexto já consultado.
+        # Cada invocação abaixo percorre novamente as verificações do callback.
+        context = service.context()
+        monthly = service.deferred_export("monthly", {"month": month}, context=context)
+        replenishment = service.deferred_export("replenishment", {}, context=context)
+        mechanism = "Callback diferido real do botão, invocado sem navegador"
+    else:
+        def monthly():
+            """Executa o mesmo exportador imediato utilizado pela interface anterior."""
+            return service.export_monthly_report(month)
+
+        replenishment = service.export_replenishment
+        mechanism = "Exportador imediato da versão anterior, invocado sem navegador"
+
+    def export(callback):
+        """Confirma que o exportador produziu bytes, sem registrar conteúdo do CSV."""
+        content = callback()
+        assert isinstance(content, bytes) and len(content) > 0
+
+    actions = {
+        "gerar_relatorio_mensal": generate,
+        "exportar_relatorio_csv": lambda: export(monthly),
+        "exportar_reposicao_csv": lambda: export(replenishment),
+    }
+    return {
+        "scope": "Ações completas do backend; sem transferência ou renderização no navegador",
+        "export_mechanism": mechanism,
+        "measurements": {
+            name: summarize([probe.sample(scenario, action) for _ in range(iterations)])
+            for name, action in actions.items()
+        },
+    }
+
+
 def measure_service(fixture, probe, size, iterations, latency):
     """Mede o backend completo; não apresenta esses tempos como renderização UI."""
     scenario = fixture.Scenario(size=size, latency_ms=latency)
@@ -128,7 +181,10 @@ def measure_service(fixture, probe, size, iterations, latency):
             assert len(result["panel"]) == size
 
     samples = [probe.sample(scenario, load) for _ in range(iterations)]
-    return {"dashboard_backend": summarize(samples)}
+    return {
+        "dashboard_backend": summarize(samples),
+        "acoes_backend": measure_actions(fixture, probe, size, iterations, latency),
+    }
 
 
 def measure_ui(fixture, probe, size, iterations, latency):
@@ -158,6 +214,22 @@ def measure_ui(fixture, probe, size, iterations, latency):
         navigation.set_value(name)
         samples = [probe.sample(scenario, execute) for _ in range(iterations)]
         results[name] = summarize(samples)
+    generate_buttons = [item for item in app.button if item.label == "Gerar relatório"]
+    if generate_buttons:
+        def generate_report():
+            """Clica no formulário real, incluindo consulta, cálculo e apresentação."""
+            button = next(item for item in app.button if item.label == "Gerar relatório")
+            button.click()
+            execute()
+
+        results["gerar_relatorio_interface"] = summarize([
+            probe.sample(scenario, generate_report) for _ in range(iterations)
+        ])
+    else:
+        results["gerar_relatorio_interface"] = {
+            "mode": "Geração automática já incluída na entrada em Relatórios nesta versão",
+        }
+    results["acoes_backend"] = measure_actions(fixture, probe, size, iterations, latency)
     return results
 
 
@@ -189,6 +261,10 @@ def main():
         "network": "Transporte fictício local; sem conexão com Supabase/Streamlit Cloud",
         "simulated_latency_per_request_ms": args.latency_ms,
         "timing_note": "Etapas são inclusivas; não somar motor com normalização nem relatório com exportação.",
+        "navigation_note": (
+            "Acesso à página e ação solicitada são medidos separadamente. Adiar cálculo não elimina seu custo. "
+            "AppTest não mede pintura do navegador; ações_backend não medem transferência de arquivos."
+        ),
         "datasets": {},
     }
     measure = measure_service if args.mode == "service" else measure_ui

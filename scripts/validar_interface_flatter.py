@@ -126,13 +126,14 @@ def verificar_layout(pagina, nome: str, destino: Path, estrito: bool, miniaturas
         .map(el => { const r=el.getBoundingClientRect(); return {tag:el.tagName, w:r.width, h:r.height}; });
       const acoes = [...document.querySelectorAll('[class*="st-key-flatter_"] button')]
         .filter(el => el.getClientRects().length && !el.disabled && el.innerText.trim().length > 3)
-        .map(el => { const r=el.getBoundingClientRect(); return {w:r.width, h:r.height}; });
+        .map(el => { const r=el.getBoundingClientRect(); return {rotulo:el.innerText.trim().slice(0,80), w:r.width, h:r.height}; });
       return {viewport:innerWidth, documento:raiz.scrollWidth,
         principal_visivel:main.clientWidth, principal_conteudo:main.scrollWidth,
         alvos_total:controles.length,
         alvos_menores_44:controles.filter(r => r.w<44 || r.h<44).length,
         acoes_aplicacao_total:acoes.length,
-        acoes_aplicacao_menores_44:acoes.filter(r => r.w<43.5 || r.h<43.5).length};
+        acoes_aplicacao_menores_44:acoes.filter(r => r.w<43.5 || r.h<43.5).length,
+        acoes_aplicacao_pequenas:acoes.filter(r => r.w<43.5 || r.h<43.5)};
     }""")
     medidas["sem_rolagem_horizontal_pagina"] = (
         medidas["documento"] <= medidas["viewport"] + 2
@@ -174,6 +175,7 @@ def conferir_perfil(pagina, perfil: str) -> None:
     menus = pagina.get_by_role("radiogroup", name="Navegação", exact=True)
     if perfil != "Master":
         assert menus.get_by_role("radio", name="Administração", exact=True, include_hidden=True).count() == 0
+    if perfil in {"Operador", "Visualizador"}:
         assert menus.get_by_role("radio", name="Importação", exact=True, include_hidden=True).count() == 0
         assert "R$" not in pagina.locator("body").inner_text()
         assert pagina.get_by_text("Capital conhecido em estoque", exact=True).count() == 0
@@ -184,7 +186,7 @@ def conferir_perfil(pagina, perfil: str) -> None:
 
 def verificar_fluxos(browser, base: str, destino: Path, controle: Path, estrito: bool,
                      miniaturas: bool) -> dict:
-    """Exercita telas, dois tamanhos, três perfis e revogação em sessões independentes."""
+    """Exercita telas, dois tamanhos, quatro perfis e revogação em sessões independentes."""
     resultados: dict = {"telas": {}, "fluxos": {}, "limitacoes": [
         "UI real com transporte fictício; Auth remoto e RLS são testados por suítes separadas.",
         "Contagem de alvos pequenos inclui controles nativos e não equivale a auditoria WCAG integral.",
@@ -231,8 +233,11 @@ def verificar_fluxos(browser, base: str, destino: Path, controle: Path, estrito:
                 pagina, f"relatorios-{largura}", destino, estrito, miniaturas,
             )
             if largura == 1440:
+                pagina.get_by_role("button", name="Preparar CSV do relatório", exact=True).click()
+                quadro_csv = pagina.frame_locator("iframe").get_by_role("link", name="Salvar CSV", exact=True)
+                quadro_csv.wait_for()
                 with pagina.expect_download() as transferencia:
-                    pagina.get_by_role("button", name="Baixar relatório mensal (CSV)", exact=True).click()
+                    quadro_csv.click()
                 caminho_csv = transferencia.value.path()
                 assert caminho_csv and Path(caminho_csv).stat().st_size > 0
                 resultados["fluxos"]["download-mensal-sob-demanda"] = "aprovado"
@@ -245,7 +250,7 @@ def verificar_fluxos(browser, base: str, destino: Path, controle: Path, estrito:
 
         # Contextos simultâneos impedem um falso resultado causado por logout global do navegador.
         paginas = {}
-        for perfil in ("Master", "Operador", "Visualizador"):
+        for perfil in ("Master", "Administrador", "Operador", "Visualizador"):
             contexto = browser.new_context(viewport={"width": 1440, "height": 1000}, locale="pt-BR")
             contextos.append(contexto)
             pagina = contexto.new_page()
@@ -257,11 +262,25 @@ def verificar_fluxos(browser, base: str, destino: Path, controle: Path, estrito:
 
         master = paginas["Master"]
         assert "R$" in master.locator("body").inner_text()
-        controle.write_text(json.dumps({"sem_financeiro": ["Master"]}))
+        administrador = paginas["Administrador"]
+        assert "R$" in administrador.locator("body").inner_text()
+        controle.write_text(json.dumps({"sem_financeiro": ["Administrador"]}))
         # Espera o watcher produtivo; o teste não acelera nem desliga o monitor.
-        master.wait_for_function("() => !document.body.innerText.includes('R$')", timeout=35000)
-        assert master.get_by_role("radiogroup", name="Navegação", exact=True).count() == 1
+        administrador.wait_for_function("() => !document.body.innerText.includes('R$')", timeout=35000)
+        aguardar_tela(administrador)
+        assert administrador.get_by_role("radiogroup", name="Navegação", exact=True).count() == 1
+        assert "R$" in master.locator("body").inner_text()
         resultados["fluxos"]["revogacao-financeira-em-tela-aberta"] = "aprovado"
+
+        navegar(administrador, "Relatórios")
+        preparar = administrador.get_by_role("button", name="Preparar CSV do relatório", exact=True)
+        preparar.wait_for()
+        controle.write_text(json.dumps({"sem_financeiro": ["Administrador"], "sem_exportacao": ["Administrador"]}))
+        preparar.click()
+        aguardar_tela(administrador)
+        preparar.wait_for(state="detached")
+        assert administrador.locator('iframe[srcdoc*="data:text/csv"]').count() == 0
+        resultados["fluxos"]["exportacao-negada-apos-revogacao"] = "aprovado"
 
         master.get_by_role("button", name="Sair", exact=True).click()
         master.get_by_role("button", name="Entrar", exact=True).wait_for()
@@ -272,6 +291,7 @@ def verificar_fluxos(browser, base: str, destino: Path, controle: Path, estrito:
 
         controle.write_text(json.dumps({"desativados": ["Operador"]}))
         paginas["Operador"].get_by_role("button", name="Entrar", exact=True).wait_for(timeout=35000)
+        aguardar_tela(paginas["Operador"])
         assert paginas["Operador"].get_by_test_id("stDataFrame").count() == 0
         assert paginas["Operador"].get_by_test_id("stMetric").count() == 0
         conferir_perfil(paginas["Visualizador"], "Visualizador")

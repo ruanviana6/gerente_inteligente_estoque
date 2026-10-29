@@ -27,9 +27,11 @@ def executar() -> None:
 
     def fabrica(estado):
         """Mantém cenário e cliente exclusivos de cada sessão fictícia do navegador."""
+        if "_flatter_test_service" in estado:
+            return estado["_flatter_test_service"]
         if "_flatter_browser_scenario" not in estado:
             perfil = st.query_params.get("perfil", "Master")
-            if perfil not in {"Master", "Operador", "Visualizador"}:
+            if perfil not in {"Master", "Administrador", "Operador", "Visualizador"}:
                 raise ValueError("Perfil de teste desconhecido.")
             scenario = Scenario(size=100, role=perfil, authenticated=False)
             permissoes_iniciais = set(scenario.permissions)
@@ -42,6 +44,8 @@ def executar() -> None:
                 scenario.permissions = set(permissoes_iniciais)
                 if perfil in controle.get("sem_financeiro", []):
                     scenario.permissions.discard("finance.view")
+                if perfil in controle.get("sem_exportacao", []):
+                    scenario.permissions.difference_update({"reports.export", "replenishment.export"})
                 return transporte(method, url, headers, payload, timeout)
 
             scenario.transport = transporte_controlado

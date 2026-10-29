@@ -8,6 +8,7 @@ A Issue #6 reorganiza a aplicação web existente em Streamlit. As páginas usam
 - `web/theme.py`: marca em texto, cabeçalho, cartões de indicadores, superfícies e status. Não consulta dados nem guarda estado de usuários.
 - `web/ui.py`: entrada, login, sessão, monitoramento de autorização e navegação.
 - `web/pages.py`: páginas operacionais, filtros, detalhe, relatórios e administração.
+- `web/downloads.py`: preparação autorizada e entrega direta do CSV à página.
 
 O CSS complementar usa as classes `st-key-` documentadas para containers. Não depende de hashes, `data-testid`, posição dos elementos ou scripts de terceiros. `st.html` recebe apenas CSS e marca estáticos. Produtos, fornecedores, nomes de pessoas e indicadores passam pelos widgets nativos, sem interpolação em HTML.
 
@@ -34,7 +35,7 @@ Quando houver um arquivo oficial autorizado, adicione o arquivo local em `assets
 
 ## Acessibilidade e celular
 
-Os componentes nativos mantêm rótulos e navegação por teclado. O complemento visual fornece foco visível e altura mínima de 44 px para botões, campos e seletores dentro dos containers Flatter. A navegação também reserva altura de toque de 44 px. A barra lateral é recolhível; linhas horizontais usam quebra nativa do Streamlit, e tabelas mantêm sua própria rolagem.
+Os componentes nativos mantêm rótulos e navegação por teclado. O complemento visual fornece foco visível e altura mínima de 44 px para botões, campos e seletores dentro dos containers Flatter. Botões também têm largura mínima de 44 px, incluindo a ação de mostrar ou ocultar a senha. A navegação reserva altura de toque de 44 px. A barra lateral é recolhível; linhas horizontais usam quebra nativa do Streamlit, e tabelas mantêm sua própria rolagem.
 
 As razões abaixo foram calculadas localmente com a fórmula de luminância relativa sRGB do WCAG. São verificações da paleta, não uma certificação de acessibilidade da aplicação inteira.
 
@@ -62,3 +63,11 @@ A nova interface só será publicada após revisão e autorização do propriet�
 - [Tema e cores no Streamlit](https://docs.streamlit.io/develop/concepts/configuration/theming-customize-colors-and-borders)
 - [Containers e classes associadas à chave](https://docs.streamlit.io/develop/api-reference/layout/st.container)
 - [Critério de contraste WCAG](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html)
+
+## Exportação e revogação
+
+Use **Preparar CSV** para gerar o arquivo, depois **Salvar CSV** para salvá-lo. A preparação reconsulta identidade e permissões antes e depois do cálculo. O arquivo segue pela conexão da própria página, em um link `data:` dentro de um iframe nativo, com nome fixo e conteúdo codificado em base64. Nenhum nome ou texto importado é interpolado como HTML. Não há callback ou arquivo registrado no gerenciador global de downloads do Streamlit.
+
+Essa escolha evita depender do isolamento de callbacks diferidos do Streamlit 1.66.1. Uma sessão diferente não recebe um identificador global que execute a geração em nome de outra pessoa. Dados já entregues ao navegador, como qualquer arquivo baixado, não podem ser apagados retroativamente por revogação. Toda nova preparação exige nova autorização.
+
+A opção `client.disableDataExport` oculta os controles de CSV e cópia das tabelas, concentrando a exportação nos fluxos autorizados. Ela não impede a extração de informações que o próprio usuário já recebeu na tela.

@@ -14,6 +14,8 @@ import streamlit as st
 
 from dados import hoje_local
 from motor import somar_valores_financeiros
+from web.downloads import csv_export
+from web.errors import AuthorizationError
 from web.insights import gerar_insights
 from web.reports import filtrar_relatorio
 from web.theme import metric_card, page_header, status_badge, surface
@@ -137,10 +139,22 @@ def _origem(dados: dict) -> None:
     )
 
 
-def _carregar(servico: Any, modulo: str) -> dict | None:
-    """Obtém uma única base autorizada para a página solicitada."""
+def _validar_contexto(inicial: Any, atual: Any) -> None:
+    """Recusa conteúdo cuja autorização mudou durante a operação remota."""
+    if atual is None:
+        raise AuthorizationError("Não foi possível confirmar a autorização dos dados recebidos.")
+    campos = ("user_id", "organization_id", "role", "active")
+    if (tuple(_perfil(inicial, campo) for campo in campos)
+            != tuple(_perfil(atual, campo) for campo in campos)
+            or inicial.permissions != atual.permissions):
+        raise AuthorizationError("Seu acesso mudou. Atualize a página antes de consultar os dados.")
+
+
+def _carregar(servico: Any, modulo: str, contexto: Any) -> dict | None:
+    """Obtém uma base autorizada e confirma o contexto antes de renderizar dados."""
     with st.spinner("Carregando os dados autorizados…"):
         dados = servico.load_inventory(modulo)
+    _validar_contexto(contexto, dados.get("_access_context"))
     _origem(dados)
     if dados["panel"].empty:
         st.info("Ainda não há produtos. Um usuário com permissão de importação pode carregar os CSVs.")
@@ -177,7 +191,7 @@ def _flash(painel: pd.DataFrame, contexto: Any) -> None:
 def _painel(servico: Any, contexto: Any) -> None:
     """Organiza KPIs, prioridades e insights sem executar novamente o motor."""
     page_header("Visão geral", "O que merece atenção no estoque agora.")
-    dados = _carregar(servico, "dashboard.view")
+    dados = _carregar(servico, "dashboard.view", contexto)
     if dados is None:
         return
     painel = dados["panel"]
@@ -256,7 +270,7 @@ def _filtros(painel: pd.DataFrame, prefixo: str) -> tuple[pd.DataFrame, dict]:
 def _estoque(servico: Any, contexto: Any) -> None:
     """Apresenta catálogo paginado e calcula séries somente quando solicitadas."""
     page_header("Estoque e histórico", "Encontre o produto e confira a memória dos indicadores.")
-    dados = _carregar(servico, "inventory.view")
+    dados = _carregar(servico, "inventory.view", contexto)
     if dados is None:
         return
     vista, _ = _filtros(dados["panel"], "estoque")
@@ -336,7 +350,7 @@ def _explicar_reposicao(item: pd.Series) -> None:
 def _reposicao(servico: Any, contexto: Any) -> None:
     """Prioriza fornecedor e urgência; exportação só é produzida após clique."""
     page_header("Reposição por fornecedor", "Uma lista prática para conferir antes de decidir.")
-    dados = _carregar(servico, "replenishment.view")
+    dados = _carregar(servico, "replenishment.view", contexto)
     if dados is None:
         return
     vista, filtros = _filtros(dados["panel"], "reposicao")
@@ -365,16 +379,13 @@ def _reposicao(servico: Any, contexto: Any) -> None:
                 st.warning(str(item["aviso_qualidade"]))
     st.caption("Não há compra automática nem alterações no ERP. Confira as limitações e embalagens do fornecedor.")
     if contexto.can("replenishment.export"):
-        st.download_button("Baixar lista de reposição (CSV)",
-                           data=servico.deferred_export("replenishment", filtros, context=contexto),
-                           file_name="reposicao.csv", mime="text/csv", on_click="ignore", type="primary")
-        st.caption("O arquivo é gerado no clique, com nova verificação das permissões.")
+        csv_export(servico, "replenishment", filtros, contexto)
 
 
 def _tendencias(servico: Any, contexto: Any) -> None:
     """Exibe séries comparáveis e identifica explicitamente a base de custo da ABC."""
     page_header("Tendências e Curva ABC", "Compare demanda recente e histórica sem inventar sazonalidade.")
-    dados = _carregar(servico, "trends.view")
+    dados = _carregar(servico, "trends.view", contexto)
     if dados is None:
         return
     painel = dados["panel"]
@@ -418,11 +429,16 @@ def _relatorios(servico: Any, contexto: Any) -> None:
         mes = st.date_input("Mês de referência", value=anterior.date(), max_value=anterior.date()).replace(day=1)
         st.caption("Exige histórico completo do período e fotografia de estoque no último dia do mês.")
         gerar = st.form_submit_button("Gerar relatório", type="primary")
+    # O botão de exportação é independente do resultado momentâneo do formulário.
+    # Assim seu clique continua disponível no rerun, sem reter relatório ou CSV.
+    if contexto.can("reports.export"):
+        csv_export(servico, "monthly", {"month": mes.isoformat()}, contexto)
     if not gerar:
-        st.info("Selecione um mês fechado e clique em Gerar relatório. Nenhum fechamento foi consultado ainda.")
+        st.info("Para exibir os indicadores nesta página, selecione um mês fechado e clique em Gerar relatório.")
         return
     with st.spinner("Conferindo o fechamento e preparando os indicadores…"):
         relatorio = servico.monthly_report(mes)
+    _validar_contexto(contexto, relatorio.get("_access_context"))
     # Defesa de apresentação adicional ao filtro vigente aplicado pela fachada.
     relatorio = filtrar_relatorio(relatorio, contexto.permissions)
     periodo = relatorio["periodo"]
@@ -459,12 +475,6 @@ def _relatorios(servico: Any, contexto: Any) -> None:
             st.warning("Capital parcial: há produtos sem custo informado no fechamento.")
         if financeiro.get("limite_excedido"):
             st.warning("Há valores acima do limite de representação. O capital não é calculável com segurança.")
-    if contexto.can("reports.export"):
-        st.download_button("Baixar relatório mensal (CSV)",
-                           data=servico.deferred_export("monthly", {"month": mes.isoformat()}, context=contexto),
-                           file_name=f"relatorio_{mes:%Y_%m}.csv", mime="text/csv", on_click="ignore",
-                           type="primary")
-        st.caption("O download reconfere o fechamento e as permissões no momento do clique.")
 
 
 def _importacao(servico: Any, contexto: Any) -> None:
@@ -491,6 +501,7 @@ def _importacao(servico: Any, contexto: Any) -> None:
             st.success("Importação concluída no Supabase. O histórico foi preservado.")
     if contexto.can("inventory.view") and st.button("Consultar histórico de importações"):
         dados = servico.load_inventory("inventory.view")
+        _validar_contexto(contexto, dados.get("_access_context"))
         _tabela(pd.DataFrame(dados.get("imports", [])), key="importacoes_historico", paginar=False)
     if _perfil(contexto, "role") == "Master":
         with st.expander("Carregar dados fictícios para validação"):
@@ -506,7 +517,7 @@ def _importacao(servico: Any, contexto: Any) -> None:
 def _parametros(servico: Any, contexto: Any) -> None:
     """Edita parâmetros de cálculo do gerente, preservando os saldos oficiais."""
     page_header("Parâmetros de reposição", "Prazo, segurança e cobertura-alvo por produto.")
-    dados = _carregar(servico, "parameters.edit")
+    dados = _carregar(servico, "parameters.edit", contexto)
     if dados is None:
         return
     produtos = dados["products"].set_index("codigo", drop=False)
@@ -530,7 +541,7 @@ def _parametros(servico: Any, contexto: Any) -> None:
 def _decisoes(servico: Any, contexto: Any) -> None:
     """Registra a decisão humana e consulta o histórico somente quando solicitado."""
     page_header("Decisões de reposição", "Registre sua avaliação, sem criar pedidos no ERP.")
-    dados = _carregar(servico, "decisions.write")
+    dados = _carregar(servico, "decisions.write", contexto)
     if dados is None:
         return
     painel = dados["panel"].set_index("codigo", drop=False)

@@ -274,10 +274,21 @@ class AuthService:
     @_serialized
     def rpc(self, name: str, payload: dict | None, permission: str) -> Any:
         """Verifica autorização no backend e envia JWT; o banco a verifica novamente."""
-        self.require(permission)
+        return self.rpc_with_context(name, payload, permission)[0]
+
+    @_serialized
+    def rpc_with_context(
+        self, name: str, payload: dict | None, permission: str,
+    ) -> tuple[Any, AccessContext]:
+        """Vincula a resposta ao contexto consultado sem repetir app_context.
+
+        O contexto retornado identifica o escopo da consulta. Não substitui
+        a revalidação de autorização após cálculos ou antes de entregar dados.
+        """
+        context = self.require(permission)
         session = self._current_session()
         try:
-            return self.api.rpc(name, payload or {}, session.access_token)
+            return self.api.rpc(name, payload or {}, session.access_token), context
         except (AuthenticationError, AuthorizationError):
             # Uma revogação entre a consulta de contexto e a operação não reutiliza sessão local.
             self._invalidate_session()
