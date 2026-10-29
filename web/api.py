@@ -6,6 +6,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from threading import Lock
 from typing import Any
 
 from web.errors import (
@@ -37,12 +38,11 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def http_transport(
-    method: str, url: str, headers: Mapping[str, str], payload: bytes | None, timeout: int,
+def _http_request(
+    opener, method: str, url: str, headers: Mapping[str, str], payload: bytes | None, timeout: int,
 ) -> HTTPResponse:
-    """Executa HTTPS com TLS padrão, proxy do ambiente, limite de leitura e timeout."""
+    """Usa headers novos por requisição e mantém TLS, timeout e limite de resposta."""
     request = urllib.request.Request(url, data=payload, headers=dict(headers), method=method)
-    opener = urllib.request.build_opener(_NoRedirect())
     try:
         with opener.open(request, timeout=timeout) as response:
             body = response.read(MAX_RESPONSE_BYTES + 1)
@@ -56,6 +56,34 @@ def http_transport(
         return HTTPResponse(status, b"")
     except (urllib.error.URLError, TimeoutError, OSError):
         raise ServiceUnavailable("Não foi possível acessar o Supabase. Tente novamente.") from None
+
+
+class _HTTPTransport:
+    """Reutiliza configuração TLS/proxy somente dentro de um cliente Supabase.
+
+    Não é um pool de conexões. Não há CookieProcessor, tokens, headers padrão
+    de autenticação ou cache de respostas no opener. Cada navegador recebe
+    seu próprio cliente; o lock protege os handlers de chamadas concorrentes.
+    """
+
+    def __init__(self) -> None:
+        """Adia a configuração do opener até a primeira requisição desta instância."""
+        self._opener = None
+        self._lock = Lock()
+
+    def __call__(self, method, url, headers, payload, timeout) -> HTTPResponse:
+        """Envia uma requisição com credenciais explícitas, sem reter seus headers."""
+        with self._lock:
+            if self._opener is None:
+                self._opener = urllib.request.build_opener(_NoRedirect())
+            return _http_request(self._opener, method, url, headers, payload, timeout)
+
+
+def http_transport(
+    method: str, url: str, headers: Mapping[str, str], payload: bytes | None, timeout: int,
+) -> HTTPResponse:
+    """Executa uma chamada isolada, conservando o contrato usado nos testes HTTP."""
+    return _HTTPTransport()(method, url, headers, payload, timeout)
 
 
 Transport = Callable[[str, str, Mapping[str, str], bytes | None, int], HTTPResponse]
@@ -72,7 +100,7 @@ class SupabaseAPI:
     def __init__(self, settings: Settings, transport: Transport | None = None) -> None:
         """Cria um cliente sem sessão compartilhada nem cache de resultados."""
         self.settings = settings
-        self._transport = transport or http_transport
+        self._transport = transport if transport is not None else _HTTPTransport()
 
     def _request(
         self, method: str, path: str, payload: dict | None = None,

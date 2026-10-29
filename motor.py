@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from numbers import Integral, Real
 from typing import Iterable
 
+import numpy as np
 import pandas as pd
 
 from config import NIVEIS_ALERTA, Configuracao
@@ -119,28 +120,40 @@ def medias_por_produto(
     else:
         saldo = pd.Series(dtype="float64")
 
-    linhas = []
-    for codigo in codigos:
-        indice = pd.MultiIndex.from_product([[codigo], dias], names=["codigo", "data"])
-        vendas_diarias = soma.reindex(indice, fill_value=0)
-        estoques = saldo.reindex(indice)
-        conflito = estoques.eq(0) & vendas_diarias.gt(0)
-        ruptura = estoques.eq(0) & ~conflito
-        elegiveis = ~ruptura
-        dias_validos = int(elegiveis.sum())
-        total = float(vendas_diarias[elegiveis].sum())
-        linhas.append({
-            "codigo": codigo,
-            "media": total / dias_validos if dias_validos else 0.0,
-            "dias_ruptura_conhecidos": int(ruptura.sum()),
-            "dias_snapshots_conflitantes": int(conflito.sum()),
-            "dias_disponibilidade_desconhecida": int(estoques.isna().sum()),
-            "dias_elegiveis": dias_validos,
-        })
-    return pd.DataFrame(linhas, columns=[
+    colunas = [
         "codigo", "media", "dias_ruptura_conhecidos", "dias_snapshots_conflitantes",
         "dias_disponibilidade_desconhecida", "dias_elegiveis",
-    ]).set_index("codigo")
+    ]
+    if not codigos:
+        return pd.DataFrame(columns=colunas).set_index("codigo")
+
+    # Reindexar por SKU recriava milhares de índices e dominava o tempo do motor.
+    # Cada bloco contém os mesmos dias, zeros e ausências do cálculo anterior.
+    # O limite de células evita alocar catálogo × janela inteiro de uma vez.
+    tamanho_bloco = max(1, min(1024, 100_000 // janela))
+    blocos = []
+    for inicio_bloco in range(0, len(codigos), tamanho_bloco):
+        bloco = codigos[inicio_bloco:inicio_bloco + tamanho_bloco]
+        indice = pd.MultiIndex.from_product([bloco, dias], names=["codigo", "data"])
+        vendas_diarias = soma.reindex(indice, fill_value=0).to_numpy().reshape(len(bloco), janela)
+        estoques = saldo.reindex(indice).to_numpy().reshape(len(bloco), janela)
+        conflito = (estoques == 0) & (vendas_diarias > 0)
+        ruptura = (estoques == 0) & ~conflito
+        elegiveis = ~ruptura
+        dias_validos = elegiveis.sum(axis=1)
+        # As quantidades já validadas são inteiras. A soma e o denominador
+        # permanecem idênticos; nenhum dia desconhecido vira ruptura presumida.
+        total = np.where(elegiveis, vendas_diarias, 0).sum(axis=1)
+        medias = np.divide(total, dias_validos, out=np.zeros(len(bloco)), where=dias_validos > 0)
+        blocos.append(pd.DataFrame({
+            "codigo": bloco,
+            "media": medias,
+            "dias_ruptura_conhecidos": ruptura.sum(axis=1),
+            "dias_snapshots_conflitantes": conflito.sum(axis=1),
+            "dias_disponibilidade_desconhecida": pd.isna(estoques).sum(axis=1),
+            "dias_elegiveis": dias_validos,
+        }))
+    return pd.concat(blocos, ignore_index=True).set_index("codigo")
 
 
 def classificar_tendencia(curta: float, longa: float, limite_pct: float) -> str:

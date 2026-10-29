@@ -5,6 +5,30 @@ on:
 permissions:
   contents: read
 jobs:
+  navegador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Instalar aplicativo e navegador de testes
+        run: |
+          python -m pip install -r requirements.txt playwright==1.62.0 setuptools==84.1.0
+          python -m playwright install --with-deps chromium
+      - name: Validar telas, celular e revogação com dados fictícios
+        run: >-
+          python scripts/validar_interface_flatter.py
+          --output evidencias/interface --strict-layout --emit-thumbnails
+          --check-public-login
+      - name: Guardar capturas e resultados sem dados comerciais
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: interface-flatter
+          path: evidencias/interface/
   desempenho:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -33,6 +57,10 @@ jobs:
           python scripts/benchmark_flatter.py --repository .
           --mode ui --sizes 100 1200 --iterations 5 --latency-ms 40
           --output evidencias/desempenho/depois.json
+      - name: Medir preparação local do cliente HTTP
+        run: >-
+          python scripts/benchmark_http_flatter.py --iterations 100
+          --output evidencias/desempenho/cliente-http.json
       - name: Guardar medições reproduzíveis sem dados comerciais
         if: always()
         uses: actions/upload-artifact@v7.0.2

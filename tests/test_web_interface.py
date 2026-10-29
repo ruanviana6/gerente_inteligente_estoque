@@ -3,6 +3,7 @@
 A fábrica é injetada no processo de teste, nunca por flag, URL ou segredo da
 aplicação. Os testes não consultam o Supabase nem disponibilizam login alternativo.
 """
+from contextlib import nullcontext
 from uuid import UUID
 
 import pandas as pd
@@ -78,6 +79,10 @@ class ServicoFicticio:
             raise AuthenticationError("DETALHE_INTERNO_FICTICIO")
         return AccessContext(Profile(self.usuario, ORGANIZACAO, self.nome, "Visualizador", True),
                              self.permissoes)
+
+    def execution(self):
+        """Mantém o contrato de escopo; este fake não realiza consultas de Auth."""
+        return nullcontext()
 
     def load_inventory(self, module, month=None):
         """Registra a permissão usada e mantém dados financeiros sentinela no fake."""
