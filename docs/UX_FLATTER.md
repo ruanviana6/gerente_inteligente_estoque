@@ -35,7 +35,7 @@ Quando houver um arquivo oficial autorizado, adicione o arquivo local em `assets
 
 ## Acessibilidade e celular
 
-Os componentes nativos mantêm rótulos e navegação por teclado. O complemento visual fornece foco visível e altura mínima de 44 px para botões, campos e seletores dentro dos containers Flatter. Botões também têm largura mínima de 44 px, incluindo a ação de mostrar ou ocultar a senha. A navegação reserva altura de toque de 44 px. A barra lateral é recolhível; linhas horizontais usam quebra nativa do Streamlit, e tabelas mantêm sua própria rolagem.
+Os componentes nativos mantêm rótulos e navegação por teclado. O complemento visual fornece foco visível e altura mínima de 44 px para botões, campos e seletores dentro dos containers Flatter. Botões também têm largura mínima de 44 px, incluindo a ação de mostrar ou ocultar a senha. A navegação reserva altura de toque de 44 px. A barra lateral é recolhível; linhas horizontais usam quebra nativa do Streamlit, e tabelas mantêm sua própria rolagem. Os grupos de indicadores usam `st.columns(..., wrap=True)` e cartões com `width="stretch"`, formando uma grade no desktop e ocupando a largura disponível quando empilhados no celular.
 
 As razões abaixo foram calculadas localmente com a fórmula de luminância relativa sRGB do WCAG. São verificações da paleta, não uma certificação de acessibilidade da aplicação inteira.
 

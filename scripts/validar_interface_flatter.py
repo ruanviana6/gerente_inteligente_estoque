@@ -233,6 +233,19 @@ def verificar_fluxos(browser, base: str, destino: Path, controle: Path, estrito:
             resultados["telas"][f"estoque-detalhe-{largura}"] = verificar_layout(
                 pagina, f"estoque-detalhe-{largura}", destino, estrito, miniaturas,
             )
+            produto = pagina.locator(".st-key-flatter_surface_neutral_flatter_produto")
+            produto.evaluate("""el => {
+              el.scrollIntoView({block: 'start', behavior: 'instant'});
+              const principal = el.closest('[data-testid=stMain]');
+              if (principal) principal.scrollBy({top: -72, behavior: 'instant'});
+            }""")
+            # O alinhamento explícito registra os indicadores do produto, além
+            # da captura anterior do catálogo, sem alterar estilos ou conteúdo.
+            caixa_produto = produto.bounding_box()
+            assert caixa_produto and 0 <= caixa_produto["y"] < 250
+            resultados["telas"][f"produto-detalhe-{largura}"] = verificar_layout(
+                pagina, f"produto-detalhe-{largura}", destino, estrito, miniaturas,
+            )
             navegar(pagina, "Relatórios")
             gerar = pagina.get_by_role("button", name="Gerar relatório", exact=True)
             assert pagina.get_by_text("Unidades vendidas", exact=True).count() == 0
@@ -324,9 +337,20 @@ def conferir_url_publicada(browser) -> dict:
             login = pagina.get_by_role("button", name="Entrar", exact=True).is_visible()
         except Exception:
             login = False
+        sinais = pagina.evaluate("""() => {
+          const texto = document.body?.innerText || '';
+          return {
+            suspensao_observada: /this app (has gone to sleep|is sleeping|is hibernating)|wake (it|this app) up/i.test(texto),
+            acesso_privado_observado: /this app is private|you do not have access to this app|request access to this app/i.test(texto),
+            aplicativo_ausente_observado: /app not found|this app does not exist|couldn.t find this app|404: not found/i.test(texto),
+            configuracao_pendente_observada: /configura[çc][ãa]o pendente/i.test(texto)
+          };
+        }""")
         return {"url": SITE_PUBLICADO, "http_status": resposta.status if resposta else None,
                 "formulario_login_observado": login, "autenticado": False,
-                "limite": "Somente abertura anônima; nenhuma operação na aplicação publicada."}
+                "sinais_publicos": sinais,
+                "limite": "Somente abertura anônima; HTTP 200 não comprova funcionamento nem autenticação. "
+                          "Nenhuma operação foi realizada na aplicação publicada."}
     except Exception:
         return {"url": SITE_PUBLICADO, "formulario_login_observado": False, "autenticado": False,
                 "limite": "A URL publicada não pôde ser validada por este ambiente."}

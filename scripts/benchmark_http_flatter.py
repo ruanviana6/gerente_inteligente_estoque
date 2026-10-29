@@ -66,10 +66,15 @@ def main():
     """Emite somente métricas, sem headers, tokens ou conteúdo de respostas."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--iterations", type=int, default=100)
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if not 10 <= args.iterations <= 10000:
         parser.error("Use de 10 a 10.000 repetições.")
-    print(json.dumps(run(args.iterations), indent=2, ensure_ascii=False))
+    resultado = json.dumps(run(args.iterations), indent=2, ensure_ascii=False)
+    if args.output is not None:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(resultado + "\n", encoding="utf-8")
+    print(resultado)
 
 
 if __name__ == "__main__":

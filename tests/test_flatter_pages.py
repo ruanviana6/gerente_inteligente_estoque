@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import base64
 import copy
-from datetime import timedelta
 import re
 from dataclasses import replace
+from datetime import timedelta
 
 from test_web_interface import ServicoFicticio, abrir
 

@@ -13,6 +13,7 @@ import json
 import platform
 import statistics
 import sys
+import threading
 import time
 from collections import Counter
 from contextlib import nullcontext
@@ -54,35 +55,68 @@ class Probe:
         """Prepara contadores exclusivos desta execução de benchmark."""
         self.times = Counter()
         self.counts = Counter()
+        self._local = threading.local()
+        self._lock = threading.Lock()
+        self._backend_intervals = []
 
-    def wrap(self, owner, name, stage):
-        """Cronometra uma função real, propagando seu resultado e suas exceções."""
-        original = getattr(owner, name)
-
+    def instrument(self, original, stage, *, boundary=False):
+        """Observa a função sem somar novamente serviços aninhados na mesma thread."""
         def measured(*args, **kwargs):
-            """Acumula apenas um nome fixo de etapa e duração, sem inspecionar argumentos."""
+            """Registra apenas etapa, duração e fronteiras temporais internas."""
             started = time.perf_counter()
-            self.counts[stage] += 1
+            depth = getattr(self._local, "depth", 0)
+            if boundary:
+                self._local.depth = depth + 1
+            with self._lock:
+                self.counts[stage] += 1
             try:
                 return original(*args, **kwargs)
             finally:
-                self.times[stage] += time.perf_counter() - started
+                ended = time.perf_counter()
+                if boundary:
+                    self._local.depth = depth
+                with self._lock:
+                    self.times[stage] += ended - started
+                    if boundary and depth == 0:
+                        self._backend_intervals.append((started, ended))
+        return measured
 
-        setattr(owner, name, measured)
+    def wrap(self, owner, name, stage, *, boundary=False):
+        """Cronometra uma função real, propagando seu resultado e suas exceções."""
+        setattr(owner, name, self.instrument(getattr(owner, name), stage, boundary=boundary))
+
+    def backend_seconds(self, started, ended):
+        """Soma a união dos intervalos de backend, sem contar sobreposições entre threads."""
+        total = 0.0
+        previous_end = started
+        for beginning, finish in sorted(self._backend_intervals):
+            beginning = max(beginning, started, previous_end)
+            finish = min(finish, ended)
+            if finish > beginning:
+                total += finish - beginning
+                previous_end = finish
+        return total
 
     def reset(self):
         """Descarta números da execução anterior sem alterar a sessão observada."""
         self.times.clear()
         self.counts.clear()
+        self._backend_intervals.clear()
 
-    def sample(self, scenario, action):
+    def sample(self, scenario, action, *, ui=False):
         """Mede uma ação completa e separa transporte de etapas locais inclusivas."""
         scenario.reset_counts()
         self.reset()
         started = time.perf_counter()
         action()
+        ended = time.perf_counter()
+        backend = self.backend_seconds(started, ended)
+        self.times["backend_total_sem_sobreposicao"] = backend
+        self.times["execucao_UI_fora_servicos" if ui else "execucao_fora_servicos"] = max(
+            0.0, ended - started - backend,
+        )
         return {
-            "seconds": time.perf_counter() - started,
+            "seconds": ended - started,
             "calls": dict(scenario.calls + self.counts),
             "stages_seconds": {**self.times, **scenario.http_seconds},
         }
@@ -100,7 +134,7 @@ def load_fixture(repository: Path):
     return module
 
 
-def install_probe() -> Probe:
+def install_probe(fixture) -> Probe:
     """Instrumenta os mesmos pontos na versão original e na versão candidata."""
     import web.reports
     import web.service
@@ -109,9 +143,14 @@ def install_probe() -> Probe:
     probe.wrap(web.service, "gerar_painel", "motor")
     probe.wrap(web.reports, "gerar_painel", "motor")
     probe.wrap(web.service, "normalizar_payload", "normalizacao_inclui_motor")
-    probe.wrap(web.service.Service, "export_replenishment", "export_reposicao")
-    probe.wrap(web.service.Service, "export_monthly_report", "export_relatorio")
-    probe.wrap(web.service.Service, "monthly_report", "relatorio")
+    probe.wrap(fixture.Scenario, "service_factory", "service_factory", boundary=True)
+    probe.wrap(web.service.Service, "context", "contexto_backend", boundary=True)
+    probe.wrap(web.service.Service, "load_inventory", "carregamento_backend", boundary=True)
+    probe.wrap(web.service.Service, "export_replenishment", "export_reposicao", boundary=True)
+    probe.wrap(web.service.Service, "export_monthly_report", "export_relatorio", boundary=True)
+    probe.wrap(web.service.Service, "monthly_report", "relatorio", boundary=True)
+    if hasattr(web.service.Service, "deferred_export"):
+        probe.wrap(web.service.Service, "deferred_export", "preparar_download", boundary=True)
     return probe
 
 
@@ -147,6 +186,8 @@ def measure_actions(fixture, probe, size, iterations, latency):
 
         replenishment = service.export_replenishment
         mechanism = "Exportador imediato da versão anterior, invocado sem navegador"
+    monthly = probe.instrument(monthly, "callback_csv_mensal", boundary=True)
+    replenishment = probe.instrument(replenishment, "callback_csv_reposicao", boundary=True)
 
     def export(callback):
         """Confirma que o exportador produziu bytes, sem registrar conteúdo do CSV."""
@@ -208,11 +249,11 @@ def measure_ui(fixture, probe, size, iterations, latency):
         if app.error:
             raise AssertionError("A interface exibiu erro durante o benchmark: " + str(app.error[0].value))
 
-    results = {"primeira_carga": summarize([probe.sample(scenario, execute)])}
+    results = {"primeira_carga": summarize([probe.sample(scenario, execute, ui=True)])}
     for name in ("Painel", "Estoque", "Reposição", "Relatórios"):
         navigation = next(item for item in app.sidebar.radio if item.label == "Navegação")
         navigation.set_value(name)
-        samples = [probe.sample(scenario, execute) for _ in range(iterations)]
+        samples = [probe.sample(scenario, execute, ui=True) for _ in range(iterations)]
         results[name] = summarize(samples)
     generate_buttons = [item for item in app.button if item.label == "Gerar relatório"]
     if generate_buttons:
@@ -223,7 +264,7 @@ def measure_ui(fixture, probe, size, iterations, latency):
             execute()
 
         results["gerar_relatorio_interface"] = summarize([
-            probe.sample(scenario, generate_report) for _ in range(iterations)
+            probe.sample(scenario, generate_report, ui=True) for _ in range(iterations)
         ])
     else:
         results["gerar_relatorio_interface"] = {
@@ -247,7 +288,7 @@ def main():
         parser.error("Use pelo menos duas repetições para calcular dispersão.")
     bootstrap = time.perf_counter()
     fixture = load_fixture(args.repository.resolve())
-    probe = install_probe()
+    probe = install_probe(fixture)
     bootstrap = time.perf_counter() - bootstrap
     versions = {}
     for package in ("pandas", "numpy", "streamlit"):
@@ -261,6 +302,13 @@ def main():
         "network": "Transporte fictício local; sem conexão com Supabase/Streamlit Cloud",
         "simulated_latency_per_request_ms": args.latency_ms,
         "timing_note": "Etapas são inclusivas; não somar motor com normalização nem relatório com exportação.",
+        "ui_timing_note": (
+            "execucao_UI_fora_servicos = tempo AppTest menos união das fronteiras de serviços. "
+            "Inclui Python da interface, Streamlit, serialização e coordenação do AppTest; "
+            "não mede pintura nem rede do navegador. A primeira carga também inclui importação da UI. "
+            "backend_total_sem_sobreposicao elimina chamadas aninhadas e intervalos concorrentes; "
+            "service_factory mede criação/recuperação do serviço com a mesma fronteira nas duas versões."
+        ),
         "navigation_note": (
             "Acesso à página e ação solicitada são medidos separadamente. Adiar cálculo não elimina seu custo. "
             "AppTest não mede pintura do navegador; ações_backend não medem transferência de arquivos."

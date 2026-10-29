@@ -6,7 +6,7 @@ A base comparada é o commit `5f4856384167d7100dfedc0f5d4fcefa94f28c03`, da bran
 
 O diagnóstico começou pela base intacta, antes das otimizações. `scripts/benchmark_flatter.py` seleciona o checkout antes de importar o código; usa AuthService, Service, cálculo e, no modo `ui`, a interface verdadeira via AppTest. Somente o transporte é fictício. A amostra determinística contém 100 e 1.200 SKUs, 90 dias declarados, vendas, snapshots esparsos, rupturas, produtos sem vendas e custos ausentes.
 
-Cada cenário repete cinco vezes e informa amostras brutas, mediana (p50), p95 interpolado, chamadas HTTP e etapas de cálculo. Cinco amostras servem à comparação controlada, não a uma estimativa robusta de disponibilidade operacional. Primeira carga aparece separada. Os tempos de etapas são inclusivos e não devem ser somados.
+Cada cenário repete cinco vezes e informa amostras brutas, mediana (p50), p95 interpolado, chamadas HTTP e etapas de cálculo. Cinco amostras servem à comparação controlada, não a uma estimativa robusta de disponibilidade operacional. Primeira carga aparece separada. Os tempos de etapas são inclusivos e não devem ser somados. A medida `backend_total_sem_sobreposicao` calcula a união das fronteiras externas de serviços. O residual `execucao_UI_fora_servicos` subtrai essa união do tempo do AppTest e inclui montagem de widgets, serialização e coordenação do framework; não representa pintura ou interação no navegador.
 
 O CI compara ambas as versões no mesmo runner Ubuntu, Python 3.12 e dependências de `requirements.txt`, simulando 40 ms por requisição. Isso permite medir o custo das chamadas sequenciais, mas **não mede a rede, o banco hospedado nem a latência da aplicação publicada**. Autenticação e RLS reais são verificadas em outro job, com Supabase descartável.
 
@@ -40,7 +40,7 @@ Em um checkout da candidata, com as dependências instaladas:
 
 ```bash
 mkdir -p /tmp/flatter-base
- git archive 5f4856384167d7100dfedc0f5d4fcefa94f28c03 | tar -x -C /tmp/flatter-base
+git archive 5f4856384167d7100dfedc0f5d4fcefa94f28c03 | tar -x -C /tmp/flatter-base
 python scripts/benchmark_flatter.py --repository /tmp/flatter-base --mode ui --sizes 100 1200 --iterations 5 --latency-ms 40 --output /tmp/antes.json
 python scripts/benchmark_flatter.py --repository . --mode ui --sizes 100 1200 --iterations 5 --latency-ms 40 --output /tmp/depois.json
 python scripts/benchmark_http_flatter.py --iterations 100 --output /tmp/http.json

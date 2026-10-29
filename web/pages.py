@@ -195,22 +195,28 @@ def _painel(servico: Any, contexto: Any) -> None:
     if dados is None:
         return
     painel = dados["panel"]
-    with st.container(horizontal=True, wrap=True, gap="small"):
-        metric_card("Produtos", len(painel), key="flatter_kpi_produtos", note="No catálogo atual")
+    colunas = st.columns(4 if contexto.can("replenishment.view") else 3, gap="small", wrap=True)
+    with colunas[0]:
+        metric_card("Produtos", len(painel), key="flatter_kpi_produtos", note="No catálogo atual", width="stretch")
+    with colunas[1]:
         metric_card("Em ruptura", int(painel["status"].eq("Ruptura").sum()),
-                    key="flatter_kpi_ruptura", tone="danger", note="Saldo observado igual a zero")
+                    key="flatter_kpi_ruptura", tone="danger", note="Saldo observado igual a zero", width="stretch")
+    with colunas[2]:
         metric_card("Risco antes da entrega", int(painel["risco_prazo"].sum()),
-                    key="flatter_kpi_risco", tone="warning", note="Conferir prazo do fornecedor")
-        if contexto.can("replenishment.view"):
+                    key="flatter_kpi_risco", tone="warning", note="Conferir prazo do fornecedor", width="stretch")
+    if contexto.can("replenishment.view"):
+        with colunas[3]:
             metric_card("Produtos com sugestão", int(painel["quantidade_sugerida"].gt(0).sum()),
-                        key="flatter_kpi_sugestoes", tone="brand", note="Revisão humana necessária")
+                        key="flatter_kpi_sugestoes", tone="brand", note="Revisão humana necessária", width="stretch")
     if contexto.can("finance.view"):
         parados = painel.loc[painel["status"].isin(["Parado", "Excesso"]), "capital_estoque"]
-        with st.container(horizontal=True, wrap=True, gap="small"):
+        colunas_financeiras = st.columns(2, gap="small", wrap=True)
+        with colunas_financeiras[0]:
             metric_card("Capital conhecido em estoque", _moeda(somar_valores_financeiros(painel["capital_estoque"])),
-                        key="flatter_kpi_capital", width=320, note="A custo informado, não receita")
+                        key="flatter_kpi_capital", width="stretch", note="A custo informado, não receita")
+        with colunas_financeiras[1]:
             metric_card("Capital em parados/excesso", _moeda(0.0 if parados.empty else somar_valores_financeiros(parados)),
-                        key="flatter_kpi_excesso", width=320, note="Somente custos conhecidos")
+                        key="flatter_kpi_excesso", width="stretch", note="Somente custos conhecidos")
         if painel["capital_estoque"].isna().any():
             st.caption("Capital parcial: há custos ausentes ou não calculáveis.")
     _flash(painel, contexto)
@@ -288,14 +294,18 @@ def _estoque(servico: Any, contexto: Any) -> None:
         status_badge(str(item["status"]), tone=TONS_STATUS.get(str(item["status"]), "neutral"))
         if item["risco_prazo"]:
             status_badge("Risco antes da entrega", tone="danger")
-        with st.container(horizontal=True, wrap=True, gap="small"):
-            metric_card("Estoque", int(item["estoque"]), key="flatter_detalhe_estoque", width=200)
+        colunas = st.columns(4, gap="small", wrap=True)
+        with colunas[0]:
+            metric_card("Estoque", int(item["estoque"]), key="flatter_detalhe_estoque", width="stretch")
+        with colunas[1]:
             metric_card("Venda média/dia", f"{item['venda_media_diaria']:.2f}" if item["demanda_estimavel"] else "Não estimável",
-                        key="flatter_detalhe_demanda", width=200)
+                        key="flatter_detalhe_demanda", width="stretch")
+        with colunas[2]:
             metric_card("Cobertura", f"{item['cobertura_dias']:.1f} dias" if pd.notna(item["cobertura_dias"]) else "Indefinida",
-                        key="flatter_detalhe_cobertura", width=200)
+                        key="flatter_detalhe_cobertura", width="stretch")
+        with colunas[3]:
             metric_card("Prazo do fornecedor", f"{int(item['prazo_entrega_dias'])} dias",
-                        key="flatter_detalhe_prazo", width=200)
+                        key="flatter_detalhe_prazo", width="stretch")
         if item["requer_revisao"]:
             st.warning(str(item["aviso_qualidade"]))
         if contexto.can("replenishment.view"):
@@ -446,13 +456,16 @@ def _relatorios(servico: Any, contexto: Any) -> None:
     periodo = relatorio["periodo"]
     st.write(f"Período: {periodo['inicio']} a {periodo['fim']}")
     resumo = relatorio["resumo"]
-    with st.container(horizontal=True, wrap=True, gap="small"):
-        metric_card("Unidades vendidas", resumo["unidades_vendidas"], key="flatter_mes_vendas")
-        metric_card("Produtos com venda", resumo["produtos_com_venda"], key="flatter_mes_produtos")
-        variacao = resumo.get("variacao_unidades_pct")
-        if variacao is not None:
-            metric_card("Variação de unidades frente ao mês anterior", f"{variacao:.1f}%",
-                        key="flatter_mes_variacao")
+    variacao = resumo.get("variacao_unidades_pct")
+    colunas = st.columns(3 if variacao is not None else 2, gap="small", wrap=True)
+    with colunas[0]:
+        metric_card("Unidades vendidas", resumo["unidades_vendidas"], key="flatter_mes_vendas", width="stretch")
+    with colunas[1]:
+        metric_card("Produtos com venda", resumo["produtos_com_venda"], key="flatter_mes_produtos", width="stretch")
+    if variacao is not None:
+        with colunas[2]:
+            metric_card("Variação de unidades", f"{variacao:.1f}%", key="flatter_mes_variacao",
+                        note="Frente ao mês anterior", width="stretch")
     for aviso in relatorio.get("cautelas", []):
         st.warning(aviso)
     fonte = relatorio.get("fonte", {})
@@ -467,11 +480,13 @@ def _relatorios(servico: Any, contexto: Any) -> None:
     if contexto.can("finance.view") and "financeiro" in relatorio:
         financeiro = relatorio["financeiro"]
         st.subheader("Indicadores a custo")
-        with st.container(horizontal=True, wrap=True, gap="small"):
+        colunas_financeiras = st.columns(2, gap="small", wrap=True)
+        with colunas_financeiras[0]:
             metric_card("Capital em estoque no fechamento", _moeda(financeiro.get("capital_estoque")),
-                        key="flatter_mes_capital", width=320)
+                        key="flatter_mes_capital", width="stretch")
+        with colunas_financeiras[1]:
             metric_card("Capital parado no fechamento", _moeda(financeiro.get("capital_parado")),
-                        key="flatter_mes_parado", width=320)
+                        key="flatter_mes_parado", width="stretch")
         st.caption(financeiro.get("base", "Valores a custo informado; não representam receita."))
         if financeiro.get("custos_parciais"):
             st.warning("Capital parcial: há produtos sem custo informado no fechamento.")
