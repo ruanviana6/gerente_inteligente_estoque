@@ -3,8 +3,12 @@
 import math
 import re
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
+from functools import wraps
+from threading import RLock
 from typing import Any
 from uuid import UUID
 
@@ -17,6 +21,7 @@ from web.errors import (
     RateLimited,
     ServiceUnavailable,
 )
+from web.telemetry import measure
 
 PERMISSIONS = frozenset({
     "dashboard.view", "inventory.view", "replenishment.view", "replenishment.export",
@@ -90,6 +95,16 @@ class AccessContext:
         return self.profile.active and permission in self.permissions
 
 
+def _serialized(method: Callable) -> Callable:
+    """Serializa operações da mesma sessão, inclusive a renovação em downloads."""
+    @wraps(method)
+    def wrapped(self, *args, **kwargs):
+        """Evita que login, logout e refresh troquem identidade durante uma operação."""
+        with self._lock:
+            return method(self, *args, **kwargs)
+    return wrapped
+
+
 class AuthService:
     """Coordena autenticação de uma única sessão Streamlit, sem estado global."""
 
@@ -100,11 +115,51 @@ class AuthService:
         self._session: Session | None = None
         self._failed_logins = 0
         self._blocked_until = 0.0
+        self._lock = RLock()
+        self._generation = 0
+        # ContextVar pertence a esta instância e ao fluxo atual, nunca ao processo
+        # inteiro. Só a validação Auth é reutilizada; permissões sempre vêm do banco.
+        self._verified: ContextVar[tuple | None] = ContextVar("auth_verification", default=None)
+        self._execution_active: ContextVar[bool] = ContextVar("auth_execution", default=False)
 
     @property
     def session(self) -> Session | None:
         """Disponibiliza somente a sessão desta instância, sem expor senha."""
-        return self._session
+        with self._lock:
+            return self._session
+
+    @property
+    def generation(self) -> int:
+        """Identifica a vida da sessão; novo login nunca reativa downloads antigos."""
+        with self._lock:
+            return self._generation
+
+    def _invalidate_session(self) -> None:
+        """Descarta a sessão e invalida callbacks vinculados à autenticação anterior."""
+        self._session = None
+        self._generation += 1
+        self._verified.set(None)
+
+    @contextmanager
+    def execution(self) -> Iterator[None]:
+        """Limita a reutilização Auth ao rerun, fragmento ou download atual.
+
+        Escopos novos sempre validam Auth de novo. Não se guardam permissões,
+        dados nem autorização entre execuções. O banco revalida auth.sessions.
+        """
+        marker = self._verified.set(None)
+        active = self._execution_active.set(True)
+        try:
+            yield
+        finally:
+            self._verified.reset(marker)
+            self._execution_active.reset(active)
+
+    @contextmanager
+    def operation(self) -> Iterator[None]:
+        """Mantém a identidade estável até terminar uma operação com vários passos."""
+        with self._lock:
+            yield
 
     def _read_session(self, response: object) -> Session:
         """Aceita sessão somente após validar estrutura e identidade da resposta Auth."""
@@ -129,6 +184,7 @@ class AuthService:
         except (KeyError, ValueError, TypeError, OverflowError):
             raise AuthenticationError("A sessão retornada é inválida. Entre novamente.") from None
 
+    @_serialized
     def _current_session(self) -> Session:
         """Renova o token antes da expiração e recusa troca inesperada de identidade."""
         session = self._session
@@ -145,13 +201,14 @@ class AuthService:
                 self._session = refreshed
                 session = refreshed
             except AppError:
-                self._session = None
+                self._invalidate_session()
                 raise
         return session
 
+    @_serialized
     def login(self, email: str, password: str) -> AccessContext:
         """Autentica e exige perfil ativo antes de disponibilizar qualquer dado interno."""
-        self._session = None
+        self._invalidate_session()
         if self._clock() < self._blocked_until:
             raise RateLimited("Muitas tentativas nesta sessão. Aguarde um minuto.")
         email = _email(email)
@@ -162,27 +219,34 @@ class AuthService:
             self._session = self._read_session(response)
             context = self.context()
         except (AuthenticationError, AuthorizationError):
-            self._session = None
+            self._invalidate_session()
             self._failed_logins += 1
             if self._failed_logins >= 5:
                 self._blocked_until = self._clock() + 60
                 self._failed_logins = 0
             raise AuthenticationError("Acesso não autorizado. Confira suas credenciais ou consulte o Master.") from None
         except AppError:
-            self._session = None
+            self._invalidate_session()
             raise
         self._failed_logins = 0
         return context
 
+    @_serialized
     def context(self) -> AccessContext:
         """Revalida usuário e perfil no servidor, incluindo bloqueios e revogações recentes."""
         try:
             session = self._current_session()
-            user = self.api.auth("GET", "user", access_token=session.access_token)
-            if (not isinstance(user, dict) or _uuid(user.get("id")) != session.user_id
-                    or user.get("is_anonymous") is True):
-                raise AuthenticationError("Sessão inválida. Entre novamente.")
-            result = self.api.rpc("app_context", {}, session.access_token)
+            stamp = (session, self._generation)
+            if not self._execution_active.get() or self._verified.get() != stamp:
+                with measure("auth_user"):
+                    user = self.api.auth("GET", "user", access_token=session.access_token)
+                if (not isinstance(user, dict) or _uuid(user.get("id")) != session.user_id
+                        or user.get("is_anonymous") is True):
+                    raise AuthenticationError("Sessão inválida. Entre novamente.")
+                if self._execution_active.get():
+                    self._verified.set(stamp)
+            with measure("app_context"):
+                result = self.api.rpc("app_context", {}, session.access_token)
             if not isinstance(result, dict) or not isinstance(result.get("profile"), dict):
                 raise AuthorizationError("A conta não possui acesso ativo ao aplicativo.")
             profile = result["profile"]
@@ -196,9 +260,10 @@ class AuthService:
                 display_name=str(profile.get("display_name", "Usuário")), role=profile["role"], active=True,
             ), frozenset(permissions))
         except (AuthenticationError, AuthorizationError):
-            self._session = None
+            self._invalidate_session()
             raise
 
+    @_serialized
     def require(self, permission: str) -> AccessContext:
         """Exige uma permissão vigente antes de cada operação protegida."""
         context = self.context()
@@ -206,17 +271,30 @@ class AuthService:
             raise AuthorizationError("Seu usuário não tem permissão para esta funcionalidade.")
         return context
 
+    @_serialized
     def rpc(self, name: str, payload: dict | None, permission: str) -> Any:
         """Verifica autorização no backend e envia JWT; o banco a verifica novamente."""
-        self.require(permission)
+        return self.rpc_with_context(name, payload, permission)[0]
+
+    @_serialized
+    def rpc_with_context(
+        self, name: str, payload: dict | None, permission: str,
+    ) -> tuple[Any, AccessContext]:
+        """Vincula a resposta ao contexto consultado sem repetir app_context.
+
+        O contexto retornado identifica o escopo da consulta. Não substitui
+        a revalidação de autorização após cálculos ou antes de entregar dados.
+        """
+        context = self.require(permission)
         session = self._current_session()
         try:
-            return self.api.rpc(name, payload or {}, session.access_token)
+            return self.api.rpc(name, payload or {}, session.access_token), context
         except (AuthenticationError, AuthorizationError):
             # Uma revogação entre a consulta de contexto e a operação não reutiliza sessão local.
-            self._session = None
+            self._invalidate_session()
             raise
 
+    @_serialized
     def logout(self) -> None:
         """Revoga sessões no Auth e sempre remove os tokens locais, inclusive em falha de rede."""
         try:
@@ -226,7 +304,7 @@ class AuthService:
         except AppError:
             raise ServiceUnavailable("Sessão local encerrada; não foi possível confirmar a revogação remota.") from None
         finally:
-            self._session = None
+            self._invalidate_session()
 
     def request_password_reset(self, email: str) -> None:
         """Solicita código de recuperação somente após habilitação explícita do remetente."""
@@ -234,19 +312,21 @@ class AuthService:
             raise ConfigurationError("Recuperação por e-mail aguarda configuração e autorização do proprietário.")
         self.api.auth("POST", "recover", {"email": _email(email)})
 
+    @_serialized
     def recover_password(self, email: str, otp: str, password: str) -> None:
         """Confirma código digitado, troca senha e encerra a sessão sem tokens na URL."""
         validate_password(password)
         if not isinstance(otp, str) or not re.fullmatch(r"\d{6,10}", otp):
             raise AuthenticationError("Informe o código de recuperação recebido.")
-        self._session = None
+        self._invalidate_session()
         try:
             response = self.api.auth("POST", "verify", {"type": "recovery", "email": _email(email), "token": otp})
             self._session = self._read_session(response)
             self.change_password(password)
         finally:
-            self._session = None
+            self._invalidate_session()
 
+    @_serialized
     def change_password(self, password: str) -> None:
         """Exige identidade ativa, altera senha no Auth e solicita novo login."""
         validate_password(password)
@@ -255,6 +335,7 @@ class AuthService:
         self.api.auth("PUT", "user", {"password": password}, session.access_token)
         self.logout()
 
+    @_serialized
     def create_user(
         self, email: str, password: str, display_name: str, role: str,
         permissions: Mapping[str, bool] | None = None,

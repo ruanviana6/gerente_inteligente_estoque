@@ -1,6 +1,7 @@
 """Integração da fachada web: autorização vigente, dados civis e motor auditado."""
 
 import copy
+from contextlib import nullcontext
 from datetime import date
 
 import pandas as pd
@@ -49,6 +50,15 @@ class AuthFalso:
         self.payload = payload or payload_ficticio()
         self.calls = []
         self.after_rpc = None
+
+    def operation(self):
+        """Representa o contrato de operação; concorrência usa AuthService real em outros testes."""
+        return nullcontext()
+
+    def rpc_with_context(self, name, payload, permission):
+        """Associa o contexto inicial à resposta do transporte simulado."""
+        context = self.require(permission)
+        return self.rpc(name, payload, permission), context
 
     def context(self):
         """Retorna sempre um contexto novo, tal como a consulta ao servidor."""

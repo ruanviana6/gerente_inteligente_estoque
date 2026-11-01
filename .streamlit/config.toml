@@ -7,6 +7,55 @@ enableCORS = true
 
 [client]
 showErrorDetails = "none"
+# Mantém downloads nos botões que reautorizam a operação; dados já exibidos
+# continuam acessíveis ao próprio usuário, isto não é uma barreira de segurança.
+disableDataExport = true
 
 [browser]
 gatherUsageStats = false
+
+# Tema Flatter: fontes do próprio sistema, sem downloads ou serviços externos.
+[theme]
+base = "dark"
+primaryColor = "#B55440"
+backgroundColor = "#101720"
+secondaryBackgroundColor = "#1C2937"
+textColor = "#F5F7FA"
+font = "sans-serif"
+headingFont = "sans-serif"
+headingFontSizes = ["2rem", "1.5rem", "1.25rem", "1.1rem", "1rem", "0.875rem"]
+headingFontWeights = [650, 600, 600, 600, 600, 600]
+baseRadius = "0.65rem"
+buttonRadius = "0.65rem"
+borderColor = "#6C7A8B"
+showWidgetBorder = true
+showSidebarBorder = true
+linkColor = "#D97963"
+linkUnderline = true
+grayTextColor = "#B8C2CE"
+redColor = "#FFADAD"
+redBackgroundColor = "#3B252C"
+redTextColor = "#FFADAD"
+yellowColor = "#F8D17B"
+yellowBackgroundColor = "#3A3222"
+yellowTextColor = "#F8D17B"
+greenColor = "#8CD5B3"
+greenBackgroundColor = "#1C382F"
+greenTextColor = "#8CD5B3"
+blueColor = "#9FC7FF"
+blueBackgroundColor = "#22354A"
+blueTextColor = "#9FC7FF"
+chartCategoricalColors = ["#D97963", "#9FC7FF", "#8CD5B3", "#F8D17B", "#C3A8EB", "#FFADAD"]
+dataframeBorderColor = "#334355"
+dataframeHeaderBackgroundColor = "#151E2B"
+dataframeHeaderTextColor = "#F5F7FA"
+paddingTop = "1.5rem"
+paddingBottom = "2rem"
+
+[theme.sidebar]
+backgroundColor = "#151E2B"
+secondaryBackgroundColor = "#1C2937"
+textColor = "#F5F7FA"
+borderColor = "#6C7A8B"
+headingFontSizes = ["1.4rem", "1.2rem", "1.1rem", "1rem", "0.95rem", "0.875rem"]
+paddingTop = "1.25rem"

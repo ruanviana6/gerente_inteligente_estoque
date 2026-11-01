@@ -1,0 +1,190 @@
+{
+  "aprovado": true,
+  "natureza": "Navegador real, dados e transporte fictícios.",
+  "telas": {
+    "login-1440": {
+      "viewport": 1440,
+      "documento": 1440,
+      "principal_visivel": 1440,
+      "principal_conteudo": 1440,
+      "alvos_total": 6,
+      "alvos_menores_44": 2,
+      "acoes_aplicacao_total": 2,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "login-1440.png"
+    },
+    "painel-1440": {
+      "viewport": 1440,
+      "documento": 1440,
+      "principal_visivel": 1140,
+      "principal_conteudo": 1140,
+      "alvos_total": 30,
+      "alvos_menores_44": 13,
+      "acoes_aplicacao_total": 7,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "painel-1440.png"
+    },
+    "estoque-detalhe-1440": {
+      "viewport": 1440,
+      "documento": 1440,
+      "principal_visivel": 1140,
+      "principal_conteudo": 1140,
+      "alvos_total": 55,
+      "alvos_menores_44": 16,
+      "acoes_aplicacao_total": 2,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "estoque-detalhe-1440.png"
+    },
+    "produto-detalhe-1440": {
+      "viewport": 1440,
+      "documento": 1440,
+      "principal_visivel": 1140,
+      "principal_conteudo": 1140,
+      "alvos_total": 55,
+      "alvos_menores_44": 16,
+      "acoes_aplicacao_total": 2,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "produto-detalhe-1440.png"
+    },
+    "relatorios-1440": {
+      "viewport": 1440,
+      "documento": 1440,
+      "principal_visivel": 1140,
+      "principal_conteudo": 1140,
+      "alvos_total": 33,
+      "alvos_menores_44": 13,
+      "acoes_aplicacao_total": 3,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "relatorios-1440.png"
+    },
+    "administracao-1440": {
+      "viewport": 1440,
+      "documento": 1440,
+      "principal_visivel": 1140,
+      "principal_conteudo": 1140,
+      "alvos_total": 58,
+      "alvos_menores_44": 17,
+      "acoes_aplicacao_total": 2,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "administracao-1440.png"
+    },
+    "login-390": {
+      "viewport": 390,
+      "documento": 390,
+      "principal_visivel": 390,
+      "principal_conteudo": 390,
+      "alvos_total": 3,
+      "alvos_menores_44": 2,
+      "acoes_aplicacao_total": 1,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "login-390.png"
+    },
+    "painel-390": {
+      "viewport": 390,
+      "documento": 390,
+      "principal_visivel": 390,
+      "principal_conteudo": 390,
+      "alvos_total": 23,
+      "alvos_menores_44": 14,
+      "acoes_aplicacao_total": 7,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "painel-390.png"
+    },
+    "estoque-detalhe-390": {
+      "viewport": 390,
+      "documento": 390,
+      "principal_visivel": 390,
+      "principal_conteudo": 390,
+      "alvos_total": 55,
+      "alvos_menores_44": 17,
+      "acoes_aplicacao_total": 2,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "estoque-detalhe-390.png"
+    },
+    "produto-detalhe-390": {
+      "viewport": 390,
+      "documento": 390,
+      "principal_visivel": 390,
+      "principal_conteudo": 390,
+      "alvos_total": 55,
+      "alvos_menores_44": 17,
+      "acoes_aplicacao_total": 2,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "produto-detalhe-390.png"
+    },
+    "relatorios-390": {
+      "viewport": 390,
+      "documento": 390,
+      "principal_visivel": 390,
+      "principal_conteudo": 390,
+      "alvos_total": 33,
+      "alvos_menores_44": 14,
+      "acoes_aplicacao_total": 3,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "relatorios-390.png"
+    },
+    "administracao-390": {
+      "viewport": 390,
+      "documento": 390,
+      "principal_visivel": 390,
+      "principal_conteudo": 390,
+      "alvos_total": 58,
+      "alvos_menores_44": 18,
+      "acoes_aplicacao_total": 2,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "administracao-390.png"
+    }
+  },
+  "fluxos": {
+    "download-mensal-sob-demanda": "aprovado",
+    "master-1440": "aprovado",
+    "master-390": "aprovado",
+    "revogacao-financeira-em-tela-aberta": "aprovado",
+    "exportacao-negada-apos-revogacao": "aprovado",
+    "logout-isolado-entre-contextos": "aprovado",
+    "desativacao-sem-interacao": "aprovado",
+    "perfis-e-financeiro": "aprovado"
+  },
+  "limitacoes": [
+    "UI real com transporte fictício; Auth remoto e RLS são testados por suítes separadas.",
+    "Contagem de alvos pequenos inclui controles nativos e não equivale a auditoria WCAG integral.",
+    "Capturas não representam publicação nem dados empresariais."
+  ],
+  "publicado": {
+    "url": "https://estoqueinteligente-flatter.streamlit.app/",
+    "http_status": 200,
+    "formulario_login_observado": false,
+    "autenticado": false,
+    "sinais_publicos": {
+      "suspensao_observada": false,
+      "acesso_privado_observado": false,
+      "aplicativo_ausente_observado": false,
+      "configuracao_pendente_observada": false
+    },
+    "limite": "Somente abertura anônima; HTTP 200 não comprova funcionamento nem autenticação. Nenhuma operação foi realizada na aplicação publicada."
+  }
+}

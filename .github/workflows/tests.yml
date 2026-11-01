@@ -70,6 +70,7 @@ jobs:
       - name: Testes
         run: python -m pytest -ra --junitxml=resultado-testes.xml
       - name: Lint principal
+        if: always()
         run: ruff check .
       - name: Verificar dependências instaladas
         run: python -m pip check

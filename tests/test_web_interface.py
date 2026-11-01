@@ -3,6 +3,7 @@
 A fábrica é injetada no processo de teste, nunca por flag, URL ou segredo da
 aplicação. Os testes não consultam o Supabase nem disponibilizam login alternativo.
 """
+from contextlib import nullcontext
 from uuid import UUID
 
 import pandas as pd
@@ -79,6 +80,10 @@ class ServicoFicticio:
         return AccessContext(Profile(self.usuario, ORGANIZACAO, self.nome, "Visualizador", True),
                              self.permissoes)
 
+    def execution(self):
+        """Mantém o contrato de escopo; este fake não realiza consultas de Auth."""
+        return nullcontext()
+
     def load_inventory(self, module, month=None):
         """Registra a permissão usada e mantém dados financeiros sentinela no fake."""
         assert self.context().can(module), "A UI pediu dados de uma funcionalidade não autorizada."
@@ -86,7 +91,7 @@ class ServicoFicticio:
         if self.falhar_dados:
             raise ServiceUnavailable("DETALHE_INTERNO_FICTICIO")
         # O serviço real já remove custos; este fake testa também a defesa na UI.
-        return self.dados
+        return {**self.dados, "_access_context": self.context()}
 
     def list_decisions(self):
         """Fornece histórico vazio sem persistência externa."""

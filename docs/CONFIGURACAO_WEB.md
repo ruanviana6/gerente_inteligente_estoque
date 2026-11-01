@@ -2,7 +2,7 @@
 
 O aplicativo usa exclusivamente o projeto `csiqpzoudruzppfbpqqx`, região `sa-east-1`.
 Não crie outro projeto. A estrutura é versionada em `supabase/migrations/`.
-Não copie dados empresariais para a validação inicial. Este guia não declara publicação concluída.
+Não copie dados empresariais para a validação inicial. O endereço publicado informado pelo proprietário é https://estoqueinteligente-flatter.streamlit.app/. Este guia continua como referência de configuração; a candidata Flatter da Issue #6 não deve ser publicada nem alterar Secrets antes da revisão.
 
 ## 1. Configurar Supabase Auth
 
@@ -68,7 +68,7 @@ Mantenha esse segredo separado de `REPORT_JOB_SECRET`, utilizado exclusivamente 
 5. Acesse a URL HTTPS gerada e faça login com a conta Master. Uma sessão sem login deve mostrar apenas o formulário de autenticação. Sem Secrets, o app mostra instrução de configuração e não consulta dados.
 6. Se desejar restringir também quem abre o endereço, configure os viewers da plataforma. Essa restrição é adicional à autorização do app e à RLS.
 
-Não há conta/conector de Streamlit Cloud disponível nesta execução. O proprietário precisa realizar esses passos e fornecer a URL para a verificação remota posterior. Um teste HTTP local não comprova publicação.
+A conta de administração do Streamlit Cloud não está conectada nesta execução. A aplicação existente foi preservada. Para publicar uma alteração aprovada, o proprietário controla a branch e o reinício/deploy no painel. Um HTTP 200 anônimo, sem observar o login e os fluxos autenticados, não comprova funcionamento da aplicação. A validação da candidata está documentada em docs/DESEMPENHO_FLATTER.md.
 
 ## 4. Validar com dados fictícios
 
