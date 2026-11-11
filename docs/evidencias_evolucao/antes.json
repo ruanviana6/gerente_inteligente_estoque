@@ -1,0 +1,1084 @@
+{
+  "mode": "ui",
+  "python": "3.12.14",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "versions": {
+    "pandas": "2.3.3",
+    "numpy": "2.4.6",
+    "streamlit": "1.66.1"
+  },
+  "bootstrap_import_seconds": 0.38331733699999404,
+  "network": "Transporte fictício local; sem conexão com Supabase/Streamlit Cloud",
+  "simulated_latency_per_request_ms": 40.0,
+  "timing_note": "Etapas são inclusivas; não somar motor com normalização nem relatório com exportação.",
+  "ui_timing_note": "execucao_UI_fora_servicos = tempo AppTest menos união das fronteiras de serviços. Inclui Python da interface, Streamlit, serialização e coordenação do AppTest; não mede pintura nem rede do navegador. A primeira carga também inclui importação da UI. backend_total_sem_sobreposicao elimina chamadas aninhadas e intervalos concorrentes; service_factory mede criação/recuperação do serviço com a mesma fronteira nas duas versões.",
+  "navigation_note": "Acesso à página e ação solicitada são medidos separadamente. Adiar cálculo não elimina seu custo. AppTest não mede pintura do navegador; ações_backend não medem transferência de arquivos.",
+  "datasets": {
+    "100": {
+      "primeira_carga": {
+        "samples": 1,
+        "first_seconds": 0.8258884699999953,
+        "p50_seconds": 0.8258884699999953,
+        "p95_seconds": 0.8258884699999953,
+        "calls_per_sample": {
+          "auth_user": [
+            1
+          ],
+          "carregamento_backend": [
+            1
+          ],
+          "contexto_backend": [
+            1
+          ],
+          "motor": [
+            1
+          ],
+          "normalizacao_inclui_motor": [
+            1
+          ],
+          "rpc_app_context": [
+            3
+          ],
+          "rpc_load_inventory": [
+            1
+          ],
+          "service_factory": [
+            1
+          ]
+        },
+        "stage_p50_seconds": {
+          "auth_user": 0.040163953000046604,
+          "backend_total_sem_sobreposicao": 0.2958419739999272,
+          "carregamento_backend": 0.21471708699993997,
+          "contexto_backend": 0.08086216399999557,
+          "execucao_UI_fora_servicos": 0.5300464960000681,
+          "motor": 0.03909017199998743,
+          "normalizacao_inclui_motor": 0.08718013899999733,
+          "rpc_app_context": 0.1206484699999919,
+          "rpc_load_inventory": 0.04549038200002542,
+          "service_factory": 0.00026272299999163806
+        },
+        "raw_seconds": [
+          0.8258884699999953
+        ]
+      },
+      "Painel": {
+        "samples": 3,
+        "first_seconds": 0.34055713200007176,
+        "p50_seconds": 0.35393481200003407,
+        "p95_seconds": 0.37300844449996473,
+        "calls_per_sample": {
+          "auth_user": [
+            1,
+            1,
+            1
+          ],
+          "carregamento_backend": [
+            1,
+            1,
+            1
+          ],
+          "contexto_backend": [
+            1,
+            1,
+            1
+          ],
+          "motor": [
+            1,
+            1,
+            1
+          ],
+          "normalizacao_inclui_motor": [
+            1,
+            1,
+            1
+          ],
+          "rpc_app_context": [
+            3,
+            3,
+            3
+          ],
+          "rpc_load_inventory": [
+            1,
+            1,
+            1
+          ],
+          "service_factory": [
+            1,
+            1,
+            1
+          ]
+        },
+        "stage_p50_seconds": {
+          "auth_user": 0.040185818999930234,
+          "backend_total_sem_sobreposicao": 0.3161128239999016,
+          "carregamento_backend": 0.2353949170000078,
+          "contexto_backend": 0.08068659799994293,
+          "execucao_UI_fora_servicos": 0.03782198800013248,
+          "motor": 0.04023360799999409,
+          "normalizacao_inclui_motor": 0.10198275200002627,
+          "rpc_app_context": 0.12065290500015635,
+          "rpc_load_inventory": 0.046484534000001076,
+          "service_factory": 3.674899994621228e-05
+        },
+        "raw_seconds": [
+          0.34055713200007176,
+          0.35393481200003407,
+          0.37512773699995705
+        ]
+      },
+      "Estoque": {
+        "samples": 3,
+        "first_seconds": 0.393765142999996,
+        "p50_seconds": 0.3868292519999841,
+        "p95_seconds": 0.3930715538999948,
+        "calls_per_sample": {
+          "auth_user": [
+            1,
+            1,
+            1
+          ],
+          "carregamento_backend": [
+            1,
+            1,
+            1
+          ],
+          "contexto_backend": [
+            1,
+            1,
+            1
+          ],
+          "motor": [
+            1,
+            1,
+            1
+          ],
+          "normalizacao_inclui_motor": [
+            1,
+            1,
+            1
+          ],
+          "rpc_app_context": [
+            3,
+            3,
+            3
+          ],
+          "rpc_load_inventory": [
+            1,
+            1,
+            1
+          ],
+          "service_factory": [
+            1,
+            1,
+            1
+          ]
+        },
+        "stage_p50_seconds": {
+          "auth_user": 0.04021170699991217,
+          "backend_total_sem_sobreposicao": 0.36533164000002216,
+          "carregamento_backend": 0.2692787160000307,
+          "contexto_backend": 0.08069494700009727,
+          "execucao_UI_fora_servicos": 0.02638805899982799,
+          "motor": 0.04185609899991505,
+          "normalizacao_inclui_motor": 0.11054381500002819,
+          "rpc_app_context": 0.12063003699995534,
+          "rpc_load_inventory": 0.05031474600002639,
+          "service_factory": 5.1215999974374427e-05
+        },
+        "raw_seconds": [
+          0.393765142999996,
+          0.3868292519999841,
+          0.3514669489999278
+        ]
+      },
+      "Reposição": {
+        "samples": 3,
+        "first_seconds": 0.33818563099998755,
+        "p50_seconds": 0.3476915450000888,
+        "p95_seconds": 0.37771780939999644,
+        "calls_per_sample": {
+          "auth_user": [
+            1,
+            1,
+            1
+          ],
+          "carregamento_backend": [
+            1,
+            1,
+            1
+          ],
+          "contexto_backend": [
+            1,
+            1,
+            1
+          ],
+          "motor": [
+            1,
+            1,
+            1
+          ],
+          "normalizacao_inclui_motor": [
+            1,
+            1,
+            1
+          ],
+          "rpc_app_context": [
+            3,
+            3,
+            3
+          ],
+          "rpc_load_inventory": [
+            1,
+            1,
+            1
+          ],
+          "service_factory": [
+            1,
+            1,
+            1
+          ]
+        },
+        "stage_p50_seconds": {
+          "auth_user": 0.040193401000010454,
+          "backend_total_sem_sobreposicao": 0.3120459579998851,
+          "carregamento_backend": 0.23141528199994355,
+          "contexto_backend": 0.08072419599989189,
+          "execucao_UI_fora_servicos": 0.03381673400008367,
+          "motor": 0.049752619000059894,
+          "normalizacao_inclui_motor": 0.10167744099999254,
+          "rpc_app_context": 0.12062692299991795,
+          "rpc_load_inventory": 0.04698407499995483,
+          "service_factory": 3.529699995397095e-05
+        },
+        "raw_seconds": [
+          0.33818563099998755,
+          0.3476915450000888,
+          0.3810540609999862
+        ]
+      },
+      "Relatórios": {
+        "samples": 3,
+        "first_seconds": 0.09067950399992242,
+        "p50_seconds": 0.09067950399992242,
+        "p95_seconds": 0.09123379330000034,
+        "calls_per_sample": {
+          "auth_user": [
+            1,
+            1,
+            1
+          ],
+          "contexto_backend": [
+            1,
+            1,
+            1
+          ],
+          "rpc_app_context": [
+            1,
+            1,
+            1
+          ],
+          "service_factory": [
+            1,
+            1,
+            1
+          ]
+        },
+        "stage_p50_seconds": {
+          "auth_user": 0.04021002199999657,
+          "backend_total_sem_sobreposicao": 0.08085216599999967,
+          "contexto_backend": 0.08074872100007724,
+          "execucao_UI_fora_servicos": 0.009676698999896871,
+          "rpc_app_context": 0.04022694499997215,
+          "service_factory": 4.228900002090086e-05
+        },
+        "raw_seconds": [
+          0.09067950399992242,
+          0.091295381000009,
+          0.08995690199992623
+        ]
+      },
+      "gerar_relatorio_interface": {
+        "samples": 3,
+        "first_seconds": 0.5490397600000279,
+        "p50_seconds": 0.5471694210000351,
+        "p95_seconds": 0.5488527261000286,
+        "calls_per_sample": {
+          "auth_user": [
+            1,
+            1,
+            1
+          ],
+          "contexto_backend": [
+            1,
+            1,
+            1
+          ],
+          "motor": [
+            1,
+            1,
+            1
+          ],
+          "relatorio": [
+            1,
+            1,
+            1
+          ],
+          "rpc_app_context": [
+            5,
+            5,
+            5
+          ],
+          "rpc_load_inventory": [
+            2,
+            2,
+            2
+          ],
+          "service_factory": [
+            1,
+            1,
+            1
+          ]
+        },
+        "stage_p50_seconds": {
+          "auth_user": 0.04014853699993637,
+          "backend_total_sem_sobreposicao": 0.5136012199999413,
+          "contexto_backend": 0.08077863799996976,
+          "execucao_UI_fora_servicos": 0.026172165000048153,
+          "motor": 0.048556274000020494,
+          "relatorio": 0.432793337000021,
+          "rpc_app_context": 0.20100446599985844,
+          "rpc_load_inventory": 0.09296371700008876,
+          "service_factory": 4.099699992821115e-05
+        },
+        "raw_seconds": [
+          0.5490397600000279,
+          0.5147320540000919,
+          0.5471694210000351
+        ]
+      },
+      "acoes_backend": {
+        "scope": "Ações completas do backend; sem transferência ou renderização no navegador",
+        "export_mechanism": "Callback diferido real do botão, invocado sem navegador",
+        "measurements": {
+          "gerar_relatorio_mensal": {
+            "samples": 3,
+            "first_seconds": 0.5034299650000094,
+            "p50_seconds": 0.48685526100007337,
+            "p95_seconds": 0.5017724946000157,
+            "calls_per_sample": {
+              "auth_user": [
+                1,
+                1,
+                1
+              ],
+              "motor": [
+                1,
+                1,
+                1
+              ],
+              "relatorio": [
+                1,
+                1,
+                1
+              ],
+              "rpc_app_context": [
+                4,
+                4,
+                4
+              ],
+              "rpc_load_inventory": [
+                2,
+                2,
+                2
+              ]
+            },
+            "stage_p50_seconds": {
+              "auth_user": 0.04017294299990226,
+              "backend_total_sem_sobreposicao": 0.48676978000003146,
+              "execucao_fora_servicos": 7.64540000091074e-05,
+              "motor": 0.03778339500001948,
+              "relatorio": 0.48676978000003146,
+              "rpc_app_context": 0.16086837699992884,
+              "rpc_load_inventory": 0.0998141500000429
+            },
+            "raw_seconds": [
+              0.5034299650000094,
+              0.48685526100007337,
+              0.4378402199999982
+            ]
+          },
+          "exportar_relatorio_csv": {
+            "samples": 3,
+            "first_seconds": 0.6305498790000001,
+            "p50_seconds": 0.708573347999959,
+            "p95_seconds": 0.8505208998000284,
+            "calls_per_sample": {
+              "auth_user": [
+                2,
+                2,
+                2
+              ],
+              "callback_csv_mensal": [
+                1,
+                1,
+                1
+              ],
+              "contexto_backend": [
+                2,
+                2,
+                2
+              ],
+              "export_relatorio": [
+                1,
+                1,
+                1
+              ],
+              "motor": [
+                1,
+                1,
+                1
+              ],
+              "relatorio": [
+                1,
+                1,
+                1
+              ],
+              "rpc_app_context": [
+                8,
+                8,
+                8
+              ],
+              "rpc_load_inventory": [
+                2,
+                2,
+                2
+              ]
+            },
+            "stage_p50_seconds": {
+              "auth_user": 0.0802908009999328,
+              "backend_total_sem_sobreposicao": 0.7085660439998946,
+              "callback_csv_mensal": 0.7085660439998946,
+              "contexto_backend": 0.16142807099993206,
+              "execucao_fora_servicos": 8.44600003802043e-06,
+              "export_relatorio": 0.5474349489999213,
+              "motor": 0.04619182500005081,
+              "relatorio": 0.4491710290000128,
+              "rpc_app_context": 0.3250718170000937,
+              "rpc_load_inventory": 0.09246497099991302
+            },
+            "raw_seconds": [
+              0.6305498790000001,
+              0.708573347999959,
+              0.8662928500000362
+            ]
+          },
+          "exportar_reposicao_csv": {
+            "samples": 3,
+            "first_seconds": 0.4810468870000477,
+            "p50_seconds": 0.45665446500004236,
+            "p95_seconds": 0.4786076448000472,
+            "calls_per_sample": {
+              "auth_user": [
+                2,
+                2,
+                2
+              ],
+              "callback_csv_reposicao": [
+                1,
+                1,
+                1
+              ],
+              "carregamento_backend": [
+                1,
+                1,
+                1
+              ],
+              "contexto_backend": [
+                2,
+                2,
+                2
+              ],
+              "export_reposicao": [
+                1,
+                1,
+                1
+              ],
+              "motor": [
+                1,
+                1,
+                1
+              ],
+              "normalizacao_inclui_motor": [
+                1,
+                1,
+                1
+              ],
+              "rpc_app_context": [
+                6,
+                6,
+                6
+              ],
+              "rpc_load_inventory": [
+                1,
+                1,
+                1
+              ]
+            },
+            "stage_p50_seconds": {
+              "auth_user": 0.080285968000112,
+              "backend_total_sem_sobreposicao": 0.4566428130000304,
+              "callback_csv_reposicao": 0.4566428130000304,
+              "carregamento_backend": 0.20938629500005845,
+              "contexto_backend": 0.16109479200008536,
+              "execucao_fora_servicos": 7.103000029928808e-06,
+              "export_reposicao": 0.2950096989999338,
+              "motor": 0.03521658699992258,
+              "normalizacao_inclui_motor": 0.08104017800008023,
+              "rpc_app_context": 0.2411750450002046,
+              "rpc_load_inventory": 0.045755305999932716
+            },
+            "raw_seconds": [
+              0.4810468870000477,
+              0.45553910399996767,
+              0.45665446500004236
+            ]
+          }
+        }
+      }
+    },
+    "1200": {
+      "primeira_carga": {
+        "samples": 1,
+        "first_seconds": 0.9386113350000187,
+        "p50_seconds": 0.9386113350000187,
+        "p95_seconds": 0.9386113350000187,
+        "calls_per_sample": {
+          "auth_user": [
+            1
+          ],
+          "carregamento_backend": [
+            1
+          ],
+          "contexto_backend": [
+            1
+          ],
+          "motor": [
+            1
+          ],
+          "normalizacao_inclui_motor": [
+            1
+          ],
+          "rpc_app_context": [
+            3
+          ],
+          "rpc_load_inventory": [
+            1
+          ],
+          "service_factory": [
+            1
+          ]
+        },
+        "stage_p50_seconds": {
+          "auth_user": 0.04013957799998025,
+          "backend_total_sem_sobreposicao": 0.7353921009998885,
+          "carregamento_backend": 0.6547854089999419,
+          "contexto_backend": 0.08052278499997101,
+          "execucao_UI_fora_servicos": 0.2032192340001302,
+          "motor": 0.09626078500002677,
+          "normalizacao_inclui_motor": 0.44991670000001704,
+          "rpc_app_context": 0.12050853699986419,
+          "rpc_load_inventory": 0.11021109199998591,
+          "service_factory": 8.390699997562479e-05
+        },
+        "raw_seconds": [
+          0.9386113350000187
+        ]
+      },
+      "Painel": {
+        "samples": 3,
+        "first_seconds": 0.7740508959999488,
+        "p50_seconds": 0.8013745319999543,
+        "p95_seconds": 0.8397167783999293,
+        "calls_per_sample": {
+          "auth_user": [
+            1,
+            1,
+            1
+          ],
+          "carregamento_backend": [
+            1,
+            1,
+            1
+          ],
+          "contexto_backend": [
+            1,
+            1,
+            1
+          ],
+          "motor": [
+            1,
+            1,
+            1
+          ],
+          "normalizacao_inclui_motor": [
+            1,
+            1,
+            1
+          ],
+          "rpc_app_context": [
+            3,
+            3,
+            3
+          ],
+          "rpc_load_inventory": [
+            1,
+            1,
+            1
+          ],
+          "service_factory": [
+            1,
+            1,
+            1
+          ]
+        },
+        "stage_p50_seconds": {
+          "auth_user": 0.040156653000053666,
+          "backend_total_sem_sobreposicao": 0.7697381469999982,
+          "carregamento_backend": 0.6892030029999887,
+          "contexto_backend": 0.08063683699992907,
+          "execucao_UI_fora_servicos": 0.034677643000009084,
+          "motor": 0.10138864400005332,
+          "normalizacao_inclui_motor": 0.45955198600006497,
+          "rpc_app_context": 0.12054885099996682,
+          "rpc_load_inventory": 0.13272824600005606,
+          "service_factory": 2.889400002459297e-05
+        },
+        "raw_seconds": [
+          0.7740508959999488,
+          0.8013745319999543,
+          0.8439770279999266
+        ]
+      },
+      "Estoque": {
+        "samples": 3,
+        "first_seconds": 0.7454816130000381,
+        "p50_seconds": 1.065194660999964,
+        "p95_seconds": 1.1296923258000446,
+        "calls_per_sample": {
+          "auth_user": [
+            1,
+            1,
+            1
+          ],
+          "carregamento_backend": [
+            1,
+            1,
+            1
+          ],
+          "contexto_backend": [
+            1,
+            1,
+            1
+          ],
+          "motor": [
+            1,
+            1,
+            1
+          ],
+          "normalizacao_inclui_motor": [
+            1,
+            1,
+            1
+          ],
+          "rpc_app_context": [
+            3,
+            3,
+            3
+          ],
+          "rpc_load_inventory": [
+            1,
+            1,
+            1
+          ],
+          "service_factory": [
+            1,
+            1,
+            1
+          ]
+        },
+        "stage_p50_seconds": {
+          "auth_user": 0.04013124100004006,
+          "backend_total_sem_sobreposicao": 0.9280100360000461,
+          "carregamento_backend": 0.8473929890000136,
+          "contexto_backend": 0.08058835300005285,
+          "execucao_UI_fora_servicos": 0.03482419600004505,
+          "motor": 0.09774416999994173,
+          "normalizacao_inclui_motor": 0.5660087069999236,
+          "rpc_app_context": 0.12048727000012605,
+          "rpc_load_inventory": 0.12263177600004838,
+          "service_factory": 3.501599996980076e-05
+        },
+        "raw_seconds": [
+          0.7454816130000381,
+          1.1368587330000537,
+          1.065194660999964
+        ]
+      },
+      "Reposição": {
+        "samples": 3,
+        "first_seconds": 0.9389332260000174,
+        "p50_seconds": 0.9389332260000174,
+        "p95_seconds": 1.0434720987000445,
+        "calls_per_sample": {
+          "auth_user": [
+            1,
+            1,
+            1
+          ],
+          "carregamento_backend": [
+            1,
+            1,
+            1
+          ],
+          "contexto_backend": [
+            1,
+            1,
+            1
+          ],
+          "motor": [
+            1,
+            1,
+            1
+          ],
+          "normalizacao_inclui_motor": [
+            1,
+            1,
+            1
+          ],
+          "rpc_app_context": [
+            3,
+            3,
+            3
+          ],
+          "rpc_load_inventory": [
+            1,
+            1,
+            1
+          ],
+          "service_factory": [
+            1,
+            1,
+            1
+          ]
+        },
+        "stage_p50_seconds": {
+          "auth_user": 0.0401409789999434,
+          "backend_total_sem_sobreposicao": 0.9085977220000814,
+          "carregamento_backend": 0.8280567470000051,
+          "contexto_backend": 0.08062318599991158,
+          "execucao_UI_fora_servicos": 0.03689769800018894,
+          "motor": 0.13242995499990684,
+          "normalizacao_inclui_motor": 0.543600371000025,
+          "rpc_app_context": 0.12110191700014639,
+          "rpc_load_inventory": 0.16028514499998892,
+          "service_factory": 3.285200000391342e-05
+        },
+        "raw_seconds": [
+          0.9389332260000174,
+          1.0550875290000477,
+          0.9288139090000413
+        ]
+      },
+      "Relatórios": {
+        "samples": 3,
+        "first_seconds": 0.09473340700003519,
+        "p50_seconds": 0.09471586500001195,
+        "p95_seconds": 0.09473165280003286,
+        "calls_per_sample": {
+          "auth_user": [
+            1,
+            1,
+            1
+          ],
+          "contexto_backend": [
+            1,
+            1,
+            1
+          ],
+          "rpc_app_context": [
+            1,
+            1,
+            1
+          ],
+          "service_factory": [
+            1,
+            1,
+            1
+          ]
+        },
+        "stage_p50_seconds": {
+          "auth_user": 0.040162551999969764,
+          "backend_total_sem_sobreposicao": 0.08068252500004292,
+          "contexto_backend": 0.08063330300001326,
+          "execucao_UI_fora_servicos": 0.013950779999959195,
+          "rpc_app_context": 0.04022516199995607,
+          "service_factory": 3.5497999988365336e-05
+        },
+        "raw_seconds": [
+          0.09473340700003519,
+          0.09231292799995572,
+          0.09471586500001195
+        ]
+      },
+      "gerar_relatorio_interface": {
+        "samples": 3,
+        "first_seconds": 2.155060123999988,
+        "p50_seconds": 2.066336412999931,
+        "p95_seconds": 2.146187752899982,
+        "calls_per_sample": {
+          "auth_user": [
+            1,
+            1,
+            1
+          ],
+          "contexto_backend": [
+            1,
+            1,
+            1
+          ],
+          "motor": [
+            1,
+            1,
+            1
+          ],
+          "relatorio": [
+            1,
+            1,
+            1
+          ],
+          "rpc_app_context": [
+            5,
+            5,
+            5
+          ],
+          "rpc_load_inventory": [
+            2,
+            2,
+            2
+          ],
+          "service_factory": [
+            1,
+            1,
+            1
+          ]
+        },
+        "stage_p50_seconds": {
+          "auth_user": 0.040175412999928994,
+          "backend_total_sem_sobreposicao": 2.0263147129999197,
+          "contexto_backend": 0.08079316199996356,
+          "execucao_UI_fora_servicos": 0.04224256599979981,
+          "motor": 0.213659254999925,
+          "relatorio": 1.9454915149999579,
+          "rpc_app_context": 0.20103082399998584,
+          "rpc_load_inventory": 0.29757591399993544,
+          "service_factory": 3.088799996930902e-05
+        },
+        "raw_seconds": [
+          2.155060123999988,
+          1.348675147999984,
+          2.066336412999931
+        ]
+      },
+      "acoes_backend": {
+        "scope": "Ações completas do backend; sem transferência ou renderização no navegador",
+        "export_mechanism": "Callback diferido real do botão, invocado sem navegador",
+        "measurements": {
+          "gerar_relatorio_mensal": {
+            "samples": 3,
+            "first_seconds": 1.817576348999978,
+            "p50_seconds": 1.817576348999978,
+            "p95_seconds": 2.0228608914000232,
+            "calls_per_sample": {
+              "auth_user": [
+                1,
+                1,
+                1
+              ],
+              "motor": [
+                1,
+                1,
+                1
+              ],
+              "relatorio": [
+                1,
+                1,
+                1
+              ],
+              "rpc_app_context": [
+                4,
+                4,
+                4
+              ],
+              "rpc_load_inventory": [
+                2,
+                2,
+                2
+              ]
+            },
+            "stage_p50_seconds": {
+              "auth_user": 0.04019585499997902,
+              "backend_total_sem_sobreposicao": 1.8172318109999424,
+              "execucao_fora_servicos": 0.0004648020000104225,
+              "motor": 0.2006690590000062,
+              "relatorio": 1.8172318109999424,
+              "rpc_app_context": 0.16083291300003566,
+              "rpc_load_inventory": 0.3488172250000616
+            },
+            "raw_seconds": [
+              1.817576348999978,
+              1.8107881270000235,
+              2.0456702850000283
+            ]
+          },
+          "exportar_relatorio_csv": {
+            "samples": 3,
+            "first_seconds": 2.2104623740000306,
+            "p50_seconds": 1.585820482000031,
+            "p95_seconds": 2.1479981848000307,
+            "calls_per_sample": {
+              "auth_user": [
+                2,
+                2,
+                2
+              ],
+              "callback_csv_mensal": [
+                1,
+                1,
+                1
+              ],
+              "contexto_backend": [
+                2,
+                2,
+                2
+              ],
+              "export_relatorio": [
+                1,
+                1,
+                1
+              ],
+              "motor": [
+                1,
+                1,
+                1
+              ],
+              "relatorio": [
+                1,
+                1,
+                1
+              ],
+              "rpc_app_context": [
+                8,
+                8,
+                8
+              ],
+              "rpc_load_inventory": [
+                2,
+                2,
+                2
+              ]
+            },
+            "stage_p50_seconds": {
+              "auth_user": 0.08031763099984346,
+              "backend_total_sem_sobreposicao": 1.5858139389999906,
+              "callback_csv_mensal": 1.5858139389999906,
+              "contexto_backend": 0.16122672599999532,
+              "execucao_fora_servicos": 6.543000040437619e-06,
+              "export_relatorio": 1.4245651359999556,
+              "motor": 0.08873000899995986,
+              "relatorio": 1.2563416670000151,
+              "rpc_app_context": 0.3216776709999749,
+              "rpc_load_inventory": 0.27522327800011226
+            },
+            "raw_seconds": [
+              2.2104623740000306,
+              1.579210329000034,
+              1.585820482000031
+            ]
+          },
+          "exportar_reposicao_csv": {
+            "samples": 3,
+            "first_seconds": 0.9544686299999512,
+            "p50_seconds": 0.9326580659999308,
+            "p95_seconds": 0.9522875735999492,
+            "calls_per_sample": {
+              "auth_user": [
+                2,
+                2,
+                2
+              ],
+              "callback_csv_reposicao": [
+                1,
+                1,
+                1
+              ],
+              "carregamento_backend": [
+                1,
+                1,
+                1
+              ],
+              "contexto_backend": [
+                2,
+                2,
+                2
+              ],
+              "export_reposicao": [
+                1,
+                1,
+                1
+              ],
+              "motor": [
+                1,
+                1,
+                1
+              ],
+              "normalizacao_inclui_motor": [
+                1,
+                1,
+                1
+              ],
+              "rpc_app_context": [
+                6,
+                6,
+                6
+              ],
+              "rpc_load_inventory": [
+                1,
+                1,
+                1
+              ]
+            },
+            "stage_p50_seconds": {
+              "auth_user": 0.08034470500001589,
+              "backend_total_sem_sobreposicao": 0.9326511829999617,
+              "callback_csv_reposicao": 0.9326511829999617,
+              "carregamento_backend": 0.6761496080000597,
+              "contexto_backend": 0.1613589830001274,
+              "execucao_fora_servicos": 8.375999982490612e-06,
+              "export_reposicao": 0.7711736679999603,
+              "motor": 0.10265164299994467,
+              "normalizacao_inclui_motor": 0.4459819979999793,
+              "rpc_app_context": 0.24139756199974727,
+              "rpc_load_inventory": 0.13263021700004174
+            },
+            "raw_seconds": [
+              0.9544686299999512,
+              0.9326580659999308,
+              0.8826582789999975
+            ]
+          }
+        }
+      }
+    }
+  }
+}

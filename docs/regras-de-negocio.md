@@ -1,5 +1,33 @@
 # Regras do Gerente Inteligente de Estoque
 
+## Persistência e relatórios na versão web
+
+As fórmulas do motor auditado no PR #4 foram preservadas. A web consulta um lote
+do PostgreSQL autorizado para o usuário, usando a data observada do saldo como
+referência de análise. Alterações em parâmetros atuais não reescrevem os valores
+guardados nos lotes de fechamento anteriores.
+
+A importação continua completa, mas cada lote tem sua própria versão de catálogo,
+vendas e custos. Uma importação idêntica é reutilizada. SKUs ausentes em um novo
+lote deixam de aparecer na referência atual, sem apagar os lotes históricos.
+Uma fotografia antiga não substitui a referência operacional de data posterior.
+
+Relatórios exigem mês civil encerrado em America/Fortaleza, abrangência declarada
+de vendas cobrindo todo o mês e snapshot do último dia coerente com o catálogo.
+Sem fechamento confiável, a geração é recusada. Sem período anterior comparável,
+a variação percentual fica indisponível. A abrangência declarada depende da
+conferência humana da origem, e não prova que o arquivo recebido esteja completo.
+
+As permissões de estoque, reposição, tendências e finanças restringem os blocos
+do relatório. Custos são protegidos em tabela própria e removidos também antes
+do cálculo quando não autorizados. E-mails preparados contêm aviso e link
+autenticado, sem indicadores ou anexos financeiros.
+
+O scheduler revalida conta ativa, destinatário e permissões na geração e antes
+do envio. Repetições são identificadas por organização, mês, destinatário e modo
+de simulação/envio; falhas claras têm até três tentativas. Entrega incerta não
+é repetida automaticamente. Não há operações de escrita no GestãoClick.
+
 O GestãoClick será a fonte da verdade após a integração; o MVP só trabalha com dados simulados e CSV normalizado.
 
 A integração futura será sempre somente leitura. Nenhum componente pode criar, editar ou excluir objetos ou movimentos no GestãoClick; consultas futuras também dependem de autorização. A regra permanente está no `AGENTS.md`.

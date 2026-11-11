@@ -1,0 +1,28 @@
+{
+  "project_ref": "csiqpzoudruzppfbpqqx",
+  "status_initial": "INACTIVE",
+  "status_final": "ACTIVE_HEALTHY",
+  "region": "sa-east-1",
+  "inspection": "Somente leitura, sem consultar registros comerciais ou credenciais",
+  "public_tables": 16,
+  "all_public_tables_rls": true,
+  "public_security_definer_functions": 0,
+  "applied_migrations": [
+    "20261028171810",
+    "20261028174209",
+    "20261028181759",
+    "20261028191333"
+  ],
+  "new_migrations_applied": false,
+  "security_advisor": {
+    "WARN": 1,
+    "name": "auth_leaked_password_protection",
+    "remediation": "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection",
+    "limitation": "Recurso Pro, nenhuma contratação autorizada"
+  },
+  "performance_advisor": {
+    "INFO": 13,
+    "name": "unused_index",
+    "removed": false
+  }
+}

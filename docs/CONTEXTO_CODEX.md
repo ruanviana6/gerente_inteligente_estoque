@@ -1,5 +1,24 @@
 # Contexto de continuidade para o Codex
 
+## Estado da implementação web em 28/10/2026
+
+O PR #5, branch `implementacao/web-supabase`, continua o PR #4 e implementa a
+Issue #2. A entrada oficial agora é `app.py` → `web/ui.py`, com Supabase Auth,
+sessões individuais, fachada de autorização, PostgreSQL, RLS, lotes históricos,
+administração Master, insights e relatórios mensais. SQLite permanece apenas
+como legado e suporte aos testes anteriores, sem uso operacional na web.
+
+As migrações ficam em `supabase/migrations/` e usam o projeto existente em
+São Paulo, `csiqpzoudruzppfbpqqx`. Os resultados de cada execução de testes
+estão no PR; não deduza validação a partir da presença de arquivos. A ativação
+da conta do proprietário e a publicação exigem os passos de
+`docs/CONFIGURACAO_WEB.md`. E-mails reais continuam desligados; consulte
+`docs/ATIVAR_RELATORIOS.md`. A auditoria independente da Issue #3 ocorrerá
+após a entrega e ativação da versão web.
+
+As seções posteriores registram o contexto original do MVP e não substituem
+essa arquitetura atual nem os requisitos de `docs/EXECUCAO_CODEX.md`.
+
 > Documento de passagem entre planejamento em ChatGPT e implementação no Codex.
 > Atualização inicial: 28/10/2026. Este arquivo descreve **intenção e decisões**, não comprova testes executados.
 

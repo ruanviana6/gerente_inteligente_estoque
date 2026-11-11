@@ -1,0 +1,127 @@
+{
+  "aprovado": true,
+  "natureza": "Chromium/páginas/cálculos reais, RPC e dados DEMO.",
+  "limitacoes": [
+    "Não verifica produção, ERP, Auth remoto ou RLS."
+  ],
+  "telas": {
+    "vendas-inicial-1440": {
+      "viewport": 1440,
+      "documento": 1440,
+      "principal_visivel": 1140,
+      "principal_conteudo": 1140,
+      "alvos_total": 4,
+      "alvos_menores_44": 3,
+      "acoes_aplicacao_total": 1,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "vendas-inicial-1440.png"
+    },
+    "vendas-analisadas-1440": {
+      "viewport": 1440,
+      "documento": 1440,
+      "principal_visivel": 1140,
+      "principal_conteudo": 1140,
+      "alvos_total": 51,
+      "alvos_menores_44": 8,
+      "acoes_aplicacao_total": 1,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "vendas-analisadas-1440.png"
+    },
+    "integracoes-inicial-1440": {
+      "viewport": 1440,
+      "documento": 1440,
+      "principal_visivel": 1140,
+      "principal_conteudo": 1140,
+      "alvos_total": 14,
+      "alvos_menores_44": 7,
+      "acoes_aplicacao_total": 1,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "integracoes-inicial-1440.png"
+    },
+    "integracoes-previa-1440": {
+      "viewport": 1440,
+      "documento": 1440,
+      "principal_visivel": 1140,
+      "principal_conteudo": 1140,
+      "alvos_total": 19,
+      "alvos_menores_44": 8,
+      "acoes_aplicacao_total": 2,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "integracoes-previa-1440.png"
+    },
+    "vendas-inicial-390": {
+      "viewport": 390,
+      "documento": 390,
+      "principal_visivel": 390,
+      "principal_conteudo": 390,
+      "alvos_total": 9,
+      "alvos_menores_44": 8,
+      "acoes_aplicacao_total": 1,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "vendas-inicial-390.png"
+    },
+    "vendas-analisadas-390": {
+      "viewport": 390,
+      "documento": 390,
+      "principal_visivel": 390,
+      "principal_conteudo": 390,
+      "alvos_total": 51,
+      "alvos_menores_44": 8,
+      "acoes_aplicacao_total": 1,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "vendas-analisadas-390.png"
+    },
+    "integracoes-inicial-390": {
+      "viewport": 390,
+      "documento": 390,
+      "principal_visivel": 390,
+      "principal_conteudo": 390,
+      "alvos_total": 14,
+      "alvos_menores_44": 7,
+      "acoes_aplicacao_total": 1,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "integracoes-inicial-390.png"
+    },
+    "integracoes-previa-390": {
+      "viewport": 390,
+      "documento": 390,
+      "principal_visivel": 390,
+      "principal_conteudo": 390,
+      "alvos_total": 19,
+      "alvos_menores_44": 8,
+      "acoes_aplicacao_total": 2,
+      "acoes_aplicacao_menores_44": 0,
+      "acoes_aplicacao_pequenas": [],
+      "sem_rolagem_horizontal_pagina": true,
+      "captura": "integracoes-previa-390.png"
+    }
+  },
+  "fluxos": {
+    "1440": {
+      "analise_vendas": true,
+      "previa_sem_commit_automatico": true,
+      "cancelamento": true,
+      "confirmacao_explicita": true
+    },
+    "390": {
+      "analise_vendas": true,
+      "previa_sem_commit_automatico": true,
+      "cancelamento": true,
+      "confirmacao_explicita": true
+    }
+  }
+}
