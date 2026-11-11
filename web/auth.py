@@ -253,12 +253,12 @@ class AuthService:
             permissions = result.get("permissions")
             if (profile.get("active") is not True or _uuid(profile.get("user_id")) != session.user_id
                     or profile.get("role") not in ROLES or not isinstance(permissions, list)
-                    or not all(isinstance(p, str) and p in PERMISSIONS for p in permissions)):
+                    or not all(isinstance(p, str) and 1 <= len(p) <= 100 for p in permissions)):
                 raise AuthorizationError("A conta não possui acesso ativo ao aplicativo.")
             return AccessContext(Profile(
                 user_id=session.user_id, organization_id=_uuid(profile.get("organization_id")),
                 display_name=str(profile.get("display_name", "Usuário")), role=profile["role"], active=True,
-            ), frozenset(permissions))
+            ), frozenset(p for p in permissions if p in PERMISSIONS))
         except (AuthenticationError, AuthorizationError):
             self._invalidate_session()
             raise

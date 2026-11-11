@@ -357,7 +357,11 @@ def conferir_url_publicada(browser) -> dict:
             configuracao_pendente_observada: /configura[çc][ãa]o pendente/i.test(texto)
           };
         }""")
+        marcador = pagina.locator('[data-flatter-release]').first
+        versao = marcador.get_attribute('data-flatter-release') if marcador.count() else None
+        from urllib.parse import urlsplit
         return {"url": SITE_PUBLICADO, "http_status": resposta.status if resposta else None,
+                "versao_observada": versao, "host_final": urlsplit(pagina.url).hostname,
                 "formulario_login_observado": login, "autenticado": False,
                 "sinais_publicos": sinais,
                 "limite": "Somente abertura anônima; HTTP 200 não comprova funcionamento nem autenticação. "
