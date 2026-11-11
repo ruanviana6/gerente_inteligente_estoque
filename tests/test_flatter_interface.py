@@ -49,10 +49,10 @@ def test_reposicao_nao_gera_exportacao_na_renderizacao(monkeypatch):
         """Falha se a UI tentar preparar um CSV antes da ação do usuário."""
         raise AssertionError("CSV calculado durante a renderização.")
 
-    monkeypatch.setattr(Service, "export_replenishment", exportacao_indevida)
+    monkeypatch.setattr(Service, "export_industry_proposal", exportacao_indevida)
     app, scenario = abrir_cenario(monkeypatch)
     scenario.reset_counts()
-    app.sidebar.radio[0].set_value("Reposição").run()
+    app.sidebar.radio[0].set_value("Reposição Inteligente").run()
     assert not app.exception
     assert scenario.calls["rpc_load_inventory"] == 1
 
@@ -141,11 +141,13 @@ def test_prioridade_abre_filtro_real_de_ruptura(monkeypatch):
 
 def test_retorno_prioridade_substitui_filtro_anterior(monkeypatch):
     """Uma segunda ação do painel atualiza o filtro mesmo com widget já criado."""
-    app, _ = abrir_cenario(monkeypatch)
+    app, scenario = abrir_cenario(monkeypatch)
     clicar(app, "Conferir rupturas")
     app.sidebar.radio[0].set_value("Painel").run()
     clicar(app, "Conferir risco no prazo")
-    assert app.dataframe[0].value["risco_prazo"].all()
+    painel = scenario.service_factory({}).load_inventory("inventory.view")["panel"]
+    codigos_risco = set(painel.loc[painel["risco_prazo"], "codigo"])
+    assert set(app.dataframe[0].value["codigo"]).issubset(codigos_risco)
 
 
 @pytest.mark.parametrize("perfil", ["Operador", "Visualizador"])

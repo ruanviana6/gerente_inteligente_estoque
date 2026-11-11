@@ -170,3 +170,55 @@ def test_download_vinculado_a_tela_recusa_troca_de_usuario():
     with pytest.raises(AuthorizationError):
         callback()
     assert not scenario.calls["rpc_load_inventory"]
+
+
+@pytest.mark.parametrize("kind", ["inventory", "industry"])
+@pytest.mark.parametrize("permissao", ["leitura", "exportacao"])
+def test_novos_downloads_exigem_leitura_e_exportacao_antes_de_consultar(kind, permissao):
+    """Permissão isolada ou nome de perfil não autoriza nenhum novo arquivo."""
+    scenario = Scenario(size=3)
+    leitura = "inventory.view" if kind == "inventory" else "replenishment.view"
+    exportacao = "inventory.export" if kind == "inventory" else "replenishment.export"
+    scenario.permissions = {leitura if permissao == "leitura" else exportacao}
+    service = scenario.service_factory({})
+    with pytest.raises(AuthorizationError):
+        service.deferred_export(kind, {} if kind == "inventory" else {"ciclo": 14})
+    assert not scenario.calls["rpc_load_inventory"]
+
+
+@pytest.mark.parametrize("kind", ["inventory", "industry"])
+@pytest.mark.parametrize("mudanca", ["finance.view", "usuario", "organizacao", "sessao", "expirada"])
+def test_novos_csv_recusam_alteracao_durante_serializacao(kind, mudanca):
+    """A validação de saída também vale para estoque e solicitação à indústria."""
+    scenario = Scenario(size=3)
+    service = scenario.service_factory({})
+    def serializar(tabela):
+        """Altera um limite depois de preparar os bytes, antes de entregá-los."""
+        conteudo = exportar_csv_seguro(tabela)
+        if mudanca == "finance.view":
+            scenario.permissions.discard("finance.view")
+        elif mudanca == "usuario":
+            scenario.user_id = "00000000-0000-0000-0000-000000000888"
+        elif mudanca == "organizacao":
+            scenario.organization_id = "00000000-0000-0000-0000-000000000999"
+        elif mudanca == "sessao":
+            service.auth._generation += 1
+        else:
+            scenario.authenticated = False
+        return conteudo
+    with patch("web.service.exportar_csv_seguro", side_effect=serializar), pytest.raises((AuthenticationError, AuthorizationError)):
+        if kind == "inventory":
+            service.export_inventory()
+        else:
+            service.export_industry_proposal({"ciclo": 14})
+
+
+def test_csv_estoque_tem_snapshot_situacao_e_nao_inclui_custo_sem_concessao():
+    """O novo contrato é uma projeção explícita, com data e proteção de fórmula."""
+    scenario = Scenario(size=3)
+    scenario.permissions = {"inventory.view", "inventory.export"}
+    leitor = _csv(scenario.service_factory({}).export_inventory())
+    assert leitor.fieldnames == ["codigo", "nome", "estoque", "status", "data_referencia"]
+    linhas = list(leitor)
+    assert len(linhas) == 3 and all(r["data_referencia"] for r in linhas)
+    assert not any("custo" in k for k in leitor.fieldnames)

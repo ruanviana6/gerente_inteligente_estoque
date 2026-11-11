@@ -13,11 +13,13 @@ create table auth.users (
   id uuid primary key,
   email text unique,
   email_confirmed_at timestamptz,
+  encrypted_password text,
   raw_user_meta_data jsonb not null default '{}'
 );
 create table auth.sessions (
   id uuid primary key,
   user_id uuid not null references auth.users(id),
+  created_at timestamptz not null default now(),
   not_after timestamptz
 );
 create function auth.jwt() returns jsonb language sql stable
