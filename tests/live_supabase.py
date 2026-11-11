@@ -205,3 +205,23 @@ def test_painel_sem_estoque_nao_le_base_bruta_pela_api(ambiente):
         assert resposta.status == 403
     with pytest.raises(AuthorizationError):
         auth.rpc("load_inventory", {"p_module": "inventory.view"}, "inventory.view")
+
+
+def test_reabertura_e_refresh_persistentes_com_auth_e_postgrest_reais(ambiente):
+    """Reconstitui conexão, gira refresh uma vez e prova que Sair impede retomada."""
+    from web.persistent_sessions import PersistentSessions
+
+    auth = operador(ambiente)
+    expirado = replace(auth.session, expires_at=time.time()-1)
+    ticket = PersistentSessions(auth.api).register(expirado, auth.context())
+    nova = AuthService(SupabaseAPI(ambiente["api"].settings, ambiente["transport"]))
+    inicio = len(ambiente["chamadas"])
+    assert nova.restore_browser(ticket).profile.user_id == ambiente["operador_id"]
+    chamadas = ambiente["chamadas"][inicio:]
+    assert ("POST", "/auth/v1/token", "grant_type=refresh_token") in chamadas
+    assert ("POST", "/auth/v1/token", "grant_type=password") not in chamadas
+    terceira = AuthService(SupabaseAPI(ambiente["api"].settings, ambiente["transport"]))
+    assert terceira.restore_browser(ticket).profile.user_id == ambiente["operador_id"]
+    nova.logout()
+    with pytest.raises((AuthenticationError, AuthorizationError)):
+        terceira.restore_browser(ticket)

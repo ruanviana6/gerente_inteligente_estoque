@@ -177,6 +177,19 @@ class SupabaseAPI:
             parameters["p_backend_secret"] = self.settings.backend_secret
         return self._request("POST", "/rest/v1/rpc/" + name, parameters, access_token)
 
+    def session_rpc(self, name: str, payload: dict, access_token: str | None = None) -> Any:
+        """Restringe retomada aos RPCs próprios e injeta somente o segredo do servidor."""
+        allowed = {"persistent_register", "persistent_claim", "persistent_finish", "persistent_release", "persistent_forget"}
+        if name not in allowed or not isinstance(payload, dict):
+            raise AuthorizationError("Operação de sessão não permitida.")
+        if not self.settings.backend_secret:
+            raise ConfigurationError("O acesso persistente exige o segredo protegido do backend.")
+        if name in {"persistent_register", "persistent_finish"} and not access_token:
+            raise AuthenticationError("Entre para continuar.")
+        params = dict(payload)
+        params["p_backend_secret"] = self.settings.backend_secret
+        return self._request("POST", "/rest/v1/rpc/" + name, params, access_token)
+
     def _create_auth_user(self, email: str, password: str) -> dict:
         """Usa a chave administrativa somente neste endpoint, após autorização no AuthService."""
         return self._request(

@@ -47,6 +47,14 @@ jobs:
         with:
           name: interface-comercial
           path: evidencias/comercial/
+      - name: Validar F5, reabertura e logout com sessão cifrada
+        run: python scripts/validar_login_persistente.py --output evidencias/login-persistente
+      - name: Guardar resultado de permanência do login sem tokens
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: login-persistente
+          path: evidencias/login-persistente/login-persistente.json
   desempenho:
     runs-on: ubuntu-latest
     timeout-minutes: 30
