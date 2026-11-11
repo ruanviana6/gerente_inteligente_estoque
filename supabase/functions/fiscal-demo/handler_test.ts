@@ -51,7 +51,7 @@ for (const [label, identity, expected] of [
 Deno.test("permissão negada, outra organização e solicitação inexistente não usam chave administrativa", async () => {
   for (const denied of [401, 403, 404, 409]) {
     const paths: string[] = [];
-    const handle = createHandler(config, (async (url, options) => {
+    const handle = createHandler(config, (async (url: string | URL | Request, options?: { headers?: Record<string, string> }) => {
       paths.push(String(url));
       const headers = options?.headers as Record<string, string>;
       check(headers.Authorization === token, "Credencial privilegiada usada na leitura");
@@ -64,7 +64,7 @@ Deno.test("permissão negada, outra organização e solicitação inexistente n�
 
 Deno.test("fluxo válido usa JWT individual antes do finish restrito e nunca consulta ERP", async () => {
   const calls: { path: string; body: unknown }[] = [];
-  const handle = createHandler(config, (async (url, options) => {
+  const handle = createHandler(config, (async (url: string | URL | Request, options?: { headers?: Record<string, string>; redirect?: string; body?: string; method?: string }) => {
     const path = new URL(String(url)).pathname;
     check(String(url).startsWith(config.url + "/"), "Destino externo indevido");
     check(options?.redirect === "error", "Redirect não bloqueado");

@@ -89,6 +89,7 @@ def _pedido(servico, contexto):
         st.write(f'Frete {frete}: {MODALIDADES_FRETE[frete]}')
         st.write(f'Contribuinte {contribuinte}: {TIPOS_CONTRIBUINTE[contribuinte]}')
         st.caption(f'Prévia versão {previa["version"]} · referência {previa["id"]}')
+        st.caption(f'Responsável pela conferência: {contexto.profile.display_name}. A identidade e o horário serão vinculados pelo Supabase.')
         st.info('Cadastro, tributação, natureza da operação, transporte e pagamento reais ainda não foram '
                 'homologados. A prévia permite apenas simulação. Nenhum CFOP, imposto ou cadastro é inferido.')
         aprovacao = False

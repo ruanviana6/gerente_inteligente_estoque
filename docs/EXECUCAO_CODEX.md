@@ -1,3 +1,5 @@
+> Atualização vigente de 11/11/2026: a consolidação fiscal DEMO e os seis menus estão em [FISCAL_DEMO.md](FISCAL_DEMO.md). O cliente analítico permanece GET-only. Somente o executor isolado poderá futuramente criar/emitir NF-e direta no Varejo após OpenAPI, homologação e nova autorização. Sem XML/PDF, segundo banco operacional ou alterações reais no ERP nesta entrega. As instruções anteriores abaixo são históricas quando divergirem dessa decisão.
+
 # Ordem principal para o Codex: finalizar a aplicação web
 
 > Atualização de escopo em 10/11/2026: o proprietário autorizou preparar a integração de leitura e a primeira Inteligência de Vendas. As restrições temporárias históricas deste documento são substituídas por esse pedido; ativação real continua condicionada ao contrato, às autorizações e à validação. Consulte `ATIVACAO_GESTAOCLICK.md` e `ENTREGA_EVOLUCAO.md`. Escrita no ERP permanece proibida.

@@ -2,7 +2,7 @@
 
 Criei este projeto para entender melhor o estoque no dia a dia. Saber o saldo de um produto nem sempre é suficiente para decidir quando repor, quanto pedir ou o que merece atenção.
 
-O gerente transforma catálogo, vendas e histórico de disponibilidade em indicadores explicáveis. O GestãoClick continua sendo a fonte operacional oficial da empresa. O conector de consulta está preparado e desativado por padrão. A ativação exige o contrato da conta e autorização; ele nunca pode alterar dados no ERP.
+O gerente transforma catálogo, vendas e histórico de disponibilidade em indicadores explicáveis. O GestãoClick continua sendo a fonte operacional oficial da empresa. O conector analítico de consulta está preparado e desativado por padrão; ele nunca pode alterar dados no ERP. A preparação fiscal funciona exclusivamente em DEMO, por um executor separado. Qualquer emissão real futura exige contrato, homologação e nova autorização, somente no Varejo.
 
 O desenvolvimento acontece com apoio de IA e Vibe Coding: eu defini o problema e as necessidades da rotina, e a IA ajuda a escrever, revisar e testar o código. O objetivo é ter uma ferramenta útil e aprender Python, SQL, Engenharia de Software, dados e logística. As sugestões continuam dependendo de conferência humana.
 
@@ -18,9 +18,15 @@ Em 11/11/2026, após o reinício confirmado pelo proprietário, o navegador veri
 
 A área **Inteligência Comercial** reúne Clientes, Cidades, Produtos Juntos e a análise de Vendas existente. Vendas usa `trends.view` e as novas visões usam suas permissões específicas. As análises leem a cópia autorizada no Supabase e não apresentam faturamento ou custos. Cestas exigem pedidos identificados e amostra mínima. Séries curtas mostram variação observada, sem prometer sazonalidade.
 
-O Master pode preparar uma carga DEMO em **Integrações**, conferir a prévia e confirmar a persistência separadamente. O conector GestãoClick aceita apenas GET documentado, com OpenAPI e mapas de campos protegidos. Nenhuma consulta real ao ERP foi executada nesta entrega. Catálogo e saldo do motor continuam usando CSV: a ligação desses campos à API depende do contrato real, sem interpretar uma extração incremental como importação completa.
+O Master pode preparar uma carga DEMO em **Administração → Integrações**, conferir a prévia e confirmar a persistência separadamente. O conector GestãoClick aceita apenas GET documentado, com OpenAPI e mapas de campos protegidos. Nenhuma consulta real ao ERP foi executada nesta entrega. Catálogo e saldo do motor continuam usando CSV: a ligação desses campos à API depende do contrato real, sem interpretar uma extração incremental como importação completa.
 
 As dez migrações versionadas foram aplicadas ao projeto Supabase existente após backups cifrados e validação de preservação dos dados e da conta Master. Migrações, RLS e autorização também foram testadas em bancos descartáveis. Veja [ativação segura do conector](docs/ATIVACAO_GESTAOCLICK.md), [contrato](docs/CONTRATO_GESTAOCLICK.md), [análises de vendas](docs/INTELIGENCIA_VENDAS.md) e [Inteligência Comercial](docs/INTELIGENCIA_COMERCIAL.md). O conector real continua desativado.
+
+## Interface consolidada e módulo fiscal DEMO
+
+A navegação reúne Visão Geral, Estoque, Reposição Inteligente, Inteligência Comercial, Automação / Notas Fiscais e Relatórios. Acompanhamento de Ações fica em Reposição. Usuários, regras, importação, integrações e auditoria ficam em Administração, conforme as permissões de cada pessoa.
+
+A área fiscal permite consultar pedidos fictícios, escolher manualmente frete e contribuinte, conferir a prévia e confirmar a simulação. Em andamento exige aprovação identificada. Solicitações únicas, histórico e resultados ficam no Supabase. O executor Edge é isolado, não baixa XML/PDF e permanece sem integração real com o ERP. Nenhum perfil nãoMaster recebe os novos acessos por padrão. Consulte [o fluxo DEMO e as permissões](docs/FISCAL_DEMO.md), [o registro da consolidação](docs/CONSOLIDACAO_FISCAL_20261111.md) e [o checklist da API](docs/CHECKLIST_ATIVACAO_API_GESTAOCLICK.md).
 
 ## O que o aplicativo faz
 
@@ -28,7 +34,7 @@ As dez migrações versionadas foram aplicadas ao projeto Supabase existente ap�
 - Conta Master criada por procedimento administrativo, sem senha padrão e sem promoção pela interface.
 - Perfis Administrador, Operador e Visualizador, com concessões e revogações individuais. Desativação e permissões são verificadas no backend e no banco.
 - Interface Flatter para computador e celular, com menu recolhível, cartões e prioridades que levam aos filtros correspondentes.
-- Painel com indicadores, avisos de qualidade e insights com avanço manual, aproveitando a mesma base autorizada.
+- Visão Geral com até seis indicadores, cinco prioridades e dois gráficos leves, lendo um resumo pré-calculado no Supabase. O Master atualiza os indicadores por ação explícita; mudanças no histórico ou parâmetros sinalizam desatualização.
 - Tabelas paginadas e gráficos do produto carregados quando solicitados.
 - Estoque, filtros por fornecedor, histórico de vendas e snapshots, detalhes do produto e memória do cálculo.
 - Cobertura, risco durante o prazo do fornecedor, reposição, tendências e Curva ABC a custo quando autorizada.
@@ -89,6 +95,9 @@ A exportação neutraliza textos que poderiam executar fórmulas em planilhas. D
 | reposicao/ | Planejamento de reposição e conversão por embalagem |
 | analytics/commercial*.py | Indicadores comerciais, modelos e processos controlados |
 | dados.py / motor.py / config.py | Validação e cálculos auditados |
+| web/dashboard*.py | Resumo controlado e Visão Geral compacta |
+| web/fiscal_*.py / fiscal/ | Interface, fachada e contrato fiscal DEMO |
+| supabase/functions/fiscal-demo/ | Único executor fiscal operacional, exclusivamente DEMO |
 | web/insights.py / web/reports.py | Insights e relatórios determinísticos |
 | web/email_delivery.py | Fila, simulação e adaptador de envio opcional |
 | supabase/migrations/ | Schema, funções, grants, RLS e histórico de migrações |
@@ -141,6 +150,6 @@ versionamento com reversão, sem exclusão automática de histórico.
 
 Os fluxos autenticados foram testados com usuários fictícios e Supabase descartável. A conferência final com a conta real na URL publicada cabe ao proprietário, sem compartilhar senha ou sessão. O envio de e-mail permanece em simulação até autorização e configuração do provedor. O cadastro público deve ser desligado no painel Auth; os testes descartáveis não alteram essa configuração externa.
 
-A versão web integrada está pronta para a auditoria independente da Issue #3. Dados empresariais só podem ser usados com autorização e validação apropriadas. A ativação real do GestãoClick depende das condições documentadas. NF-e, compras automáticas, sincronização reversa e previsão sazonal avançada continuam fora do escopo.
+A versão web integrada está pronta para a auditoria independente da Issue #3. Dados empresariais só podem ser usados com autorização e validação apropriadas. A ativação real do GestãoClick depende das condições documentadas. Emissão real de NF-e, compras automáticas, sincronização reversa e previsão sazonal avançada continuam bloqueadas. O fluxo fiscal DEMO é a preparação atual, não uma homologação da API.
 
 Quero que o projeto economize tempo na rotina e continue simples de entender e manter, sem transformar uma necessidade pessoal em uma infraestrutura desnecessária.

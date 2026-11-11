@@ -49,6 +49,14 @@ jobs:
           path: evidencias/comercial/
       - name: Validar F5, reabertura e logout com sessão cifrada
         run: python scripts/validar_login_persistente.py --output evidencias/login-persistente
+      - name: Validar escolhas, prévia e confirmação fiscal DEMO em duas larguras
+        run: python scripts/validar_interface_fiscal.py --output evidencias/fiscal
+      - name: Guardar capturas exclusivamente fictícias do módulo fiscal
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: interface-fiscal
+          path: evidencias/fiscal/
       - name: Guardar resultado de permanência do login sem tokens
         if: always()
         uses: actions/upload-artifact@v7.0.2
@@ -71,7 +79,7 @@ jobs:
       - name: Preparar cópia imutável da versão publicada
         run: |
           mkdir -p /tmp/flatter-base evidencias/desempenho
-          git archive a5157eef89da159db7182c85c132ca907c9b6e50 | tar -x -C /tmp/flatter-base
+          git archive 0add0fbf073781de4b7fcec080a8b331ba865ef2 | tar -x -C /tmp/flatter-base
           python -m pip freeze > evidencias/desempenho/dependencias.txt
       - name: Medir interface anterior com transporte fictício
         run: >-

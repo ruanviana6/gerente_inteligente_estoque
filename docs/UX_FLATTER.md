@@ -1,3 +1,5 @@
+> Atualização vigente de 11/11/2026: a consolidação fiscal DEMO e os seis menus estão em [FISCAL_DEMO.md](FISCAL_DEMO.md). O cliente analítico permanece GET-only. Somente o executor isolado poderá futuramente criar/emitir NF-e direta no Varejo após OpenAPI, homologação e nova autorização. Sem XML/PDF, segundo banco operacional ou alterações reais no ERP nesta entrega. As instruções anteriores abaixo são históricas quando divergirem dessa decisão.
+
 # Interface Flatter
 
 A Issue #6 reorganiza a aplicação web existente em Streamlit. As páginas usam o mesmo Supabase, as mesmas permissões e o motor de estoque validado. A interface não integra nem modifica o GestãoClick.

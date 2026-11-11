@@ -111,7 +111,7 @@ def navegar(pagina, destino: str) -> None:
     # reproduz o toque real e evita forçar uma interação em elemento encoberto.
     grupo.get_by_text(destino, exact=True).click()
     expect(grupo.get_by_role("radio", name=destino, exact=True)).to_be_checked()
-    titulos = {"Painel": "Visão geral", "Estoque": "Estoque e histórico",
+    titulos = {"Visão Geral": "Visão Geral", "Estoque": "Estoque e histórico",
                "Reposição Inteligente": "Reposição Inteligente", "Relatórios": "Relatório mensal",
                "Administração": "Administração"}
     if destino in titulos:
@@ -192,7 +192,7 @@ def conferir_perfil(pagina, perfil: str) -> None:
         assert pagina.get_by_text("Capital conhecido em estoque", exact=True).count() == 0
     if perfil == "Visualizador":
         assert menus.get_by_role("radio", include_hidden=True).count() == 1
-        assert menus.get_by_role("radio", name="Painel", exact=True, include_hidden=True).count() == 1
+        assert menus.get_by_role("radio", name="Visão Geral", exact=True, include_hidden=True).count() == 1
 
 
 def verificar_fluxos(browser, base: str, destino: Path, controle: Path, estrito: bool,
