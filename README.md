@@ -10,15 +10,17 @@ O desenvolvimento acontece com apoio de IA e Vibe Coding: eu defini o problema e
 
 A aplicação tem uma única entrada, **app.py**, em Streamlit, com Supabase Auth e PostgreSQL. O projeto Supabase utilizado é o já existente em São Paulo, csiqpzoudruzppfbpqqx. SQLite fica apenas como referência técnica do MVP e suporte aos seus testes de regressão; não armazena os dados da web.
 
-O código da versão web está no [PR #5](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/5), incorporando as correções auditadas do PR #4. O endereço informado pelo proprietário é [estoqueinteligente-flatter.streamlit.app](https://estoqueinteligente-flatter.streamlit.app/). A reformulação Flatter do [PR #7](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/7) foi incorporada à branch web. Esta evolução usa essa base e aguarda revisão, sem publicação automática. Testar a candidata em CI não comprova o funcionamento autenticado desse endereço.
+A aplicação está em [estoqueinteligente-flatter.streamlit.app](https://estoqueinteligente-flatter.streamlit.app/), usando a branch **implementacao/web-supabase**. A versão web preserva as correções auditadas do MVP e reúne Central de Acessos, Reposição Inteligente, Inteligência Comercial e permanência do login, integradas pelos PRs #16, #17 e #18.
 
-## Evolução preparada para revisão
+Em 11/11/2026, após o reinício confirmado pelo proprietário, o navegador verificou a versão **web-integrada-20261111.2** no domínio real. A tela de login foi conferida no computador e no celular, uma credencial fictícia inválida foi recusada e nenhum dado ficou exposto sem login. A validação não utilizou a conta Master nem dados empresariais. O [registro da publicação](docs/INTEGRACAO_WEB_20261111.md) separa essa evidência dos testes em ambiente descartável.
 
-A nova área **Inteligência de Vendas** analisa unidades líquidas, pedidos concluídos, crescimento, calendário e produtos comprados juntos. Ela usa `trends.view`, lê somente a cópia autorizada no Supabase e não apresenta faturamento ou custos. Cestas exigem pedidos reais identificados e amostra mínima. Séries curtas mostram variação observada, sem prometer sazonalidade.
+## Análises e integração preparada
+
+A área **Inteligência Comercial** reúne Clientes, Cidades, Produtos Juntos e a análise de Vendas existente. Vendas usa `trends.view` e as novas visões usam suas permissões específicas. As análises leem a cópia autorizada no Supabase e não apresentam faturamento ou custos. Cestas exigem pedidos identificados e amostra mínima. Séries curtas mostram variação observada, sem prometer sazonalidade.
 
 O Master pode preparar uma carga DEMO em **Integrações**, conferir a prévia e confirmar a persistência separadamente. O conector GestãoClick aceita apenas GET documentado, com OpenAPI e mapas de campos protegidos. Nenhuma consulta real ao ERP foi executada nesta entrega. Catálogo e saldo do motor continuam usando CSV: a ligação desses campos à API depende do contrato real, sem interpretar uma extração incremental como importação completa.
 
-O projeto Supabase foi encontrado `INACTIVE` e, ao final da verificação, estava `ACTIVE_HEALTHY`. A leitura remota confirmou as 16 tabelas atuais com RLS. Migrações novas são testadas em banco descartável e não foram aplicadas ao projeto publicado. Veja [ativação segura](docs/ATIVACAO_GESTAOCLICK.md), [contrato do conector](docs/CONTRATO_GESTAOCLICK.md), [análises](docs/INTELIGENCIA_VENDAS.md) e [evidências da evolução](docs/ENTREGA_EVOLUCAO.md).
+As dez migrações versionadas foram aplicadas ao projeto Supabase existente após backups cifrados e validação de preservação dos dados e da conta Master. Migrações, RLS e autorização também foram testadas em bancos descartáveis. Veja [ativação segura do conector](docs/ATIVACAO_GESTAOCLICK.md), [contrato](docs/CONTRATO_GESTAOCLICK.md), [análises de vendas](docs/INTELIGENCIA_VENDAS.md) e [Inteligência Comercial](docs/INTELIGENCIA_COMERCIAL.md). O conector real continua desativado.
 
 ## O que o aplicativo faz
 
@@ -40,7 +42,9 @@ Custos ficam em tabela separada e exigem **finance.view**. O navegador não conc
 
 ## Começar com segurança
 
-Siga o [guia de configuração e publicação](docs/CONFIGURACAO_WEB.md). Ele detalha:
+Na implantação atual, a conta Master e os Secrets existentes foram preservados. Os passos de criação abaixo servem à instalação inicial; não recrie a conta nem troque os segredos para acessar a atualização.
+
+O [guia de configuração e publicação](docs/CONFIGURACAO_WEB.md) detalha a instalação inicial:
 
 1. Desligar cadastro público e acesso anônimo no Supabase Auth.
 2. Criar sua conta e ativar o Master pelo UUID, no painel administrativo.
@@ -80,12 +84,16 @@ A exportação neutraliza textos que poderiam executar fórmulas em planilhas. D
 | web/downloads.py | Entrega do CSV autorizado à página |
 | web/telemetry.py | Tempos opcionais sem dados identificáveis |
 | web/auth.py / web/api.py | Sessões, Auth e chamadas autorizadas |
+| web/persistent_sessions.py / web/persistent_crypto.py | Retomada do navegador e cifra dos tokens no backend |
 | web/service.py | Coordenação, validação e autorização por operação |
+| reposicao/ | Planejamento de reposição e conversão por embalagem |
+| analytics/commercial*.py | Indicadores comerciais, modelos e processos controlados |
 | dados.py / motor.py / config.py | Validação e cálculos auditados |
 | web/insights.py / web/reports.py | Insights e relatórios determinísticos |
 | web/email_delivery.py | Fila, simulação e adaptador de envio opcional |
 | supabase/migrations/ | Schema, funções, grants, RLS e histórico de migrações |
 | scripts/run_monthly_reports.py | Agendador externo |
+| scripts/verificar_publicacao.py | Conferência da versão e do acesso anônimo no domínio real |
 | tests/ | Regressões, serviços, interface e segurança |
 | tests/sql/ | Testes PostgreSQL com rollback |
 | tests/live_supabase.py | Integração com Auth e PostgREST reais em ambiente descartável |
@@ -104,11 +112,11 @@ streamlit run app.py
 
 Ative o ambiente virtual antes de instalar. Configure os Secrets localmente, fora do Git, para acessar o Supabase autorizado. Sem configuração, o aplicativo apresenta instruções e não oferece uma demonstração pública sem login.
 
-O GitHub Actions executa Python 3.11/3.12, Ruff, auditoria de dependências, PostgreSQL 17, backup/restauração e integração local com Supabase. Os resultados comprovados, as limitações e as pendências estão no [registro da entrega](docs/ENTREGA_WEB.md) e nos checks do PR #5. As fixtures do MVP preservam testes anteriores; não são outra aplicação para operação diária.
+O GitHub Actions executa Python 3.11/3.12, Ruff, auditoria de dependências, PostgreSQL 17, backup/restauração e integração local com Supabase. A versão integrada passou por 871 testes Python, 66 subtestes, sete testes de Auth/PostgREST reais e verificações de navegador e desempenho. As fontes e limitações estão no [registro da integração](docs/INTEGRACAO_WEB_20261111.md). As fixtures do MVP preservam testes anteriores; não são outra aplicação para operação diária.
 
 ## Interface e desempenho Flatter
 
-A [documentação da interface](docs/UX_FLATTER.md) explica as cores, a marca em texto e a organização das páginas. O [comparativo de desempenho](docs/DESEMPENHO_FLATTER.md) registra o método, os resultados e os limites das medições com dados fictícios. O motor foi otimizado preservando os resultados e as regras de estoque; nenhuma migração ou configuração produtiva do Supabase foi alterada nesta etapa.
+A interface usa a logo Flatter como imagem e uma paleta clara com terracota e ameixa. A [documentação da interface](docs/UX_FLATTER.md) explica a organização das páginas. O [comparativo de desempenho](docs/DESEMPENHO_FLATTER.md) registra o método, os resultados e os limites das medições com dados fictícios. O motor foi otimizado preservando as regras de estoque; as correções e migrações posteriores estão no registro da integração.
 
 ## Limites e próximos passos
 
@@ -131,8 +139,8 @@ Clientes e cidades reais aguardam o contrato autorizado da API e a avaliação d
 privacidade. Há medição de ocupação restrita ao Master, resumos incrementais e
 versionamento com reversão, sem exclusão automática de histórico.
 
-O acesso autenticado na URL publicada precisa de validação do proprietário após a revisão e publicação autorizadas da candidata. O envio de e-mail permanece em simulação até autorização e configuração do provedor. O cadastro público deve ser desligado no painel Auth; os testes do ambiente descartável não alteram automaticamente essa configuração externa.
+Os fluxos autenticados foram testados com usuários fictícios e Supabase descartável. A conferência final com a conta real na URL publicada cabe ao proprietário, sem compartilhar senha ou sessão. O envio de e-mail permanece em simulação até autorização e configuração do provedor. O cadastro público deve ser desligado no painel Auth; os testes descartáveis não alteram essa configuração externa.
 
-Depois da implementação e da ativação, será feita a auditoria independente da Issue #3. Dados empresariais só podem ser usados com autorização e validação apropriadas. A ativação real do GestãoClick depende das condições documentadas. NF-e, compras automáticas, sincronização reversa e previsão sazonal avançada continuam fora do escopo.
+A versão web integrada está pronta para a auditoria independente da Issue #3. Dados empresariais só podem ser usados com autorização e validação apropriadas. A ativação real do GestãoClick depende das condições documentadas. NF-e, compras automáticas, sincronização reversa e previsão sazonal avançada continuam fora do escopo.
 
 Quero que o projeto economize tempo na rotina e continue simples de entender e manter, sem transformar uma necessidade pessoal em uma infraestrutura desnecessária.

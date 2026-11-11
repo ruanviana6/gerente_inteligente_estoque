@@ -1,0 +1,22 @@
+{
+  "aplicacao": "Gerente Inteligente de Estoque Flatter",
+  "url": "https://estoqueinteligente-flatter.streamlit.app/",
+  "branch": "implementacao/web-supabase",
+  "release_observado": "web-integrada-20261111.2",
+  "commit_integrado": "163c2664bf27794947e6b584feb5dd7d8ff3d937",
+  "observado_em_utc": "2026-11-11T13:47:32Z",
+  "ci": "https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/43031780655",
+  "segunda_verificacao": "Chromium anônimo no ambiente de desenvolvimento, com TLS verificado",
+  "verificacoes_aprovadas": [
+    "Marcador do release no iframe da origem esperada",
+    "Formulário de login acessível em 1440 e 390 pixels",
+    "Ausência de rolagem horizontal nas duas larguras",
+    "Zero tabelas e indicadores expostos sem autenticação",
+    "Credencial fictícia inválida recusada",
+    "Opção de manter acesso visível",
+    "Logo em imagem e paleta clara conferidas nas capturas"
+  ],
+  "login_master_produtivo_testado": false,
+  "dados_empresariais_utilizados": false,
+  "limite": "F5, reabertura, saída e revogação foram testados com dados fictícios e Auth/PostgREST descartável; o teste do domínio não autentica a conta real."
+}
