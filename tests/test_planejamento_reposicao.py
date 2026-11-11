@@ -44,6 +44,25 @@ def test_recebimento_confirmado_tem_data_e_pendencia_nao_e_inventada():
     assert not com.risco_antes_chegada
 
 
+def test_cobertura_alvo_do_produto_nao_e_ignorada_pelo_ciclo():
+    """Um alvo maior amplia a cobertura; um menor não deixa o ciclo descoberto."""
+    maior = simular(regra=RegraProduto(5, 4, 6, cobertura_alvo_dias=40))
+    menor = simular(regra=RegraProduto(5, 4, 6, cobertura_alvo_dias=7))
+    assert maior.necessidade_liquida == 66 and maior.caixas == 11
+    assert menor.necessidade_liquida == simular().necessidade_liquida
+    assert "40 dias" in maior.observacao
+
+
+def test_recebimento_na_cobertura_reduz_pedido_sem_ocultar_falta_anterior():
+    """Entradas posteriores à chegada entram no saldo sem antecipar sua data."""
+    com = simular(recebimentos=[Recebimento(date(2026, 1, 10), 20)])
+    assert com.unidades == 0
+    # O saldo de 18 unidades na chegada só dura nove dias; receber no último
+    # dia não elimina o déficit de oito unidades ocorrido antes dessa entrada.
+    tarde = simular(recebimentos=[Recebimento(date(2026, 1, 20), 20)])
+    assert tarde.necessidade_liquida == 8 and tarde.unidades == 12
+
+
 def test_embalagem_ausente_impede_inventar_caixas():
     """A necessidade líquida é explicada, mas não vira caixas sem conversão conhecida."""
     resultado = simular(regra=RegraProduto(5, 4))

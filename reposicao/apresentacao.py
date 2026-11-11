@@ -20,6 +20,7 @@ def projetar_painel(painel: pd.DataFrame, regras: dict, referencia: date, ciclo:
             prazo_dias=int(item["prazo_entrega_dias"]), seguranca=int(item["estoque_seguranca"]),
             unidades_por_caixa=regra.get("units_per_box"), lote_minimo=regra.get("minimum_lot", 0),
             multiplo=regra.get("production_multiple", 1), maximo=regra.get("maximum_units"),
+            cobertura_alvo_dias=int(item["cobertura_alvo_dias"]) if item.get("cobertura_alvo_dias") is not None else None,
         )
         suficiente = bool(item.get("demanda_estimavel", False)) and not bool(item.get("sem_historico_vendas", True))
         if item.get("requer_revisao", False) and not aceitar_incerteza:

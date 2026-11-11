@@ -14,6 +14,12 @@ Os ciclos iniciais de 14 e 21 dias e a referência habitual de 80 caixas podem s
 
 A projeção usa a média diária elegível existente no motor, saldo observado, reservas, prazo e segurança. A demanda de 30 dias é mostrada separadamente; a necessidade considera o ciclo selecionado e a posição projetada na chegada. Recebimentos só entram quando existe quantidade e data confirmadas. O campo antigo de pendências não contém data comprovada e não é somado nesta simulação.
 
+A cobertura usada é o maior valor entre o ciclo e o alvo cadastrado por produto.
+Assim a configuração do SKU não é ignorada e um alvo curto não deixa o ciclo
+descoberto. Recebimentos confirmados dentro da cobertura também entram no cálculo,
+preservando o maior déficit anterior à chegada de cada um. A memória de cálculo
+informa a cobertura efetivamente usada.
+
 A simulação compara solicitar hoje ou após o ciclo escolhido; se a ruptura ocorrer antes da chegada estimada, o risco é destacado. A data limite é o primeiro dia em que o saldo projetado alcança a segurança, menos o prazo informado. O calendário usa dias corridos; feriados e dias úteis não são presumidos. O estoque da importação é identificado pela sua data; se estiver antigo, atualize-o antes de tomar uma decisão.
 
 A necessidade líquida é arredondada para o mínimo múltiplo comum entre embalagem e múltiplo de produção e respeita o lote mínimo. Se o resultado ultrapassar o limite informado, a tela exige revisão em vez de cortar silenciosamente. Dados insuficientes bloqueiam o cálculo; disponibilidade histórica incerta exige reconhecimento explícito. Uma previsão não representa venda garantida nem recupera demanda perdida em rupturas.

@@ -56,6 +56,7 @@ class RegraProduto:
     lote_minimo: int = 0
     multiplo: int = 1
     maximo: int | None = None
+    cobertura_alvo_dias: int | None = None
 
     def __post_init__(self) -> None:
         """Verifica prazos e restrições sem supor capacidade física do caminhão."""
@@ -65,6 +66,8 @@ class RegraProduto:
             _inteiro(self.unidades_por_caixa, "Unidades por caixa", minimo=1, maximo=100_000)
         _inteiro(self.lote_minimo, "Lote mínimo")
         _inteiro(self.multiplo, "Múltiplo", minimo=1)
+        if self.cobertura_alvo_dias is not None:
+            _inteiro(self.cobertura_alvo_dias, "Cobertura alvo", minimo=1, maximo=365)
         if self.maximo is not None:
             _inteiro(self.maximo, "Limite máximo", minimo=1)
             if self.maximo < self.lote_minimo:
@@ -139,7 +142,15 @@ def simular_cenario(*, referencia: date, estoque: int, reservas: int, media_diar
     saldo_chegada, ruptura, _ = _projetar(inicial, demanda, referencia, chegada, entradas, regra.seguranca)
     _, _, minimo = _projetar(inicial, demanda, referencia, referencia + timedelta(days=365), entradas, regra.seguranca)
     data_limite = minimo - timedelta(days=regra.prazo_dias) if minimo else None
-    liquida = max(0, int((demanda * ciclo + regra.seguranca - saldo_chegada).to_integral_value(rounding=ROUND_CEILING)))
+    cobertura = max(ciclo, regra.cobertura_alvo_dias or ciclo)
+    # Entradas confirmadas durante a cobertura também reduzem a necessidade,
+    # mas uma entrada tardia não pode ocultar um déficit anterior a ela.
+    acumulado, maior_deficit = Decimal(0), Decimal(0)
+    for passo in range(1, cobertura + 1):
+        acumulado += entradas.get(chegada + timedelta(days=passo), 0)
+        maior_deficit = max(maior_deficit, demanda * passo - saldo_chegada - acumulado)
+    falta_final = demanda * cobertura + regra.seguranca - saldo_chegada - acumulado
+    liquida = max(0, int(max(maior_deficit, falta_final).to_integral_value(rounding=ROUND_CEILING)))
     if liquida > LIMITE_UNIDADES:
         raise ValueError("A necessidade calculada excede o limite suportado.")
     previsao = demanda * 30
@@ -157,5 +168,6 @@ def simular_cenario(*, referencia: date, estoque: int, reservas: int, media_diar
         return Cenario(ciclo, pedido, chegada, data_limite, ruptura, risco, previsao, liquida, None, None,
                        "As regras de lote, caixa e máximo exigem revisão; nenhuma quantidade foi cortada.")
     aviso = "Ruptura projetada antes ou na chegada; antecipar a análise." if risco else "Revise a sugestão antes de solicitar à indústria."
+    aviso += f" Cobertura usada: {cobertura} dias (maior entre ciclo e alvo do produto)."
     return Cenario(ciclo, pedido, chegada, data_limite, ruptura, risco, previsao, liquida,
                    unidades, unidades // regra.unidades_por_caixa, aviso)
