@@ -56,7 +56,8 @@ def verificar(browser, esperado, destino):
             except Exception:
                 pass
             observacao = observar(pagina, esperado)
-            observacao.update(http_status=resposta.status if resposta else None, failed_resource_types=dict(falhas), failed_scripts=recursos)
+            observacao.update(http_status=resposta.status if resposta else None, failed_resource_types=dict(falhas), failed_scripts=recursos,
+                frames=[{'host': urlsplit(f.url).hostname, 'path': urlsplit(f.url).path[:160]} for f in pagina.frames])
             resultado['attempts'].append(observacao)
             if observacao['version'] != esperado or not observacao['login_visible']:
                 continue

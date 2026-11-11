@@ -41,13 +41,16 @@ def _limpar_apresentacao(servico: Any) -> None:
 
 def _encerrar_sessao(servico: Any) -> None:
     """Revoga a sessão e sempre remove o estado local, mesmo sem rede."""
+    aviso = None
     try:
         servico.auth.logout()
     except AppError:
-        pass
+        aviso = "Acesso encerrado neste navegador. Não foi possível confirmar a revogação remota; confira sua conexão."
     finally:
         st.session_state.clear()
         set_browser_cookie(None)
+        if aviso:
+            st.session_state["_auth_notice"] = aviso
 
 
 @st.fragment(run_every="20s")

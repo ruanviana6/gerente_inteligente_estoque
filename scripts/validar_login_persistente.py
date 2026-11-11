@@ -15,7 +15,9 @@ def entrar(pagina, lembrar=True):
     pagina.get_by_label("E-mail", exact=True).fill("operador@example.test")
     pagina.get_by_label("Senha", exact=True).fill("Senha-ficticia-12345")
     if not lembrar:
-        pagina.get_by_label("Manter acesso neste navegador por até 30 dias", exact=True).uncheck()
+        # O Streamlit desenha um controle próprio sobre o input nativo oculto.
+        # O usuário interage pelo rótulo visível, sem cliques forçados.
+        pagina.get_by_text("Manter acesso neste navegador por até 30 dias", exact=True).click()
     pagina.get_by_role("button", name="Entrar", exact=True).click()
     pagina.get_by_role("radiogroup", name="Navegação", exact=True).wait_for(state="attached", timeout=30000)
 

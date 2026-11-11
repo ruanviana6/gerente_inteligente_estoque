@@ -3,7 +3,7 @@
 create table private.persistent_sessions (
   selector uuid primary key,
   organization_id uuid not null references public.organizations(id),
-  user_id uuid not null references public.app_users(user_id),
+  user_id uuid not null references public.app_users(user_id) on delete cascade,
   auth_session_id uuid not null,
   validator_hash text not null check(validator_hash ~ '^[0-9a-f]{64}$'),
   encrypted_session text not null check(octet_length(encrypted_session)<=24000),
