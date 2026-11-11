@@ -1,0 +1,19 @@
+{
+  "natureza": "PostgreSQL 17 descartável local, sem conexão com o Supabase produtivo",
+  "aprovado": true,
+  "mensagens_aprovado": 338,
+  "backup_restauracao": true,
+  "concorrencia": [
+    "vínculo de usuário",
+    "mesmo dia com saldos distintos",
+    "importação idêntica",
+    "execução única por fonte e loja",
+    "página repetida",
+    "confirmação repetida",
+    "quota conjunta entre lojas"
+  ],
+  "migracoes_sha256": {
+    "20261111004544_snapshots_por_lote.sql": "c56b6e56c09591bb8177e3ea77fd58cc3447b4c60b54053218035c785278fe8f",
+    "20261111004546_sincronizacao_vendas.sql": "8b46892fbf9bb86e43dcdebffa3b8904107e469da5147ad2469e95d6c2040c9f"
+  }
+}

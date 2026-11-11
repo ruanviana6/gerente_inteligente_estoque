@@ -182,6 +182,7 @@ jobs:
         run: |
           python tests/sql/concorrencia.py
           python tests/sql/snapshot_concurrency.py
+          python tests/sql/sync_concorrencia.py
       - name: Guardar evidências do banco
         if: always()
         uses: actions/upload-artifact@v7.0.2

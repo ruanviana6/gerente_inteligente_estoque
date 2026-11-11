@@ -18,7 +18,7 @@ A nova área **Inteligência de Vendas** analisa unidades líquidas, pedidos con
 
 O Master pode preparar uma carga DEMO em **Integrações**, conferir a prévia e confirmar a persistência separadamente. O conector GestãoClick aceita apenas GET documentado, com OpenAPI e mapas de campos protegidos. Nenhuma consulta real ao ERP foi executada nesta entrega. Catálogo e saldo do motor continuam usando CSV: a ligação desses campos à API depende do contrato real, sem interpretar uma extração incremental como importação completa.
 
-O projeto Supabase foi encontrado `INACTIVE`. O proprietário precisa selecionar **Resume project** no painel existente antes da validação remota. Migrações novas são testadas em banco descartável e não foram aplicadas ao projeto publicado. Veja [ativação segura](docs/ATIVACAO_GESTAOCLICK.md), [contrato do conector](docs/CONTRATO_GESTAOCLICK.md), [análises](docs/INTELIGENCIA_VENDAS.md) e [evidências da evolução](docs/ENTREGA_EVOLUCAO.md).
+O projeto Supabase foi encontrado `INACTIVE` e, ao final da verificação, estava `ACTIVE_HEALTHY`. A leitura remota confirmou as 16 tabelas atuais com RLS. Migrações novas são testadas em banco descartável e não foram aplicadas ao projeto publicado. Veja [ativação segura](docs/ATIVACAO_GESTAOCLICK.md), [contrato do conector](docs/CONTRATO_GESTAOCLICK.md), [análises](docs/INTELIGENCIA_VENDAS.md) e [evidências da evolução](docs/ENTREGA_EVOLUCAO.md).
 
 ## O que o aplicativo faz
 

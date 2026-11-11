@@ -121,3 +121,23 @@ def integracoes(servico, contexto):
             st.rerun()
     st.caption("Fontes reais são registradas pelo procedimento administrativo protegido. "
                "Endereços, mapeamentos e chaves não são configuráveis pelo navegador.")
+    with st.expander("Histórico de sincronização"):
+        fonte_historico = st.text_input("UUID da fonte para consultar", max_chars=36)
+        loja_historico = st.text_input("Identificador da loja para consultar", max_chars=120)
+        st.caption("Use os identificadores da configuração protegida. O banco verifica o escopo.")
+        if st.button("Consultar histórico de sincronização"):
+            from uuid import UUID
+
+            try:
+                identificador = str(UUID(fonte_historico))
+            except ValueError:
+                st.warning("Informe o UUID válido da fonte autorizada.")
+                return
+            historico = servico.auth.rpc("sync_history", {
+                "p_source_id": identificador, "p_store_id": loja_historico}, "integrations.manage")
+            if assinatura != access_stamp(servico.auth.require("integrations.manage"), servico.auth.generation):
+                raise AuthorizationError("O acesso mudou durante a consulta do histórico.")
+            if historico:
+                st.dataframe(historico, hide_index=True, width="stretch")
+            else:
+                st.info("Nenhuma execução registrada.")

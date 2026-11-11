@@ -193,3 +193,27 @@ def test_novo_login_mesma_identidade_invalida_extracao():
         SyncCoordinator(auth).prepare(source_id=SOURCE, store_id='loja1', request_key=REQUEST,
             start='2020-01-01', end='2020-01-31', read_all=read_all)
     assert [name for name, _ in auth.calls] == ['sync_authorize_source']
+
+
+def test_manifesto_vincula_conteudo_com_mesma_contagem_e_soma():
+    """Alterar um produto muda o hash mesmo que contagens e unidades coincidam."""
+    auth = FakeAuth()
+    prepare(auth, [line()])
+    first = next(payload for name, payload in auth.calls if name == 'sync_begin')
+    auth.calls.clear()
+    prepare(auth, [line(product_id='outro')])
+    second = next(payload for name, payload in auth.calls if name == 'sync_begin')
+    assert first['p_expected_rows'] == second['p_expected_rows']
+    assert first['p_expected_quantity'] == second['p_expected_quantity']
+    assert first['p_content_hash'] != second['p_content_hash']
+
+
+def test_manifesto_e_paginas_estaveis_em_ordem_diferente():
+    """A ordem dos resultados da API não altera manifesto nem checkpoints."""
+    auth = FakeAuth()
+    rows = [line(line_id='2'), line(line_id='1')]
+    prepare(auth, rows)
+    first = deepcopy(auth.calls)
+    auth.calls.clear()
+    prepare(auth, list(reversed(rows)))
+    assert auth.calls == first

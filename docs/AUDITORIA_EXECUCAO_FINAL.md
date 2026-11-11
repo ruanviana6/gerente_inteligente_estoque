@@ -89,6 +89,63 @@ código não equivale à aprovação desses cenários. A evidência de PostgreSQ
 RLS, concorrência e restauração deve ser consultada no CI do commit entregue.
 Esta revisão não executou alterações no banco produtivo.
 
+## Conferência final da candidata ao PR #8
+
+Foi conferido diretamente no GitHub que o [PR #8](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/8)
+foi aberto em rascunho para `implementacao/web-supabase`, inicialmente no commit
+`8c262a7b8dea6f9432340583141f69bd8c3d0be8`. As verificações devem acompanhar o
+commit final do PR; arquivos que mudaram depois daquela primeira publicação
+precisam da rodada correspondente do CI.
+
+Uma segunda rodada independente local executou os testes novos de segurança,
+sincronização, conector, configuração protegida, exportações e as duas páginas
+novas:
+
+```bash
+.venv/bin/python -m pytest tests/test_revisao_seguranca.py \
+  tests/test_sync_service.py tests/test_gestaoclick.py \
+  tests/test_gestaoclick_runtime.py tests/test_exportacoes_permissoes.py \
+  tests/test_sales_interface.py tests/test_integration_interface.py \
+  -ra --junitxml=/tmp/revisao-final-pr8.xml
+```
+
+Resultado observado: **243 testes aprovados**, em 14,88 segundos. Ruff do
+arquivo independente e `git diff --check` também foram aprovados. Esses testes
+se sobrepõem ao recorte anterior e à suíte geral; as contagens não são somadas.
+
+A conferência das fotografias históricas verificou que:
+
+- O fechamento usa o lote completo selecionado e fotografias cujo número de
+  ingestão é menor ou igual ao desse lote. Uma foto importada depois não altera
+  a disponibilidade utilizada anteriormente.
+- O lote selecionado possui a própria foto de fechamento. O código preserva
+  os catálogos e as versões anteriores, inclusive após outra importação no
+  mesmo dia com saldo diferente.
+- O backfill ordena o legado por `created_at` e UUID decrescente, preservando
+  o desempate anterior. Para novas importações da mesma organização, o lock
+  transacional existente serializa a atribuição da ordem de ingestão.
+
+Foi inspecionado diretamente o registro local da execução SQL anterior,
+`/tmp/estoque-sql-final.log`: 320 mensagens de aprovação, incluindo 84 de
+sincronização, sem `FALHOU`, `ERROR` ou `FATAL`. O registro inclui a reprodução
+do saldo legado 10 com foto sobrescrita 99, recuperação após migração,
+concorrência de vínculos e snapshots e repetição dos cenários após restauração.
+Isso é conferência de evidência da execução principal em banco descartável,
+não uma nova execução SQL por este agente nem validação do Supabase produtivo.
+
+Após esse registro, a migração de vendas recebeu transação explícita e
+notificação de recarga do schema. A cobertura passou a reunir somente
+intervalos confirmados contínuos do mesmo escopo, preservando lacunas; foram
+adicionados casos e um script de concorrência de sincronização. Essas mudanças
+exigem os resultados da rodada final de PostgreSQL e CI, sem reaproveitar os
+320 resultados anteriores como prova da nova versão.
+
+Também foi conferido que a fachada analítica recusa fonte ou loja divergente
+na resposta e exige booleano real na declaração de abrangência. A configuração
+do leitor permanece protegida no servidor, e as telas não recebem rotas,
+tokens ou mapas de campos do navegador. Nenhum comentário do PR #5 foi marcado
+como resolvido por esta revisão.
+
 ## Segredos e limites da inspeção
 
 Foi feita uma busca local por padrões de chave privada, token GitHub, chave
@@ -116,3 +173,13 @@ campos, status, usuário, fonte, loja e cobertura. A primeira sincronização
 completa exige autorização explícita e reconciliação de amostra. A presença de
 testes fictícios aprovados não autoriza usar dados empresariais ou habilitar
 sincronização automática.
+
+## Atualização de disponibilidade conferida pelo agente principal
+
+Depois da revisão inicial, o projeto passou a ACTIVE_HEALTHY. Leituras remotas
+confirmaram quatro migrações originais, RLS nas 16 tabelas públicas e zero funções
+públicas SECURITY DEFINER. Security Advisor retornou um WARN de proteção contra
+senhas vazadas desativada (recurso Pro, nenhum custo autorizado); Performance
+Advisor retornou 13 INFO de índices não usados, sem remoção automática. As novas
+migrações, fluxos produtivos autenticados e auditoria posterior continuam pendentes.
+Essas observações não foram usadas para declarar a implantação validada.

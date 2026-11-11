@@ -29,6 +29,16 @@ jobs:
         with:
           name: interface-flatter
           path: evidencias/interface/
+      - name: Validar novas telas de vendas e sincronização com dados fictícios
+        run: >-
+          python scripts/validar_interface_vendas.py
+          --output evidencias/vendas --strict-layout
+      - name: Guardar capturas de vendas e sincronização
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: interface-vendas-sincronizacao
+          path: evidencias/vendas/
   desempenho:
     runs-on: ubuntu-latest
     timeout-minutes: 30

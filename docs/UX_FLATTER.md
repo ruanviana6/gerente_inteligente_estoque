@@ -71,3 +71,7 @@ Use **Preparar CSV** para gerar o arquivo, depois **Salvar CSV** para salvá-lo.
 Essa escolha evita depender do isolamento de callbacks diferidos do Streamlit 1.66.1. Uma sessão diferente não recebe um identificador global que execute a geração em nome de outra pessoa. Dados já entregues ao navegador, como qualquer arquivo baixado, não podem ser apagados retroativamente por revogação. Toda nova preparação exige nova autorização.
 
 A opção `client.disableDataExport` oculta os controles de CSV e cópia das tabelas, concentrando a exportação nos fluxos autorizados. Ela não impede a extração de informações que o próprio usuário já recebeu na tela.
+
+## Navegação de vendas e integração
+
+Inteligência de Vendas usa trends.view, uma fonte/loja por análise, filtros em formulário e geração explícita. Integrações exige Master e integrations.manage, com prévia separada da confirmação. As telas usam componentes Flatter existentes, sem alterar tema/configuração publicada. scripts/validar_interface_vendas.py verifica oito capturas e os fluxos DEMO em 390/1440 px; a fixture nunca é a entrada app.py.

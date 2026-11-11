@@ -1,3 +1,4 @@
+begin;
 -- Cópia analítica versionada. Nenhuma função acessa ou modifica o ERP.
 -- Os limites conservadores reduzem o risco de ultrapassar o plano gratuito.
 create table public.integration_sources (
@@ -153,6 +154,7 @@ begin
       and status in ('staging','previewed') and id is distinct from r.id) then
     raise exception 'Há sincronização em andamento para esta fonte e loja.' using errcode='55000';
   end if;
+  perform pg_advisory_xact_lock(hashtextextended(org::text,13));
   if r.id is not null then
     update public.sync_runs set status='staging',claim_token=gen_random_uuid(),lease_until=now()+interval '30 minutes'
       where id=r.id returning * into r;
@@ -238,6 +240,9 @@ begin
   if r.status<>'staging' or p_page<>r.checkpoint+1 then
     raise exception 'Checkpoint fora de sequência.' using errcode='22023'; end if;
   n:=jsonb_array_length(p_rows);
+  -- A cota é da organização: outras lojas também disputam o mesmo limite.
+  -- Ordem consistente com commit: primeiro o lote, depois a cota da organização.
+  perform pg_advisory_xact_lock(hashtextextended(r.organization_id::text,13));
   if r.row_count+n>r.expected_rows or (select count(*) from public.sync_staging where organization_id=r.organization_id)+n>20000 then
     raise exception 'Limite ou total de registros excedido.' using errcode='54000'; end if;
   for row in select value from jsonb_array_elements(p_rows) loop
@@ -267,7 +272,7 @@ begin
 end $$;
 create function private.sync_commit(p_run_id uuid,p_claim_token uuid,p_coverage_confirmed boolean default false) returns jsonb
 language plpgsql security definer set search_path='' as $$
-declare r public.sync_runs; row record; old jsonb; v bigint; changed integer:=0; org uuid:=private.require_master();
+declare r public.sync_runs; row record; old jsonb; v bigint; changed integer:=0; reconciled_rows integer; reconciled_quantity numeric; org uuid:=private.require_master();
 begin
   perform private.require_permission('integrations.manage');
   select * into r from public.sync_runs where id=p_run_id and organization_id=org for update;
@@ -293,6 +298,20 @@ begin
       on conflict(organization_id,source_id,store_id,document_id,line_id) do update set version_id=excluded.version_id;
     changed:=changed+1;
   end loop;
+  if p_coverage_confirmed is true then
+    -- Ausência na resposta não prova exclusão. Uma declaração de período completo
+    -- exige que a cópia final também reconcilie, sem apagar linhas antigas.
+    select count(*),coalesce(sum(case when v.payload->>'status'='completed' then
+      (v.payload->>'quantity')::numeric-(v.payload->>'returned_quantity')::numeric else 0 end),0)
+      into reconciled_rows,reconciled_quantity
+      from public.sales_lines_current c join public.sales_line_versions v on v.id=c.version_id
+      where c.organization_id=org and c.source_id=r.source_id and c.store_id=r.store_id
+        and (v.payload->>'sale_date')::date between r.period_start and r.period_end;
+    if reconciled_rows<>r.expected_rows or reconciled_quantity<>r.expected_quantity then
+      raise exception 'A cópia consolidada não reconcilia com o período completo. Confira linhas ausentes e cancelamentos explícitos na origem.'
+        using errcode='22023';
+    end if;
+  end if;
   update public.sync_runs set status='completed',changed_rows=changed,coverage_confirmed=coalesce(p_coverage_confirmed,false),
     finished_at=now() where id=r.id returning * into r;
   -- O histórico definitivo permanece nas versões; staging não é histórico operacional.
@@ -333,10 +352,24 @@ begin
     from public.sales_lines_current c join public.sales_line_versions v on v.id=c.version_id
     where c.organization_id=org and c.source_id=p_source_id and c.store_id=p_store_id
     and (v.payload->>'sale_date')::date between p_start and p_end;
-  select jsonb_build_object('coverage_start',period_start,'coverage_end',period_end,'coverage_verified',coverage_confirmed,
-    'last_sync',finished_at) into coverage from public.sync_runs where organization_id=org and source_id=p_source_id
-      and store_id=p_store_id and status='completed' and coverage_confirmed and period_start<=p_start and period_end>=p_end
-      order by finished_at desc,id desc limit 1;
+  -- Junta apenas intervalos confirmados adjacentes/sobrepostos do mesmo escopo.
+  -- max anterior, em vez de lag(end), conserva ilhas com intervalos aninhados.
+  with observed as (
+    select period_start,period_end,finished_at,id,
+      max(period_end) over(order by period_start,period_end,id rows between unbounded preceding and 1 preceding) previous_end
+    from public.sync_runs where organization_id=org and source_id=p_source_id and store_id=p_store_id
+      and status='completed' and coverage_confirmed
+  ), boundaries as (
+    select *,case when previous_end is null or period_start>previous_end+1 then 1 else 0 end new_island from observed
+  ), grouped as (
+    select *,sum(new_island) over(order by period_start,period_end,id rows unbounded preceding) island from boundaries
+  ), islands as (
+    select min(period_start) coverage_start,max(period_end) coverage_end,max(finished_at) last_sync,count(*) runs
+    from grouped group by island
+  )
+  select jsonb_build_object('coverage_start',coverage_start,'coverage_end',coverage_end,'coverage_verified',true,
+    'last_sync',last_sync,'coverage_runs',runs) into coverage from islands
+    where coverage_start<=p_start and coverage_end>=p_end order by last_sync desc limit 1;
   return jsonb_build_object('rows',rows,'metadata',coalesce(coverage,jsonb_build_object('coverage_verified',false)),
     'source_id',p_source_id,'store_id',p_store_id);
 end $$;
@@ -417,3 +450,6 @@ create function public.sync_authorize_source(p_source_id uuid,p_store_id text) r
 language sql stable security invoker set search_path='' as $$select private.sync_authorize_source(p_source_id,p_store_id)$$;
 revoke all on function public.sync_authorize_source(uuid,text),private.sync_authorize_source(uuid,text) from public,anon,authenticated,service_role;
 grant execute on function public.sync_authorize_source(uuid,text),private.sync_authorize_source(uuid,text) to authenticated;
+
+notify pgrst,'reload schema';
+commit;

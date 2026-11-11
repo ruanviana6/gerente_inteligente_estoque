@@ -6,7 +6,7 @@ no GestãoClick. A configuração fica exclusivamente no servidor Streamlit.
 
 ## Recuperar o projeto existente
 
-O MCP de gerenciamento confirmou `INACTIVE` em `csiqpzoudruzppfbpqqx`, São Paulo.
+O MCP de gerenciamento confirmou inicialmente `INACTIVE` em `csiqpzoudruzppfbpqqx`, São Paulo. Na leitura final, o projeto estava `ACTIVE_HEALTHY`, com as quatro migrações antigas e 16 tabelas públicas com RLS. O procedimento de retomada abaixo só se aplica se voltar a pausar.
 O proprietário deve abrir https://supabase.com/dashboard/project/csiqpzoudruzppfbpqqx,
 selecionar **Resume project** e confirmar. A documentação oficial permite retomar
 projetos pausados por até 90 dias. Não crie outro projeto, exclua tabelas ou

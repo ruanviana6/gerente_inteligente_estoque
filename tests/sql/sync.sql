@@ -86,12 +86,52 @@ select sync_test.denied(format('select public.sync_stage(%L,%L,1,%L::jsonb)',:'r
 select public.sync_stage(:'run5',:'token5',1,sync_test.line(:'source'));
 select sync_test.denied(format('select public.sync_preview(%L,%L)',:'run5',:'token5'),'22023','soma divergente não autoriza prévia');
 select public.sync_cancel(:'run5',:'token5');
+-- Uma resposta que omite linhas antigas não ganha cobertura completa.
+select j->>'id' incomplete,j->>'claim_token' incomplete_token from public.sync_begin(:'source','loja1',
+ '74000000-0000-4000-8000-000000000019','2020-01-01','2020-01-31',0,0,repeat('e',64)) j \gset
+select public.sync_preview(:'incomplete',:'incomplete_token');
+select sync_test.denied(format('select public.sync_commit(%L,%L,true)',:'incomplete',:'incomplete_token'),
+ '22023','resposta vazia não apaga linhas nem declara abrangência completa');
+select sync_test.check(public.sync_commit(:'incomplete',:'incomplete_token',false)->>'changed_rows'='0',
+ 'carga parcial sem confirmação conserva linhas antigas');
+select sync_test.check(public.sales_payload(:'source','loja1','2020-01-01','2020-01-31')->'rows'->0->>'status'='cancelled',
+ 'ausência no incremental não remove cancelamento preservado');
 -- O Master consegue liberar staging abandonado, sem alterar o consolidado.
 select j->>'id' abandoned from public.sync_begin(:'source','loja1','74000000-0000-4000-8000-000000000009','2020-01-01','2020-01-31',1,4,repeat('a',64)) j \gset
 reset role;
 update public.sync_runs set status='interrupted',lease_until=now()-interval '1 minute' where id=:'abandoned';
 set local role authenticated;
 select sync_test.check(public.sync_cancel(:'abandoned',null)->>'status'='cancelled','limpeza de execução abandonada libera o escopo');
+-- Coberturas só formam uma ilha se não há nenhum dia desconhecido.
+reset role;
+insert into public.sync_runs(organization_id,source_id,store_id,author_id,request_key,content_hash,status,
+ period_start,period_end,expected_rows,expected_quantity,coverage_confirmed,finished_at) values
+ ('73000000-0000-4000-8000-000000000001',:'source','loja1','71000000-0000-4000-8000-000000000001',
+ '74000000-0000-4000-8000-000000000010',repeat('a',64),'completed','2020-02-02','2020-02-29',0,0,true,now()),
+ ('73000000-0000-4000-8000-000000000001',:'source','loja2','71000000-0000-4000-8000-000000000001',
+ '74000000-0000-4000-8000-000000000011',repeat('a',64),'completed','2020-02-01','2020-02-01',0,0,true,now()),
+ ('73000000-0000-4000-8000-000000000001',:'source','loja1','71000000-0000-4000-8000-000000000001',
+ '74000000-0000-4000-8000-000000000012',repeat('a',64),'completed','2020-02-01','2020-02-01',0,0,false,now());
+set local role authenticated;
+select sync_test.check(not (public.sales_payload(:'source','loja1','2020-01-01','2020-02-29')->'metadata'->>'coverage_verified')::boolean,
+ 'lacuna de um dia não é coberta por outra loja ou execução não conferida');
+reset role;
+update public.sync_runs set coverage_confirmed=true where request_key='74000000-0000-4000-8000-000000000012';
+set local role authenticated;
+select sync_test.check((public.sales_payload(:'source','loja1','2020-01-01','2020-02-29')->'metadata'->>'coverage_verified')::boolean,
+ 'intervalos adjacentes confirmados formam cobertura contínua');
+reset role;
+insert into public.sync_runs(organization_id,source_id,store_id,author_id,request_key,content_hash,status,
+ period_start,period_end,expected_rows,expected_quantity,coverage_confirmed,finished_at) values
+ ('73000000-0000-4000-8000-000000000001',:'source','loja1','71000000-0000-4000-8000-000000000001',
+ '74000000-0000-4000-8000-000000000013',repeat('a',64),'completed','2020-02-15','2020-03-05',0,0,true,now()),
+ ('73000000-0000-4000-8000-000000000001',:'source','loja1','71000000-0000-4000-8000-000000000001',
+ '74000000-0000-4000-8000-000000000014',repeat('a',64),'completed','2020-02-16','2020-02-16',0,0,true,now());
+set local role authenticated;
+select sync_test.check((public.sales_payload(:'source','loja1','2020-01-01','2020-03-05')->'metadata'->>'coverage_verified')::boolean,
+ 'intervalos sobrepostos e aninhados não abrem lacuna falsa');
+select sync_test.check(not (public.sales_payload(:'source','loja1','2020-01-01','2020-03-06')->'metadata'->>'coverage_verified')::boolean,
+ 'limite final não é ampliado sem observação');
 select sync_test.login(2);
 select sync_test.denied(format('select public.sales_payload(%L,%L,%L,%L)',:'source','loja1','2020-01-01','2020-01-31'),'42501','Master de outra organização não lê fonte');
 select sync_test.denied(format('select public.sync_history(%L,%L)',:'source','loja1'),'42501','IDOR do histórico recusado');
