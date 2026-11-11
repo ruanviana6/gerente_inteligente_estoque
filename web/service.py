@@ -28,6 +28,7 @@ from dados import (
 from motor import gerar_painel
 from web.auth import AccessContext, AuthService
 from web.errors import AuthenticationError, AuthorizationError
+from web.exports import filtrar_painel, filtrar_reposicao
 from web.telemetry import measure, performance_scope
 
 FINANCEIRO = {"custo_unitario", "capital_estoque", "classe_abc", "abc_parcial",
@@ -59,7 +60,7 @@ def _registros(tabela: pd.DataFrame) -> list[dict[str, Any]]:
     return json.loads(json.dumps(registros, allow_nan=False))
 
 
-def normalizar_payload(payload: dict, financeiro: bool = False) -> dict:
+def normalizar_payload(payload: dict, financeiro: bool = False, tendencias: bool = True) -> dict:
     """Valida o retorno remoto e prepara DataFrames para o motor já auditado.
 
     A política do banco já impede leitura de custos indevida. A remoção aqui
@@ -85,7 +86,7 @@ def normalizar_payload(payload: dict, financeiro: bool = False) -> dict:
             painel = gerar_painel(produtos, vendas, fotos, hoje=referencia)
     if not financeiro:
         produtos = produtos.drop(columns=list(FINANCEIRO), errors="ignore")
-        painel = painel.drop(columns=list(FINANCEIRO), errors="ignore")
+    painel = filtrar_painel(painel, financeiro, tendencias)
     return {"products": produtos, "sales": vendas, "snapshots": fotos, "panel": painel,
             "imports": payload.get("imports", []), "metadata": payload.get("metadata", {})}
 
@@ -136,9 +137,14 @@ class Service:
         # autorização mudou durante uma operação potencialmente demorada.
         contexto = self.auth.require(module)
         self._same_identity(original, contexto)
-        if not contexto.can("finance.view"):
-            for name in ("products", "panel"):
-                resultado[name] = resultado[name].drop(columns=list(FINANCEIRO), errors="ignore")
+        colunas_produtos = [coluna for coluna in COLUNAS_PRODUTOS
+                            if contexto.can("finance.view") or coluna not in FINANCEIRO]
+        resultado["products"] = resultado["products"].loc[:, [
+            coluna for coluna in colunas_produtos if coluna in resultado["products"]
+        ]].copy()
+        resultado["panel"] = filtrar_painel(
+            resultado["panel"], contexto.can("finance.view"), contexto.can("trends.view"),
+        )
         resultado["_access_context"] = contexto
         return resultado
 
@@ -199,7 +205,13 @@ class Service:
     def export_replenishment(self, filters: dict | None = None) -> bytes:
         """Reconsulta a autorização e os dados antes de gerar um CSV permitido."""
         original = self.auth.require("replenishment.export")
+        generation = getattr(self.auth, "generation", None)
         tabela = self.load_inventory("replenishment.view")["panel"]
+        contexto = self.auth.require("replenishment.export")
+        self._same_identity(original, contexto)
+        if not contexto.can("replenishment.view"):
+            raise AuthorizationError("O acesso à reposição foi revogado.")
+        tabela = filtrar_reposicao(tabela, contexto.permissions)
         filtros = filters or {}
         if not tabela.empty and filtros.get("somente_sugestao", True):
             tabela = tabela.loc[tabela["quantidade_sugerida"].gt(0)].copy()
@@ -219,13 +231,9 @@ class Service:
                 tabela = tabela.loc[tabela["risco_prazo"]]
             elif prioridade == "qualidade":
                 tabela = tabela.loc[tabela["requer_revisao"]]
-        contexto = self.auth.require("replenishment.export")
-        self._same_identity(original, contexto)
-        if not contexto.can("replenishment.view"):
-            raise AuthorizationError("O acesso à reposição foi revogado.")
-        if not contexto.can("finance.view"):
-            tabela = tabela.drop(columns=list(FINANCEIRO), errors="ignore")
-        return exportar_csv_seguro(tabela)
+        conteudo = exportar_csv_seguro(tabela)
+        self._validate_export(contexto, generation, "replenishment.export")
+        return conteudo
 
     @_operation
     def monthly_report(self, month):
@@ -263,12 +271,27 @@ class Service:
         from web.reports import exportar_relatorio_csv
 
         original = self.auth.require("reports.export")
+        generation = getattr(self.auth, "generation", None)
         relatorio = self.monthly_report(month)
         contexto = self.auth.require("reports.export")
         self._same_identity(original, contexto)
         if not contexto.can("reports.view"):
             raise AuthorizationError("O acesso ao relatório foi revogado.")
-        return exportar_relatorio_csv(relatorio, contexto.permissions)
+        conteudo = exportar_relatorio_csv(relatorio, contexto.permissions)
+        self._validate_export(contexto, generation, "reports.export")
+        return conteudo
+
+    def _validate_export(self, prepared: AccessContext, generation: int | None, permission: str) -> None:
+        """Revalida após serializar, bloqueando bytes de uma autorização já alterada.
+
+        A conferência ocorre também nos métodos diretos da fachada. O callback
+        da interface mantém sua própria validação de identidade Auth ao fim.
+        """
+        current = self.auth.require(permission)
+        self._same_identity(prepared, current)
+        if (getattr(self.auth, "generation", None) != generation
+                or self._access_signature(prepared) != self._access_signature(current)):
+            raise AuthorizationError("O acesso mudou durante a exportação. Atualize a página.")
 
     @staticmethod
     def _same_identity(original: AccessContext, current: AccessContext) -> None:

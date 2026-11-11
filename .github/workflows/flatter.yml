@@ -45,7 +45,7 @@ jobs:
       - name: Preparar cópia imutável da versão publicada
         run: |
           mkdir -p /tmp/flatter-base evidencias/desempenho
-          git archive 5f4856384167d7100dfedc0f5d4fcefa94f28c03 | tar -x -C /tmp/flatter-base
+          git archive a5157eef89da159db7182c85c132ca907c9b6e50 | tar -x -C /tmp/flatter-base
           python -m pip freeze > evidencias/desempenho/dependencias.txt
       - name: Medir interface anterior com transporte fictício
         run: >-
