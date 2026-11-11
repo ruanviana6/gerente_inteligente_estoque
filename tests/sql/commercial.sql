@@ -46,6 +46,12 @@ insert into public.app_users(user_id,organization_id,display_name,role,active) v
  ('b1000000-0000-4000-8000-000000000004','b3000000-0000-4000-8000-000000000001','Inativo','Administrador',false);
 set local role authenticated;
 select commercial_test.login(1);
+select commercial_test.check(not (public.app_context()->'permissions' ? 'commercial.view'),
+ 'cliente antigo continua com contrato compatível sem perder o login');
+select commercial_test.check(public.app_context(array['commercial.view'])->'permissions'='["commercial.view"]'::jsonb,
+ 'cliente novo recebe somente concessões que compreende');
+select commercial_test.check(public.app_context(array['permissao.inventada'])->'permissions'='[]'::jsonb,
+ 'declarar permissão no cliente não a concede');
 select public.integration_register_source('comercial-ficticia','Fonte comercial DEMO',array['loja1'])->>'id' source \gset
 select public.publish_commercial_batch(:'source','loja1','2020-02-01','2020-02-28','delivery',commercial_test.item())->>'id' first_batch \gset
 select commercial_test.check((public.publish_commercial_batch(:'source','loja1','2020-02-01','2020-02-28','delivery',commercial_test.item())->>'reused')::boolean,'reprocessamento idempotente');
@@ -96,6 +102,8 @@ select public.sync_commit(:'run3',:'token3',true);
 select public.refresh_commercial_daily(:'run3');
 select commercial_test.check(public.commercial_daily(:'source','loja1','2020-01-01','2020-01-31')='[]'::jsonb,'cancelamento confirmado corrige resumo sem baixar estoque');
 select commercial_test.login(3);
+select commercial_test.check(not (public.app_context(array['commercial.manage','users.manage'])->'permissions' ? 'commercial.manage'),
+ 'pedido do cliente não eleva privilégio');
 select commercial_test.denied($q$select public.commercial_sources()$q$,'42501','tendências não concede permissão comercial');
 reset role;
 insert into public.user_permissions values('b1000000-0000-4000-8000-000000000003','commercial.view',true);

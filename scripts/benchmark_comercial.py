@@ -7,6 +7,7 @@ import gzip
 import hashlib
 import io
 import json
+import math
 import statistics
 import sys
 import time
@@ -39,7 +40,9 @@ def _medir(funcao, repeticoes=3):
         inicio = time.perf_counter()
         valor = funcao()
         tempos.append((time.perf_counter()-inicio)*1000)
-    return valor, {"p50_ms": round(statistics.median(tempos), 3), "p95_observado_ms": round(max(tempos), 3),
+    return valor, {"p50_ms": round(statistics.median(tempos), 3),
+                   "p95_ms": round(sorted(tempos)[math.ceil(len(tempos)*0.95)-1], 3),
+                   "max_ms": round(max(tempos), 3),
                    "repeticoes": repeticoes}
 
 
@@ -79,7 +82,7 @@ def executar(linhas=100_000):
             "restauracao_exata": True, "csv_gzip_escrita": gzip_tempo, "csv_gzip_leitura": gzip_leitura,
             "parquet_zstd_escrita": parquet_tempo, "parquet_zstd_leitura": parquet_leitura,
             "calculo_completo_antes": preparo, "pagina_pronta_depois": leitura, "pagina_bytes": len(pagina),
-            "limites": "CPU local e dados sintéticos. p95 observado é o máximo das repetições, não SLA. "
+            "limites": "CPU local e dados sintéticos. p95 empírico pelo posto mais próximo; com três amostras coincide com o máximo, não é SLA. "
                         "O resumo não substitui o detalhe nem permite reconstruir pedidos sozinho. Nenhum arquivo foi apagado."}
 
 
@@ -91,5 +94,7 @@ if __name__ == "__main__":
     if not 2 <= args.linhas <= 100_000:
         parser.error("Use de 2 a 100.000 linhas fictícias.")
     args.saida.parent.mkdir(parents=True, exist_ok=True)
-    args.saida.write_text(json.dumps(executar(args.linhas), indent=2, ensure_ascii=False))
+    resultado = executar(args.linhas)
+    args.saida.write_text(json.dumps(resultado, indent=2, ensure_ascii=False))
+    print("RESULTADO_BENCHMARK_COMERCIAL=" + json.dumps(resultado, ensure_ascii=False))
     print("Benchmark fictício e restauração concluídos.")

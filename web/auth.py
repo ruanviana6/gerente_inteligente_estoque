@@ -277,7 +277,7 @@ class AuthService:
                 if self._execution_active.get():
                     self._verified.set(stamp)
             with measure("app_context"):
-                result = self.api.rpc("app_context", {}, session.access_token)
+                result = self.api.rpc("app_context", {"p_supported_permissions": sorted(PERMISSIONS)}, session.access_token)
             if not isinstance(result, dict) or not isinstance(result.get("profile"), dict):
                 raise AuthorizationError("A conta não possui acesso ativo ao aplicativo.")
             profile = result["profile"]

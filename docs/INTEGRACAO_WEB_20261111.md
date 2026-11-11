@@ -18,6 +18,11 @@ Permissões futuras do banco não bloqueiam versões antigas: elas são ignorada
 nunca concedidas. O rollout deve primeiro publicar essa compatibilidade. Um
 marcador público e sem informações sensíveis identifica a versão no DOM.
 
+O banco também mantém o contrato legado no RPC sem argumentos. A versão nova
+declara as permissões que compreende e recebe somente a interseção com suas
+concessões reais. Isso preserva o login mesmo se o Streamlit ainda estiver com
+código antigo durante a atualização. Declarar uma permissão nunca a concede.
+
 A cobertura alvo do SKU passou a ser considerada na reposição: usa o maior valor
 entre alvo e ciclo. Recebimentos com data confirmada dentro da cobertura reduzem
 a necessidade, sem ocultar déficits anteriores à sua chegada. Campos antigos sem

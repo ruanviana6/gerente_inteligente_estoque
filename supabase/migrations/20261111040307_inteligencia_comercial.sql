@@ -2,6 +2,30 @@
 insert into public.permissions(name) values('commercial.view'),('commercial.customer_detail'),('commercial.manage')
   on conflict(name) do nothing;
 
+-- Clientes antigos recebem o contrato antigo durante o rollout. O cliente novo
+-- informa o que compreende, mas a interseção nunca concede uma permissão nova.
+create function private.app_context_for_client(p_supported_permissions text[]) returns jsonb
+language plpgsql stable security definer set search_path='' as $$
+declare result jsonb;
+begin
+  if p_supported_permissions is null or cardinality(p_supported_permissions)>100
+    or exists(select 1 from unnest(p_supported_permissions) p where p is null or length(p) not between 1 and 100) then
+    raise exception 'Contrato de permissões inválido.' using errcode='22023'; end if;
+  result := private.app_context();
+  return jsonb_set(result,'{permissions}',coalesce((select jsonb_agg(p order by p)
+    from jsonb_array_elements_text(result->'permissions') p where p=any(p_supported_permissions)),'[]'::jsonb));
+end $$;
+create or replace function public.app_context() returns jsonb language sql stable security invoker set search_path=''
+as $$select private.app_context_for_client(array['dashboard.view','inventory.view','replenishment.view','replenishment.export',
+  'finance.view','trends.view','inventory.import','parameters.edit','decisions.write','audit.view','users.manage',
+  'permissions.manage','integrations.manage','reports.view','reports.export','reports.receive','reports.manage'])$$;
+create function public.app_context(p_supported_permissions text[]) returns jsonb
+language sql stable security invoker set search_path='' as $$select private.app_context_for_client(p_supported_permissions)$$;
+revoke all on function private.app_context_for_client(text[]) from public,anon,authenticated;
+revoke all on function public.app_context(),public.app_context(text[]) from public,anon;
+grant execute on function private.app_context_for_client(text[]) to authenticated;
+grant execute on function public.app_context(),public.app_context(text[]) to authenticated;
+
 -- Mantém a trava de concorrência e não permite delegar a gestão comercial.
 create or replace function private.admin_set_user(p_user_id uuid,p_display_name text,p_role text,p_active boolean,p_permissions jsonb)
 returns jsonb language plpgsql security definer set search_path='' as $$
@@ -174,6 +198,13 @@ create table public.commercial_insights (
      or (dimension='pair' and customer_ref is null and city_code is null and current_orders>=3 and total_orders>=20
          and sku_a is not null and sku_b is not null and alert_code='produtos_juntos'
          and support is not null and confidence is not null and lift is not null))
+  ,check(city_code is null or (state is not null and state=case substring(city_code,1,2)
+    when '11' then 'RO' when '12' then 'AC' when '13' then 'AM' when '14' then 'RR' when '15' then 'PA'
+    when '16' then 'AP' when '17' then 'TO' when '21' then 'MA' when '22' then 'PI' when '23' then 'CE'
+    when '24' then 'RN' when '25' then 'PB' when '26' then 'PE' when '27' then 'AL' when '28' then 'SE'
+    when '29' then 'BA' when '31' then 'MG' when '32' then 'ES' when '33' then 'RJ' when '35' then 'SP'
+    when '41' then 'PR' when '42' then 'SC' when '43' then 'RS' when '50' then 'MS' when '51' then 'MT'
+    when '52' then 'GO' when '53' then 'DF' else 'INVALIDA' end))
 );
 create index commercial_insights_scope on public.commercial_insights(organization_id,batch_id,dimension);
 alter table public.commercial_insights enable row level security;
