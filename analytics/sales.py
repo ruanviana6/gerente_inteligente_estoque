@@ -91,7 +91,8 @@ def normalizar_linhas(linhas: Sequence[Mapping[str, Any]]) -> tuple[list[dict], 
         linha = {campo: _texto(entrada.get(campo), campo) for campo in (
             "source_id", "store_id", "document_id", "line_id", "product_id", "sku",
         )}
-        linha["product_name"] = _texto(entrada.get("product_name"), "product_name", 300)
+        nome = _texto(entrada.get("product_name"), "product_name", 300, vazio=True)
+        linha["product_name"] = nome or f"SKU {linha['sku']} (nome indisponível)"
         for campo in ("category", "supplier"):
             linha[campo] = _texto(entrada.get(campo, ""), campo, 300, vazio=True)
         linha["sale_date"] = _data(entrada.get("sale_date"), "sale_date").isoformat()
@@ -309,6 +310,7 @@ def analisar_vendas(
                   if anterior_inicio.isoformat() <= linha["sale_date"] <= anterior_fim.isoformat()]
     cesta_periodo = [linha for linha in escopo if inicio.isoformat() <= linha["sale_date"] <= fim.isoformat()]
     status_atuais_completos = not any(linha["status"] == "unknown" for linha in atuais)
+    status_cesta_completos = not any(linha["status"] == "unknown" for linha in cesta_periodo)
     status_anteriores_completos = not any(linha["status"] == "unknown" for linha in anteriores)
     completa = completa and status_atuais_completos
     comparavel = comparavel and status_atuais_completos and status_anteriores_completos
@@ -331,6 +333,8 @@ def analisar_vendas(
     desconhecidos = sum(linha["status"] == "unknown" for linha in atuais)
     if desconhecidos:
         limitacoes.append("Existem status desconhecidos; essas linhas foram excluídas das vendas efetivas.")
+    elif not status_cesta_completos:
+        limitacoes.append("Há status desconhecidos em outros produtos do período; associação indisponível.")
     devolucoes_incompletas = sum(linha["status"] == "returned" and linha["returned_quantity"] == 0
                                 for linha in atuais)
     if devolucoes_incompletas:
@@ -440,8 +444,8 @@ def analisar_vendas(
                                            "Conferir o cálculo do estoque antes de decidir a reposição.",
                              "product_id": produto["product_id"], "limitacoes": produto["avisos"]})
     cestas = _cestas(cesta_periodo, min_pedidos, min_coocorrencias, product_id, category)
-    cestas["abrangencia_completa"] = completa
-    if not completa:
+    cestas["abrangencia_completa"] = completa and status_cesta_completos
+    if not cestas["abrangencia_completa"]:
         # O denominador de suporte só é interpretável com todos os pedidos do
         # período declarado. Linhas faltantes podem mudar confiança e lift.
         cestas.update({"disponivel": False, "pares": [],

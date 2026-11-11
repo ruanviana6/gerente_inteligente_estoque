@@ -208,6 +208,12 @@ def verificar_fluxos(browser, base: str, destino: Path, controle: Path, estrito:
             pagina = contexto.new_page()
             pagina.goto(base + "?perfil=Master", wait_until="domcontentloaded")
             pagina.get_by_role("button", name="Entrar", exact=True).wait_for()
+            logo = pagina.get_by_alt_text("Logotipo da Flatter")
+            expect(logo).to_be_visible()
+            pagina.wait_for_function("""() => {
+                const logo = document.querySelector('img[alt="Logotipo da Flatter"]');
+                return logo && logo.complete && logo.naturalWidth > 0;
+            }""")
             resultados["telas"][f"login-{largura}"] = verificar_layout(
                 pagina, f"login-{largura}", destino, estrito, miniaturas,
             )

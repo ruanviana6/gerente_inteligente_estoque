@@ -367,9 +367,12 @@ begin
     select min(period_start) coverage_start,max(period_end) coverage_end,max(finished_at) last_sync,count(*) runs
     from grouped group by island
   )
-  select jsonb_build_object('coverage_start',coverage_start,'coverage_end',coverage_end,'coverage_verified',true,
+  -- A ilha que contém o fim permite avaliar o período atual mesmo que o
+  -- anterior esteja ausente; coverage_verified continua exigindo toda a janela.
+  select jsonb_build_object('coverage_start',coverage_start,'coverage_end',coverage_end,
+    'coverage_verified',coverage_start<=p_start,'period_end_coverage_verified',true,
     'last_sync',last_sync,'coverage_runs',runs) into coverage from islands
-    where coverage_start<=p_start and coverage_end>=p_end order by last_sync desc limit 1;
+    where coverage_start<=p_end and coverage_end>=p_end order by last_sync desc limit 1;
   return jsonb_build_object('rows',rows,'metadata',coalesce(coverage,jsonb_build_object('coverage_verified',false)),
     'source_id',p_source_id,'store_id',p_store_id);
 end $$;

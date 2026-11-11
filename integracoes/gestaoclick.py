@@ -500,7 +500,9 @@ def normalizar_linhas(
                     status=status, quantity=quantity, returned_quantity=returned)
         for name in ("product_name", "category", "supplier"):
             value = values.get(name, "")
-            line[name] = _texto(value, 300) if value else ""
+            line[name] = _texto(value, 300).strip() if value else ""
+        if not line["product_name"]:
+            line["product_name"] = f"SKU {line['sku']} (nome indisponível)"
         if "source_updated_at" in values:
             try:
                 stamp = datetime.fromisoformat(values["source_updated_at"])

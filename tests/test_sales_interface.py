@@ -280,6 +280,28 @@ def test_fachada_nao_confia_em_abrangencia_sem_confirmacao():
     assert not resultado["cestas"]["disponivel"]
 
 
+def test_cobertura_atual_confirmada_sem_periodo_anterior_libera_cestas():
+    """Uma ausência anterior impede comparação, mas não invalida o mês confirmado."""
+    servico = ServicoVendasFicticio()
+    servico.metadata = {"coverage_start": "2026-09-01", "coverage_end": "2026-09-30",
+                        "coverage_verified": False, "period_end_coverage_verified": True}
+    resultado = SalesService(servico.auth).analyze(SOURCE, STORE, date(2026, 9, 1), date(2026, 9, 30))
+    assert resultado["abrangencia"]["periodo_completo"]
+    assert not resultado["comparacao"]["comparavel"]
+    assert resultado["cestas"]["disponivel"]
+    assert resultado["cestas"]["pares"]
+
+
+@pytest.mark.parametrize("confirmacao", ["true", 1, None, [], {}])
+def test_cobertura_parcial_exige_booleano_explicito(confirmacao):
+    """Valores truthy não podem autorizar a cobertura apenas do período selecionado."""
+    servico = ServicoVendasFicticio()
+    servico.metadata = {"coverage_start": "2026-09-01", "coverage_end": "2026-09-30",
+                        "coverage_verified": False, "period_end_coverage_verified": confirmacao}
+    with pytest.raises(ServiceUnavailable):
+        SalesService(servico.auth).analyze(SOURCE, STORE, date(2026, 9, 1), date(2026, 9, 30))
+
+
 def test_granularidade_escolhida_pode_ser_analisada_sem_apagar_resultado(monkeypatch):
     """Escolher o gráfico semanal precisa resultar em uma análise visível."""
     app = abrir_vendas(monkeypatch)

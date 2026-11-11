@@ -35,9 +35,8 @@ def test_bordas_de_controles_atendem_contraste_nao_textual(background):
 
 
 def test_texto_sobre_acao_terracota_atende_contraste_aa():
-    """A marca usa branco e o botão usa o texto claro do tema, ambos legíveis."""
+    """O texto branco de ações e marca contrasta com o terracota da identidade."""
     assert _contrast("#FFFFFF", theme.PALETTE["brand"]) >= 4.5
-    assert _contrast(theme.PALETTE["text"], theme.PALETTE["brand"]) >= 4.5
 
 
 def test_configuracao_nativa_coincide_com_paleta_e_preserva_protecao():
@@ -85,13 +84,18 @@ def test_tom_nao_previsto_nao_cria_estilo_arbitrario():
 
 
 def test_html_do_tema_e_estatico_e_nao_carrega_recursos_externos(monkeypatch):
-    """Somente CSS e duas versões fixas do nome Flatter chegam ao HTML."""
+    """O HTML contém só CSS estático; a marca usa um arquivo local e texto alternativo."""
     interface = MagicMock()
     monkeypatch.setattr(theme, "st", interface)
     theme.apply_theme()
     theme.brand_header()
     theme.brand_header(compact=True)
-    assert interface.html.call_count == 3
+    assert interface.html.call_count == 1
+    assert interface.image.call_count == 2
+    assert theme.LOGO_PATH.is_file()
+    for chamada in interface.image.call_args_list:
+        assert chamada.args[0] == str(theme.LOGO_PATH)
+        assert chamada.kwargs["alt"] == "Logotipo da Flatter"
     for chamada in interface.html.call_args_list:
         html = chamada.args[0].lower()
         assert "<script" not in html

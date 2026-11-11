@@ -1,12 +1,13 @@
 """Identidade Flatter com tema nativo e componentes de apresentação pequenos.
 
-Somente CSS e lettering estáticos entram em HTML. Nomes de pessoas, produtos,
+Somente CSS estático entra em HTML. Nomes de pessoas, produtos,
 fornecedores e quaisquer valores do banco passam exclusivamente por widgets
 nativos do Streamlit. Este módulo não consulta dados nem guarda estado de sessão.
 """
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any, Literal
 
 import streamlit as st
@@ -15,19 +16,22 @@ Tone = Literal["neutral", "danger", "warning", "success", "info", "brand"]
 Width = int | Literal["stretch", "content"]
 
 PALETTE = {
-    "background": "#101720",
-    "sidebar": "#151E2B",
-    "surface": "#1C2937",
-    "brand": "#B55440",
-    "brand_text": "#D97963",
-    "text": "#F5F7FA",
-    "secondary": "#B8C2CE",
-    "border": "#6C7A8B",
-    "danger": "#FFADAD",
-    "warning": "#F8D17B",
-    "success": "#8CD5B3",
-    "info": "#9FC7FF",
+    "background": "#FBF8F6",
+    "sidebar": "#F4ECE8",
+    "surface": "#FFFFFF",
+    "brand": "#9C4438",
+    "brand_text": "#8B332E",
+    "text": "#2D1C25",
+    "secondary": "#66575F",
+    "border": "#8A727A",
+    "danger": "#AA2737",
+    "warning": "#875900",
+    "success": "#1D705A",
+    "info": "#69417C",
+    "plum": "#61334D",
 }
+
+LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "flatter-logo.jpg"
 
 _BADGE_COLORS = {
     "neutral": "gray", "danger": "red", "warning": "yellow",
@@ -38,32 +42,23 @@ _BADGE_COLORS = {
 # data-testid, hashes de CSS, ordem dos elementos ou detalhes internos do DOM.
 STYLES = """
 <style>
-.flatter-wordmark {
-    display: inline-flex;
-    align-items: center;
-    background: #B55440;
-    color: #FFFFFF;
-    padding: 0.2rem 1.2rem 0.55rem;
-    border-radius: 0.8rem;
-    font-family: Georgia, Cambria, "Times New Roman", serif;
-    font-size: clamp(2.6rem, 8vw, 3.5rem);
-    font-weight: 400;
-    line-height: 1.1;
-    letter-spacing: -0.065em;
+.st-key-flatter_brand_logo, .st-key-flatter_brand_logo_compact {
+    background: #9C4438;
+    border-radius: 0.7rem;
+    width: fit-content;
     max-width: 100%;
-    box-sizing: border-box;
+    overflow: hidden;
 }
-.flatter-wordmark--compact {
-    font-size: 2.35rem;
-    padding: 0.15rem 0.85rem 0.45rem;
+.st-key-flatter_brand_logo img, .st-key-flatter_brand_logo_compact img {
+    height: 4.5rem;
+    object-fit: cover;
+    filter: grayscale(1) invert(1) brightness(4);
+    mix-blend-mode: screen;
 }
-.flatter-brand-caption {
-    color: #B8C2CE;
-    font-size: 0.75rem;
-    letter-spacing: 0.09em;
-    margin-top: 0.6rem;
-    margin-bottom: 0.5rem;
-    text-transform: uppercase;
+.st-key-flatter_brand_logo_compact img { height: 3.5rem; }
+.st-key-flatter_brand_caption, .st-key-flatter_brand_caption_compact {
+    margin-top: 0.15rem;
+    margin-bottom: 0.4rem;
 }
 .st-key-flatter_page_header {
     margin-bottom: 0.2rem;
@@ -75,9 +70,9 @@ STYLES = """
 }
 [class*="st-key-flatter_surface_"],
 [class*="st-key-flatter_metric_"] {
-    background: #1C2937;
-    border: 1px solid #334355;
-    border-radius: 0.9rem;
+    background: #FFFFFF;
+    border: 1px solid #E7DAD8;
+    border-radius: 0.8rem;
     padding: 1rem;
     min-width: 0;
     max-width: 100%;
@@ -87,36 +82,38 @@ STYLES = """
     border-top-width: 3px;
 }
 [class*="st-key-flatter_metric_danger_"],
-[class*="st-key-flatter_surface_danger_"] { border-top-color: #FFADAD; }
+[class*="st-key-flatter_surface_danger_"] { border-top-color: #AA2737; }
 [class*="st-key-flatter_metric_warning_"],
-[class*="st-key-flatter_surface_warning_"] { border-top-color: #F8D17B; }
+[class*="st-key-flatter_surface_warning_"] { border-top-color: #875900; }
 [class*="st-key-flatter_metric_success_"],
-[class*="st-key-flatter_surface_success_"] { border-top-color: #8CD5B3; }
+[class*="st-key-flatter_surface_success_"] { border-top-color: #1D705A; }
 [class*="st-key-flatter_metric_info_"],
-[class*="st-key-flatter_surface_info_"] { border-top-color: #9FC7FF; }
+[class*="st-key-flatter_surface_info_"] { border-top-color: #69417C; }
 [class*="st-key-flatter_metric_brand_"],
-[class*="st-key-flatter_surface_brand_"] { border-top-color: #D97963; }
+[class*="st-key-flatter_surface_brand_"] { border-top-color: #9C4438; }
 [class*="st-key-flatter_"] button,
 [class*="st-key-flatter_"] input:not([type="radio"]):not([type="checkbox"]),
 [class*="st-key-flatter_"] [role="combobox"] {
-    min-height: 2.75rem;
+    min-height: 44px;
 }
 [class*="st-key-flatter_"] button {
-    min-width: 2.75rem;
+    min-width: 44px;
 }
 [class*="st-key-flatter_"] button:focus-visible,
 [class*="st-key-flatter_"] input:focus-visible,
 [class*="st-key-flatter_"] [role="combobox"]:focus-visible {
-    outline: 2px solid #9FC7FF;
+    outline: 2px solid #69417C;
     outline-offset: 3px;
 }
 .st-key-flatter_surface_neutral_login {
     max-width: 34rem;
     margin-inline: auto;
+    border-top: 4px solid #61334D;
+    box-shadow: 0 12px 32px rgba(71, 33, 50, 0.06);
 }
 .st-key-flatter_navigation label {
     padding-block: 0.4rem;
-    min-height: 2.75rem;
+    min-height: 44px;
     box-sizing: border-box;
 }
 @media (max-width: 640px) {
@@ -126,16 +123,6 @@ STYLES = """
 }
 </style>
 """
-
-_BRAND = """
-<div class="flatter-wordmark">Flatter</div>
-<p class="flatter-brand-caption">Inteligência de estoque</p>
-"""
-_BRAND_COMPACT = """
-<div class="flatter-wordmark flatter-wordmark--compact">Flatter</div>
-<p class="flatter-brand-caption">Gerente de estoque</p>
-"""
-
 
 def _component_key(kind: str, key: str, tone: Tone) -> str:
     """Restringe identificadores de apresentação e recusa tons não definidos."""
@@ -152,8 +139,12 @@ def apply_theme() -> None:
 
 
 def brand_header(compact: bool = False) -> None:
-    """Exibe a marca em texto; não simula nem substitui um arquivo de logo oficial."""
-    st.html(_BRAND_COMPACT if compact else _BRAND)
+    """Mostra imagem local da marca com texto alternativo e dimensões responsivas."""
+    sufixo = "_compact" if compact else ""
+    with st.container(key="flatter_brand_logo" + sufixo, width="content"):
+        st.image(str(LOGO_PATH), width=125 if compact else 170, alt="Logotipo da Flatter")
+    with st.container(key="flatter_brand_caption" + sufixo):
+        st.caption("GERENTE DE ESTOQUE" if compact else "INTELIGÊNCIA DE ESTOQUE")
 
 
 def page_header(title: str, subtitle: str = "") -> None:

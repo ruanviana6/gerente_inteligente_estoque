@@ -1,5 +1,25 @@
 # Evolução para revisão, sem ativação produtiva
 
+## Complemento de identidade visual e revisão
+
+A interface recebeu superfícies claras e detalhes inspirados no terracota da
+Flatter, no vinho do Êxtase e no ameixa do Êxtase Elixir. A marca agora é uma
+imagem local, com descrição acessível; a origem e a diferença em relação à
+imagem mostrada na conversa estão registradas em `UX_FLATTER.md`.
+
+Três observações posteriores da revisão do PR foram reproduzidas e corrigidas:
+as cestas exigem status completos de todos os produtos do período, a abrangência
+do período atual é preservada mesmo sem cobertura do período anterior, e itens
+sem nome utilizam identificação explícita pelo SKU. Há testes de regressão para
+os três casos e para declarações inválidas de abrangência.
+
+Verificações locais deste complemento: Python 3.12 com 777 testes e 66 subtestes
+aprovados; Ruff aprovado; PostgreSQL 17 descartável com 342 verificações
+`APROVADO`; e 20 telas verificadas com Chromium em 390 e 1.440 px usando dados e
+transporte fictícios. Essas verificações não comprovam autenticação ou migração
+no Supabase produtivo. Consulte o GitHub Actions para os resultados do commit
+final nas duas versões do Python.
+
 ## Estado inicial conferido
 
 Base `implementacao/web-supabase`, commit `a5157eef89da159db7182c85c132ca907c9b6e50`.

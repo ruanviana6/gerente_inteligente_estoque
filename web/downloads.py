@@ -19,10 +19,10 @@ EXPORTACOES = {
 
 _LINK = """<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><style>
-body {margin:0;background:#101720;color:#F5F7FA;font-family:system-ui,sans-serif;}
+body {margin:0;background:#FBF8F6;color:#2D1C25;font-family:system-ui,sans-serif;}
 a {display:inline-flex;align-items:center;justify-content:center;min-height:44px;
-padding:0 1rem;background:#B55440;color:#fff;border-radius:.65rem;text-decoration:none;}
-a:focus-visible {outline:2px solid #9FC7FF;outline-offset:3px;}
+padding:0 1rem;background:#9C4438;color:#fff;border-radius:.65rem;text-decoration:none;}
+a:focus-visible {outline:2px solid #69417C;outline-offset:3px;}
 </style></head><body>
 <a download="{arquivo}" href="data:text/csv;charset=utf-8;base64,{conteudo}">Salvar CSV</a>
 </body></html>"""

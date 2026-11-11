@@ -50,6 +50,10 @@ select sync_test.denied(format('select public.sync_begin(%L,%L,%L,%L,%L,1,4,repe
 select sync_test.check(public.sales_payload(:'source','loja1','2020-01-01','2020-01-31')->'rows'->0->>'sku'='001','identificadores preservam zeros');
 select sync_test.check((public.sales_payload(:'source','loja1','2020-01-01','2020-01-31')->'metadata'->>'coverage_verified')::boolean,'cobertura explicitamente conferida');
 select sync_test.check(not (public.sales_payload(:'source','loja1','2019-12-01','2020-01-31')->'metadata'->>'coverage_verified')::boolean,'sem inventar abrangência fora do intervalo');
+select sync_test.check((public.sales_payload(:'source','loja1','2019-12-01','2020-01-31')->'metadata'->>'period_end_coverage_verified')::boolean,
+ 'abrangência do mês atual permanece disponível sem o mês anterior');
+select sync_test.check(public.sales_payload(:'source','loja1','2019-12-01','2020-01-31')->'metadata'->>'coverage_start'='2020-01-01',
+ 'início da cobertura retorna a ilha confirmada sem inventar dados anteriores');
 select sync_test.check(jsonb_array_length(public.sales_payload(:'source','loja2','2020-01-01','2020-01-31')->'rows')=0,'lojas não são consolidadas');
 select sync_test.denied($q$select * from public.sales_line_versions$q$,'42501','nenhuma leitura bruta das versões');
 select sync_test.denied($q$update public.sales_lines_current set store_id='outra'$q$,'42501','DML direto bloqueado');

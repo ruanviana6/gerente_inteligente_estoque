@@ -45,6 +45,30 @@ def pedidos_cesta():
     return linhas
 
 
+@pytest.mark.parametrize("filtro", [{"product_id": "A"}, {"category": "Categoria fictícia"}])
+def test_cesta_com_status_desconhecido_fora_do_filtro_permanece_bloqueada(filtro):
+    """Os filtros da tabela não tornam completo o denominador de todos os pedidos."""
+    linhas = pedidos_cesta()
+    categoria = linhas[0]["category"]
+    if "category" in filtro:
+        filtro["category"] = categoria
+    linhas.append(linha(document_id="incerto", line_id="Z", product_id="Z", sku="Z",
+                        product_name="Outro produto", category="Outra categoria", status="unknown"))
+    resultado = analisar(linhas, **filtro)
+    assert not resultado["cestas"]["disponivel"]
+    assert resultado["cestas"]["pares"] == []
+    assert not any("aparecem juntos" in insight["titulo"] for insight in resultado["insights"])
+
+
+@pytest.mark.parametrize("nome", [None, "", "   "])
+def test_produto_sem_nome_usa_rotulo_explicito_sem_descartar_vendas(nome):
+    """Uma linha persistida sem nome utiliza o SKU, sem fingir que é o nome oficial."""
+    dados = linha(product_name=nome, sku="001")
+    resultado = analisar([dados])
+    assert resultado["resumo"]["unidades"] == 2
+    assert resultado["produtos"][0]["nome"] == "SKU 001 (nome indisponível)"
+
+
 def serie_crescimento():
     """Cria quatro semanas com crescimento nas duas metades comparáveis."""
     inicio = date(2026, 9, 3)

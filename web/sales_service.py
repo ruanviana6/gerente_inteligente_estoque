@@ -66,6 +66,8 @@ def _sales_payload(value, source_id, store_id):
     meta = value["metadata"]
     if type(meta.get("coverage_verified", False)) is not bool:
         raise ServiceUnavailable("A declaração de abrangência da fonte é inválida.")
+    if type(meta.get("period_end_coverage_verified", False)) is not bool:
+        raise ServiceUnavailable("A declaração de abrangência da fonte é inválida.")
     return value
 
 
@@ -110,10 +112,12 @@ class SalesService:
                 "p_start": previous_start.isoformat(), "p_end": end.isoformat(),
             }, "trends.view"), source_id, store_id)
             meta = payload.get("metadata", {})
+            cobertura = (meta.get("coverage_verified") is True
+                         or meta.get("period_end_coverage_verified") is True)
             try:
                 result = analisar_vendas(payload["rows"], start, end,
-                    coverage_start=meta.get("coverage_start") if meta.get("coverage_verified") is True else None,
-                    coverage_end=meta.get("coverage_end") if meta.get("coverage_verified") is True else None,
+                    coverage_start=meta.get("coverage_start") if cobertura else None,
+                    coverage_end=meta.get("coverage_end") if cobertura else None,
                     source_id=source_id, store_id=store_id, product_id=product_id, category=category)
             except (TypeError, ValueError, KeyError):
                 raise ServiceUnavailable("Os dados de vendas não atendem ao contrato analítico. Confira a origem.") from None
