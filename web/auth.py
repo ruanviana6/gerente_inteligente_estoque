@@ -113,6 +113,7 @@ class AuthService:
         self.api = api
         self._clock = clock
         self._session: Session | None = None
+        self._password_change_required = False
         self._failed_logins = 0
         self._blocked_until = 0.0
         self._lock = RLock()
@@ -137,6 +138,7 @@ class AuthService:
     def _invalidate_session(self) -> None:
         """Descarta a sessão e invalida callbacks vinculados à autenticação anterior."""
         self._session = None
+        self._password_change_required = False
         self._generation += 1
         self._verified.set(None)
 
@@ -206,7 +208,7 @@ class AuthService:
         return session
 
     @_serialized
-    def login(self, email: str, password: str) -> AccessContext:
+    def login(self, email: str, password: str) -> AccessContext | None:
         """Autentica e exige perfil ativo antes de disponibilizar qualquer dado interno."""
         self._invalidate_session()
         if self._clock() < self._blocked_until:
@@ -217,7 +219,9 @@ class AuthService:
         try:
             response = self.api.auth("POST", "token?grant_type=password", {"email": email, "password": password})
             self._session = self._read_session(response)
-            context = self.context()
+            gate = self.password_gate_status()
+            self._password_change_required = gate["required"]
+            context = None if gate["required"] else self.context()
         except (AuthenticationError, AuthorizationError):
             self._invalidate_session()
             self._failed_logins += 1
@@ -230,6 +234,32 @@ class AuthService:
             raise
         self._failed_logins = 0
         return context
+
+    @property
+    def password_change_required(self) -> bool:
+        """Informa se esta sessão está restrita à troca obrigatória de senha."""
+        return self._password_change_required
+
+    @_serialized
+    def password_gate_status(self) -> dict[str, bool]:
+        """Consulta a restrição no banco usando somente a identidade da sessão atual."""
+        session = self._current_session()
+        result = self.api.rpc("password_gate_status", {}, session.access_token)
+        if not isinstance(result, dict) or any(type(result.get(k)) is not bool for k in ("required", "ready", "expired")):
+            raise ServiceUnavailable("Não foi possível confirmar o estado do acesso.")
+        return {k: result[k] for k in ("required", "ready", "expired")}
+
+    @_serialized
+    def finish_initial_password(self, password: str) -> None:
+        """Troca a senha temporária no Auth e só libera a conta após confirmação no banco."""
+        validate_password(password)
+        gate = self.password_gate_status()
+        if not gate["required"] or not gate["ready"] or gate["expired"]:
+            raise AuthorizationError("A senha temporária expirou ou precisa ser refeita pelo Master.")
+        session = self._current_session()
+        self.api.auth("PUT", "user", {"password": password}, session.access_token)
+        self.api.rpc("finish_initial_password", {}, session.access_token)
+        self.logout()
 
     @_serialized
     def context(self) -> AccessContext:
@@ -322,7 +352,11 @@ class AuthService:
         try:
             response = self.api.auth("POST", "verify", {"type": "recovery", "email": _email(email), "token": otp})
             self._session = self._read_session(response)
-            self.change_password(password)
+            gate = self.password_gate_status()
+            if gate["required"]:
+                self.finish_initial_password(password)
+            else:
+                self.change_password(password)
         finally:
             self._invalidate_session()
 
@@ -362,8 +396,37 @@ class AuthService:
         # O Admin API pode retornar o usuário diretamente ou dentro de user.
         user = result.get("user", result)
         user_id = _uuid(user.get("id") if isinstance(user, dict) else None)
-        self.rpc("admin_set_user", {
+        self.rpc("admin_register_temporary_user", {
             "p_user_id": user_id, "p_display_name": display_name.strip(), "p_role": role,
-            "p_active": True, "p_permissions": overrides,
+            "p_permissions": overrides,
         }, "permissions.manage")
         return user_id
+
+    @_serialized
+    def reset_employee_password(self, user_id: str, temporary_password: str, master_password: str) -> None:
+        """Reautentica o Master, bloqueia sessões antigas e prepara a troca do funcionário."""
+        user_id = _uuid(user_id)
+        validate_password(temporary_password)
+        context = self.require("users.manage")
+        if context.profile.role != "Master" or not context.can("permissions.manage"):
+            raise AuthorizationError("Somente o Master pode redefinir acessos.")
+        if not isinstance(master_password, str) or not master_password or len(master_password) > 128:
+            raise AuthenticationError("Confirme sua senha para redefinir o acesso.")
+        current = self._current_session()
+        identity = self.api.auth("GET", "user", access_token=current.access_token)
+        if not isinstance(identity, dict) or _uuid(identity.get("id")) != current.user_id:
+            raise AuthenticationError("Não foi possível confirmar sua identidade.")
+        email = _email(identity.get("email"))
+        proof = self._read_session(self.api.auth("POST", "token?grant_type=password", {
+            "email": email, "password": master_password,
+        }))
+        try:
+            if proof.user_id != current.user_id:
+                raise AuthenticationError("Não foi possível confirmar sua identidade.")
+        finally:
+            self.api.auth("POST", "logout?scope=local", access_token=proof.access_token)
+        started = self.rpc("admin_begin_password_reset", {"p_user_id": user_id}, "users.manage")
+        operation_id = _uuid(started.get("operation_id") if isinstance(started, dict) else None)
+        self.require("users.manage")
+        self.api._reset_auth_password(user_id, temporary_password)
+        self.rpc("admin_finish_password_reset", {"p_user_id": user_id, "p_operation_id": operation_id}, "users.manage")

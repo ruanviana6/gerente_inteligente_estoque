@@ -630,7 +630,7 @@ def _autorizar_usuario(servico: Any) -> None:
 
 def _criar_usuario(servico: Any) -> None:
     """Disponibiliza a operação administrativa já protegida, sem enviar convite."""
-    st.caption("Requer chave administrativa somente no servidor. Não envia convite por e-mail.")
+    st.caption("Defina uma senha temporária e entregue-a por um canal seguro. Ela vence em 24 horas.")
     with st.form("criar_usuario", clear_on_submit=True):
         email = st.text_input("E-mail do novo usuário", max_chars=254)
         nome = st.text_input("Nome da nova conta", max_chars=100)
@@ -640,7 +640,27 @@ def _criar_usuario(servico: Any) -> None:
         concedidas = _permissoes_formulario()
         if st.form_submit_button("Criar usuário autorizado", type="primary"):
             servico.auth.create_user(email, senha, nome, perfil, concedidas)
-            st.success("Conta criada. Entregue a senha por canal seguro e solicite sua alteração no primeiro acesso.")
+            st.success("Conta criada. Entregue a senha por canal seguro; a troca será obrigatória no primeiro acesso.")
+
+
+def _redefinir_usuario(servico: Any, usuarios: list[dict]) -> None:
+    """Permite ao Master recuperar um funcionário, confirmando novamente sua identidade."""
+    alvos = {u["user_id"]: u for u in usuarios if u.get("role") != "Master" and u.get("active")}
+    if not alvos:
+        st.info("Não há funcionário ativo disponível para redefinição.")
+        return
+    with st.form("redefinir_acesso", clear_on_submit=True):
+        alvo = st.selectbox("Funcionário", list(alvos),
+                            format_func=lambda uid: f"{alvos[uid].get('display_name', '')} · {alvos[uid].get('email', '')}")
+        temporaria = st.text_input("Nova senha temporária", type="password", autocomplete="new-password")
+        atual = st.text_input("Confirme sua senha Master", type="password", autocomplete="current-password")
+        confirmado = st.checkbox("Confirmei a identidade do funcionário e entregarei a senha por canal seguro.")
+        if st.form_submit_button("Redefinir acesso", type="primary"):
+            if not confirmado:
+                st.error("Confirme a identidade do funcionário para continuar.")
+            else:
+                servico.auth.reset_employee_password(alvo, temporaria, atual)
+                st.success("Acesso redefinido. A senha temporária vence em 24 horas e exige troca no próximo acesso.")
 
 
 def _administracao(servico: Any, contexto: Any) -> None:
@@ -657,17 +677,21 @@ def _administracao(servico: Any, contexto: Any) -> None:
     if area == "Relatórios por e-mail":
         _configurar_relatorios(servico, usuarios)
         return
-    _tabela(pd.DataFrame(usuarios), ["display_name", "role", "active", "user_id"], key="admin_usuarios")
+    _tabela(pd.DataFrame(usuarios), ["display_name", "email", "role", "active"], key="admin_usuarios")
     if not (contexto.can("users.manage") and contexto.can("permissions.manage")):
         st.info("A gestão de acessos exige as permissões administrativas do Master.")
         return
-    operacao = st.selectbox("Operação de usuários", ["Editar acessos", "Autorizar conta existente", "Criar conta"])
+    operacao = st.selectbox("Operação de usuários", ["Editar acessos", "Criar conta", "Redefinir acesso", "Histórico administrativo"])
     if operacao == "Editar acessos":
         _editar_usuario(servico, usuarios)
-    elif operacao == "Autorizar conta existente":
-        _autorizar_usuario(servico)
-    else:
+    elif operacao == "Criar conta":
         _criar_usuario(servico)
+    elif operacao == "Redefinir acesso":
+        _redefinir_usuario(servico, usuarios)
+    elif contexto.can("audit.view"):
+        _tabela(pd.DataFrame(servico.admin_audit()), key="admin_historico_acessos", paginar=False)
+    else:
+        st.info("O histórico exige permissão de auditoria.")
 
 
 def _configurar_relatorios(servico: Any, usuarios: list[dict]) -> None:

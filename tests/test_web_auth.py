@@ -40,6 +40,7 @@ class FakeAuthTransport:
         }
         self.tokens = {"access-" + uid: uid for uid in (USER_A, USER_B)}
         self.refreshed_identity = None
+        self.gates = {}
 
     @staticmethod
     def make_context(user_id, permissions, role="Operador"):
@@ -77,16 +78,21 @@ class FakeAuthTransport:
             current = data["refresh_token"].removeprefix("refresh-")
             result = self.session(self.refreshed_identity or current, renewed=True)
         elif path == "/auth/v1/user":
-            result = {"id": user_id, "user_metadata": {"role": "Master"}}
+            result = {"id": user_id, "email": next((email for email, uid in self.users.items() if uid == user_id), None),
+                      "user_metadata": {"role": "Master"}}
         elif path == "/rest/v1/rpc/app_context":
             result = copy.deepcopy(self.contexts.get(user_id))
+        elif path == "/rest/v1/rpc/password_gate_status":
+            result = self.gates.get(user_id, {"required": False, "ready": False, "expired": False})
+        elif path == "/rest/v1/rpc/admin_begin_password_reset":
+            result = {"operation_id": USER_C}
         elif path == "/auth/v1/admin/users":
             result = {"id": USER_C}
         elif path == "/auth/v1/verify":
             if data.get("token") != "123456":
                 return HTTPResponse(400, b"otp_invalido")
             result = self.session(self.users[data["email"]])
-        elif path == "/auth/v1/logout?scope=global":
+        elif path in {"/auth/v1/logout?scope=global", "/auth/v1/logout?scope=local"}:
             return HTTPResponse(204, b"")
         else:
             result = {"ok": True}
@@ -281,10 +287,72 @@ def test_master_cria_conta_com_chave_admin_so_no_auth(backend):
     assert admin[0]["path"] == "/auth/v1/admin/users"
     assert "app_metadata" not in admin[0]["data"]
     profile = transport.calls[-1]
-    assert profile["path"] == "/rest/v1/rpc/admin_set_user"
+    assert profile["path"] == "/rest/v1/rpc/admin_register_temporary_user"
     assert profile["headers"]["apikey"] == "sb_publishable_ficticio"
     assert profile["data"]["p_user_id"] == USER_C
     assert profile["data"]["p_role"] == "Visualizador"
+
+
+def test_primeiro_acesso_nao_consulta_contexto_antes_da_troca(backend):
+    """Senha temporária só permite definir senha própria, sem consultar dados protegidos."""
+    auth, transport = backend
+    transport.gates[USER_A] = {"required": True, "ready": True, "expired": False}
+    assert auth.login("operador@example.test", PASSWORD) is None
+    assert auth.password_change_required
+    assert not any(c["path"] == "/rest/v1/rpc/app_context" for c in transport.calls)
+    auth.finish_initial_password("Nova-senha-ficticia-987!")
+    paths = [c["path"] for c in transport.calls]
+    assert "/rest/v1/rpc/finish_initial_password" in paths
+    assert paths.index("/auth/v1/user") < paths.index("/rest/v1/rpc/finish_initial_password")
+    assert auth.session is None
+
+
+@pytest.mark.parametrize("gate", [
+    {"required": True, "ready": True, "expired": True},
+    {"required": True, "ready": False, "expired": False},
+])
+def test_acesso_temporario_expirado_ou_incompleto_nao_altera_senha(backend, gate):
+    """Uma preparação incompleta ou vencida depende de nova intervenção do Master."""
+    auth, transport = backend
+    transport.gates[USER_A] = gate
+    auth.login("operador@example.test", PASSWORD)
+    with pytest.raises(AuthorizationError):
+        auth.finish_initial_password("Nova-senha-ficticia-987!")
+    assert not any(c["method"] == "PUT" for c in transport.calls)
+
+
+def test_resposta_malformada_do_bloqueio_nega_login(backend):
+    """Uma resposta incompleta não pode ser interpretada como liberação de acesso."""
+    auth, transport = backend
+    transport.gates[USER_A] = {"required": False}
+    with pytest.raises(ServiceUnavailable):
+        auth.login("operador@example.test", PASSWORD)
+    assert auth.session is None
+
+
+def test_redefinicao_exige_master_e_reautenticacao(backend):
+    """Senha Master incorreta impede bloquear ou alterar a conta do funcionário."""
+    auth, transport = backend
+    transport.contexts[USER_A] = transport.make_context(USER_A, ["users.manage", "permissions.manage"], "Master")
+    auth.login("operador@example.test", PASSWORD)
+    transport.calls.clear()
+    with pytest.raises(AuthenticationError):
+        auth.reset_employee_password(USER_B, "Temporaria-ficticia-234!", "senha-errada")
+    assert not any("admin_begin_password_reset" in c["path"] or "/admin/users/" in c["path"]
+                   for c in transport.calls)
+
+
+def test_redefinicao_bloqueia_antes_de_usar_admin_e_confirma_depois(backend):
+    """A operação passa por sessão Master, barreira do banco e confirmação auditável."""
+    auth, transport = backend
+    transport.contexts[USER_A] = transport.make_context(USER_A, ["users.manage", "permissions.manage"], "Master")
+    auth.login("operador@example.test", PASSWORD)
+    transport.calls.clear()
+    auth.reset_employee_password(USER_B, "Temporaria-ficticia-234!", PASSWORD)
+    paths = [c["path"] for c in transport.calls]
+    assert paths.index("/rest/v1/rpc/admin_begin_password_reset") < paths.index("/auth/v1/admin/users/" + USER_B)
+    assert paths.index("/auth/v1/admin/users/" + USER_B) < paths.index("/rest/v1/rpc/admin_finish_password_reset")
+    assert "/auth/v1/logout?scope=local" in paths
 
 
 def test_nem_master_pode_criar_outro_master_pela_interface(backend):

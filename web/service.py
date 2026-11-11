@@ -393,6 +393,18 @@ class Service:
         return self.auth.rpc("report_job_history", {}, "reports.manage")
 
 
+def _administrative_key_from_secrets() -> str | None:
+    """Lê a chave protegida somente no instante de uma operação administrativa."""
+    import streamlit as st
+
+    valor = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    try:
+        valor = st.secrets.get("SUPABASE_SERVICE_ROLE_KEY", valor)
+    except (FileNotFoundError, st.errors.StreamlitSecretNotFoundError):
+        pass
+    return str(valor) if valor else None
+
+
 def create_service(state: MutableMapping, settings_mapping: dict | None = None) -> Service:
     """Cria o cliente exclusivo da sessão Streamlit sem armazenar nada em disco."""
     if "_service" in state:
@@ -411,6 +423,10 @@ def create_service(state: MutableMapping, settings_mapping: dict | None = None) 
             settings_mapping.update(dict(st.secrets))
         except (FileNotFoundError, st.errors.StreamlitSecretNotFoundError):
             pass
-    service = Service(AuthService(SupabaseAPI(Settings.from_mapping(settings_mapping))))
+    # A chave administrativa não fica dentro do serviço persistido na sessão.
+    configuracao = dict(settings_mapping)
+    configuracao.pop("SUPABASE_SERVICE_ROLE_KEY", None)
+    service = Service(AuthService(SupabaseAPI(Settings.from_mapping(configuracao),
+                                             administrative_key_provider=_administrative_key_from_secrets)))
     state["_service"] = service
     return service
