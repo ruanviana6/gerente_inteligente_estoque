@@ -50,24 +50,44 @@ Secrets. Um checksum dos atributos estáveis do Master permite conferir sua
 preservação. O teste completo de pg_dump/pg_restore usa somente dados fictícios
 em PostgreSQL descartável, nunca dados reais no GitHub Actions.
 
-As migrações pendentes do código são: snapshots por lote, sincronização de vendas,
-Central de Acessos, regras de reposição e Inteligência Comercial. A aplicação
-produtiva e o resultado de cada etapa devem ser registrados depois da execução.
-Não restaurar backup por cima de dados novos nem executar DROP/purge automático.
+Foram aplicadas no projeto existente as migrações de snapshots por lote,
+sincronização de vendas, Central de Acessos, regras de reposição e Inteligência
+Comercial. Depois, a migração aditiva `20261111122840_sessoes_persistentes.sql`
+foi aplicada para permitir retomada do login. O histórico contém dez migrações,
+com as versões alinhadas aos arquivos do repositório.
+
+Antes da última migração, um segundo backup cifrado cobriu as 37 tabelas
+`public/private`, com 1.015 registros. A decifragem e a reconstrução tipificada
+foram exatas. Após a migração, todas as 37 tabelas anteriores permaneceram
+idênticas e o checksum dos atributos protegidos do Master/Auth foi preservado.
+A nova tabela de sessões tem RLS ativa e não permite leitura direta por `anon`
+ou `authenticated`. Não restaurar backup por cima de dados novos nem executar
+DROP/purge automático.
 
 ## Verificação e limites
 
-O ambiente local não permite abrir sockets, portanto o teste HTTP do Streamlit
-falha com PermissionError. Também não contém scikit-learn. Os testes de HTTP, ML,
-Auth real, PostgreSQL, navegador e dependências são executados no GitHub Actions,
-com versões fixadas e dados fictícios. Um teste ignorado localmente não é contado
-como aprovado. Consultar os checks do PR da integração para o resultado conjunto.
+A integração foi incorporada à branch publicada pelos PRs #16 e #17. No head
+`0fee680`, o GitHub Actions aprovou 867 testes e 66 subtestes em Python 3.11/3.12,
+Ruff, dependências, PostgreSQL/RLS/restauração e sete testes de Auth/PostgREST
+reais em ambiente descartável. Os testes de ML usam scikit-learn instalado no CI.
+O Chromium aprovou retomada após F5, reabertura de aba, isolamento de navegadores,
+Sair, conta desativada, opção desmarcada e F5 no celular. São validações com dados
+fictícios; não representam login Master em produção. Referências:
+https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/43025724568
+e https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/43025724585.
 
-Na primeira observação anônima, o domínio respondeu HTTP 200, mas não exibiu o
-login da aplicação ao navegador de teste. Isso não comprova publicação funcional.
-É necessário observar o marcador da versão e validar os fluxos autenticados no
-domínio. O proprietário pode precisar permitir acesso pela conta do Streamlit ou
-efetuar o login, pois credenciais e sessão Master não são compartilhadas no chat.
+A checagem independente do domínio identificou a moldura do Streamlit Cloud:
+o aplicativo está no iframe da mesma origem em `/~/+/`. O verificador foi
+corrigido para observar esse quadro e possui regressões que rejeitam marcadores
+em origens de terceiros. A falha do script externo de analytics da plataforma
+não é usada como evidência de falha da aplicação.
+
+O navegador anônimo abriu o formulário de login real, sem tabelas ou indicadores
+expostos. Entretanto, a versão observada ainda não apresenta o marcador
+`web-integrada-20261111.2` nem a opção de manter o acesso. Portanto a incorporação
+do código no GitHub está confirmada, mas a atualização do processo do Streamlit
+ainda precisa ser comprovada. Não confundir domínio acessível com deploy novo.
+Secrets e sessão Master não são compartilhados no chat.
 
 Clientes/cidades reais e ML produtivo dependem do OpenAPI autorizado, finalidade
 LGPD, histórico confirmado e auditoria. A conta Master existente não é recriada.

@@ -6,9 +6,43 @@ import argparse
 import json
 from collections import Counter
 from pathlib import Path
+from time import monotonic
 from urllib.parse import urlsplit
 
 URL = "https://estoqueinteligente-flatter.streamlit.app/"
+
+
+def selecionar_aplicacao(pagina):
+    """Localiza o app no iframe do Cloud, sem confiar em conteúdo de outra origem."""
+    host = urlsplit(URL).hostname
+    candidatos = []
+    for frame in pagina.frames:
+        if urlsplit(frame.url).hostname != host:
+            continue
+        if frame.locator('[data-flatter-release]').count():
+            return frame
+        if urlsplit(frame.url).path.startswith('/~/+/'):
+            candidatos.append(frame)
+    return candidatos[-1] if candidatos else pagina
+
+
+def esperar_aplicacao(pagina, esperado, timeout=60):
+    """Espera a versão e o formulário na página ou no iframe oficial do aplicativo."""
+    limite = monotonic() + timeout
+    aplicacao = pagina
+    while monotonic() < limite:
+        try:
+            aplicacao = selecionar_aplicacao(pagina)
+            marcador = aplicacao.locator('[data-flatter-release]').first
+            login = aplicacao.get_by_role('button', name='Entrar', exact=True)
+            if (marcador.count() and marcador.get_attribute('data-flatter-release') == esperado
+                    and login.count() == 1 and login.is_visible()):
+                return aplicacao
+        except Exception:
+            # O iframe pode ser substituído enquanto o Cloud conclui a conexão.
+            pass
+        pagina.wait_for_timeout(500)
+    return aplicacao
 
 
 def observar(pagina, esperado):
@@ -48,14 +82,8 @@ def verificar(browser, esperado, destino):
         pagina.on('requestfailed', registrar_falha)
         try:
             resposta = pagina.goto(URL, wait_until='domcontentloaded', timeout=45000)
-            try:
-                pagina.wait_for_function("""esperado => document.querySelector('[data-flatter-release]')
-                  ?.getAttribute('data-flatter-release') === esperado""", arg=esperado, timeout=60000)
-                pagina.get_by_label('E-mail', exact=True).wait_for(timeout=20000)
-                pagina.get_by_role('button', name='Entrar', exact=True).wait_for(timeout=20000)
-            except Exception:
-                pass
-            observacao = observar(pagina, esperado)
+            aplicacao = esperar_aplicacao(pagina, esperado)
+            observacao = observar(aplicacao, esperado)
             observacao.update(http_status=resposta.status if resposta else None, failed_resource_types=dict(falhas), failed_scripts=recursos,
                 frames=[{'host': urlsplit(f.url).hostname, 'path': urlsplit(f.url).path[:160]} for f in pagina.frames])
             resultado['attempts'].append(observacao)
@@ -65,17 +93,18 @@ def verificar(browser, esperado, destino):
             assert not observacao['signals']['exception_visible']
             pagina.screenshot(path=str(destino / 'login-publicado-computador.png'), full_page=True)
             pagina.set_viewport_size({"width": 390, "height": 1000})
-            pagina.get_by_label('E-mail', exact=True).wait_for()
+            aplicacao.get_by_label('E-mail', exact=True).wait_for()
             assert pagina.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
+            assert aplicacao.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1')
             pagina.screenshot(path=str(destino / 'login-publicado-celular.png'), full_page=True)
             # Conta deliberadamente inexistente; não cria usuário, não envia
             # e-mail e não utiliza a conta nem a sessão do Master.
-            pagina.get_by_label('E-mail', exact=True).fill('verificacao-invalida@example.invalid')
-            pagina.get_by_label('Senha', exact=True).fill('Senha-ficticia-invalida-2026!')
-            pagina.get_by_role('button', name='Entrar', exact=True).click()
-            pagina.get_by_text('Não foi possível entrar. Confira os dados e se sua conta está autorizada.', exact=True).wait_for(timeout=30000)
-            assert pagina.get_by_test_id('stDataFrame').count() == 0
-            assert pagina.get_by_test_id('stMetric').count() == 0
+            aplicacao.get_by_label('E-mail', exact=True).fill('verificacao-invalida@example.invalid')
+            aplicacao.get_by_label('Senha', exact=True).fill('Senha-ficticia-invalida-2026!')
+            aplicacao.get_by_role('button', name='Entrar', exact=True).click()
+            aplicacao.get_by_text('Não foi possível entrar. Confira os dados e se sua conta está autorizada.', exact=True).wait_for(timeout=30000)
+            assert aplicacao.get_by_test_id('stDataFrame').count() == 0
+            assert aplicacao.get_by_test_id('stMetric').count() == 0
             resultado.update(aprovado=True, invalid_login_denied=True, responsive_login_verified=True)
             break
         except Exception as erro:
