@@ -10,6 +10,7 @@ from typing import Any
 
 import streamlit as st
 
+from web.browser_session import STATE_KEYS, incoming_ticket, render_browser_cookie, set_browser_cookie
 from web.commercial_page import comercial
 from web.errors import AppError, AuthenticationError, AuthorizationError, ConfigurationError
 from web.integration_page import integracoes
@@ -34,7 +35,7 @@ def _assinatura(contexto: Any) -> tuple:
 def _limpar_apresentacao(servico: Any) -> None:
     """Descarta widgets e seleções sem substituir a autenticação desta sessão."""
     for chave in list(st.session_state):
-        if st.session_state[chave] is not servico:
+        if st.session_state[chave] is not servico and chave not in STATE_KEYS:
             del st.session_state[chave]
 
 
@@ -46,6 +47,7 @@ def _encerrar_sessao(servico: Any) -> None:
         pass
     finally:
         st.session_state.clear()
+        set_browser_cookie(None)
 
 
 @st.fragment(run_every="20s")
@@ -116,12 +118,21 @@ def _login(servico: Any) -> None:
         with st.form("login", clear_on_submit=True):
             email = st.text_input("E-mail", max_chars=254, autocomplete="email")
             senha = st.text_input("Senha", type="password", autocomplete="current-password")
+            lembrar = st.checkbox("Manter acesso neste navegador por até 30 dias", value=True)
+            st.caption("Use esta opção apenas em um dispositivo pessoal. Sair encerra o acesso.")
             entrar = st.form_submit_button("Entrar", type="primary", width="stretch")
         if entrar:
             try:
                 with st.spinner("Confirmando acesso…"):
-                    servico.auth.login(email, senha)
+                    contexto = servico.auth.login(email, senha)
                 _limpar_apresentacao(servico)
+                if lembrar and contexto is not None and hasattr(servico.auth, "remember_browser"):
+                    try:
+                        set_browser_cookie(servico.auth.remember_browser())
+                    except AppError:
+                        st.session_state["_persistence_notice"] = "Você entrou, mas não foi possível lembrar este navegador. Seu acesso nesta aba continua válido."
+                else:
+                    set_browser_cookie(None)
                 st.rerun()
             except AppError:
                 st.error("Não foi possível entrar. Confira os dados e se sua conta está autorizada.")
@@ -144,6 +155,7 @@ def _conta(servico: Any, contexto: Any) -> None:
             try:
                 servico.auth.change_password(nova)
                 _limpar_apresentacao(servico)
+                set_browser_cookie(None)
                 st.session_state["_auth_notice"] = "Senha atualizada. Entre novamente para continuar."
                 st.rerun()
             except AppError:
@@ -251,6 +263,7 @@ def run_app(service_factory: Callable | None = None) -> None:
         with measure("bootstrap"):
             apply_theme()
             st.html(f'<span hidden data-flatter-release="{RELEASE}"></span>')
+            render_browser_cookie()
             if service_factory is None:
                 from web.service import create_service
 
@@ -263,6 +276,25 @@ def run_app(service_factory: Callable | None = None) -> None:
                 st.caption("Consulte o guia de publicação do repositório. Não informe credenciais no chat ou no GitHub.")
                 return
         with st.container(key="flatter_app"), servico.execution():
+            if servico.auth.session is None and hasattr(servico.auth, "restore_browser"):
+                try:
+                    ticket = incoming_ticket()
+                    if ticket:
+                        with st.spinner("Retomando seu acesso…"):
+                            servico.auth.restore_browser(ticket)
+                except (AuthenticationError, AuthorizationError):
+                    set_browser_cookie(None)
+                    render_browser_cookie()
+                    st.session_state["_auth_notice"] = "Seu acesso lembrado expirou ou foi encerrado. Entre novamente."
+                except AppError:
+                    st.warning("Não foi possível retomar o acesso agora. Tente novamente em instantes.")
+                    if st.button("Tentar retomar o acesso"):
+                        st.session_state.pop("_restore_attempted", None)
+                        st.rerun()
+                    return
+            aviso = st.session_state.pop("_persistence_notice", None)
+            if aviso:
+                st.warning(aviso)
             if servico.auth.session is None:
                 _login(servico)
             else:

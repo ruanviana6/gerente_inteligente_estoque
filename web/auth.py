@@ -119,6 +119,8 @@ class AuthService:
         self._blocked_until = 0.0
         self._lock = RLock()
         self._generation = 0
+        self._persistent_ticket: str | None = None
+        self._persistent_supported = False
         # ContextVar pertence a esta instância e ao fluxo atual, nunca ao processo
         # inteiro. Só a validação Auth é reutilizada; permissões sempre vêm do banco.
         self._verified: ContextVar[tuple | None] = ContextVar("auth_verification", default=None)
@@ -140,6 +142,7 @@ class AuthService:
         """Descarta a sessão e invalida callbacks vinculados à autenticação anterior."""
         self._session = None
         self._password_change_required = False
+        self._persistent_ticket = None
         self._generation += 1
         self._verified.set(None)
 
@@ -195,16 +198,23 @@ class AuthService:
             raise AuthenticationError("Entre para continuar.")
         if session.expires_at <= self._clock() + 60:
             try:
-                response = self.api.auth("POST", "token?grant_type=refresh_token", {
-                    "refresh_token": session.refresh_token,
-                })
+                if self._persistent_ticket:
+                    from web.persistent_sessions import PersistentSessions
+
+                    payload = PersistentSessions(self.api, self._clock).resume(self._persistent_ticket)
+                    response = payload | {"user": {"id": payload["user_id"]}}
+                else:
+                    response = self.api.auth("POST", "token?grant_type=refresh_token", {
+                        "refresh_token": session.refresh_token,
+                    })
                 refreshed = self._read_session(response)
                 if refreshed.user_id != session.user_id:
                     raise AuthenticationError("A identidade da sessão mudou. Entre novamente.")
                 self._session = refreshed
                 session = refreshed
-            except AppError:
-                self._invalidate_session()
+            except AppError as error:
+                if not self._persistent_ticket or isinstance(error, (AuthenticationError, AuthorizationError)):
+                    self._invalidate_session()
                 raise
         return session
 
@@ -281,6 +291,8 @@ class AuthService:
             if not isinstance(result, dict) or not isinstance(result.get("profile"), dict):
                 raise AuthorizationError("A conta não possui acesso ativo ao aplicativo.")
             profile = result["profile"]
+            capabilities = result.get("capabilities")
+            self._persistent_supported = isinstance(capabilities, dict) and capabilities.get("persistent_login") is True
             permissions = result.get("permissions")
             if (profile.get("active") is not True or _uuid(profile.get("user_id")) != session.user_id
                     or profile.get("role") not in ROLES or not isinstance(permissions, list)
@@ -293,6 +305,38 @@ class AuthService:
             # são ignoradas pela versão antiga, sem bloquear o login ou concedê-las.
             ), frozenset(p for p in permissions if p in PERMISSIONS))
         except (AuthenticationError, AuthorizationError):
+            self._invalidate_session()
+            raise
+
+    @property
+    def persistent_supported(self) -> bool:
+        """Só habilita lembrança depois de o banco confirmar o contrato instalado."""
+        return self._persistent_supported and bool(self.api.settings.backend_secret)
+
+    @_serialized
+    def remember_browser(self) -> str:
+        """Emite referência opaca após login completo; nunca persiste senha no navegador."""
+        from web.persistent_sessions import PersistentSessions
+
+        context = self.context()
+        if not self.persistent_supported or self.password_change_required:
+            raise ConfigurationError("A permanência do login ainda não está configurada.")
+        ticket = PersistentSessions(self.api, self._clock).register(self._current_session(), context)
+        self._persistent_ticket = ticket
+        return ticket
+
+    @_serialized
+    def restore_browser(self, ticket: str) -> AccessContext:
+        """Retoma no F5 ou reabertura e repete Auth, sessão, usuário e permissões."""
+        from web.persistent_sessions import PersistentSessions
+
+        self._invalidate_session()
+        try:
+            payload = PersistentSessions(self.api, self._clock).resume(ticket)
+            self._session = self._read_session(payload | {"user": {"id": payload["user_id"]}})
+            self._persistent_ticket = ticket
+            return self.context()
+        except AppError:
             self._invalidate_session()
             raise
 
@@ -335,6 +379,15 @@ class AuthService:
         try:
             if self._session is not None:
                 session = self._current_session()
+                if self._persistent_ticket:
+                    from web.persistent_sessions import PersistentSessions
+
+                    try:
+                        PersistentSessions(self.api, self._clock).revoke(self._persistent_ticket, session.access_token)
+                    except AppError:
+                        # O logout confirmado pelo Auth remove auth.sessions e
+                        # também invalida a retomada, mesmo se este RPC falhar.
+                        pass
                 self.api.auth("POST", f"logout?scope={scope}", access_token=session.access_token)
         except AppError:
             raise ServiceUnavailable("Sessão local encerrada; não foi possível confirmar a revogação remota.") from None

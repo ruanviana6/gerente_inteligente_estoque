@@ -119,6 +119,10 @@ migrações, testes e validação no endereço publicado. A conta Master existen
 preservada. Usuários novos recebem acesso temporário e precisam definir sua
 senha pessoal antes de consultar dados.
 
+O [login pode ser lembrado neste navegador](docs/LOGIN_PERSISTENTE.md) por até
+30 dias. O botão Sair encerra o acesso, e desativação ou redefinição continuam
+bloqueando a retomada. Use a opção somente em um dispositivo pessoal.
+
 A evolução da [Inteligência Comercial](docs/INTELIGENCIA_COMERCIAL.md) reúne clientes,
 cidades e produtos comprados juntos em uma área. A interface consome resultados
 pré-calculados. Os modelos locais são comparados a regras simples em validação

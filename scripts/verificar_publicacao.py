@@ -38,7 +38,14 @@ def verificar(browser, esperado, destino):
         contexto = browser.new_context(viewport={"width": 1440, "height": 1000}, locale="pt-BR")
         pagina = contexto.new_page()
         falhas = Counter()
-        pagina.on('requestfailed', lambda request: falhas.update([request.resource_type]))
+        recursos = []
+        def registrar_falha(request):
+            """Registra somente host/caminho de scripts públicos, sem query ou corpo."""
+            falhas.update([request.resource_type])
+            if request.resource_type == 'script':
+                url = urlsplit(request.url)
+                recursos.append({'host': url.hostname, 'path': url.path[:200], 'failure': (request.failure or '')[:100]})
+        pagina.on('requestfailed', registrar_falha)
         try:
             resposta = pagina.goto(URL, wait_until='domcontentloaded', timeout=45000)
             try:
@@ -49,7 +56,7 @@ def verificar(browser, esperado, destino):
             except Exception:
                 pass
             observacao = observar(pagina, esperado)
-            observacao.update(http_status=resposta.status if resposta else None, failed_resource_types=dict(falhas))
+            observacao.update(http_status=resposta.status if resposta else None, failed_resource_types=dict(falhas), failed_scripts=recursos)
             resultado['attempts'].append(observacao)
             if observacao['version'] != esperado or not observacao['login_visible']:
                 continue
