@@ -66,15 +66,15 @@ DROP/purge automático.
 
 ## Verificação e limites
 
-A integração foi incorporada à branch publicada pelos PRs #16 e #17. No head
-`0fee680`, o GitHub Actions aprovou 867 testes e 66 subtestes em Python 3.11/3.12,
+A integração foi incorporada à branch publicada pelos PRs #16, #17 e #18. No head
+`0fb0b94`, o GitHub Actions aprovou 871 testes e 66 subtestes em Python 3.11/3.12,
 Ruff, dependências, PostgreSQL/RLS/restauração e sete testes de Auth/PostgREST
 reais em ambiente descartável. Os testes de ML usam scikit-learn instalado no CI.
 O Chromium aprovou retomada após F5, reabertura de aba, isolamento de navegadores,
 Sair, conta desativada, opção desmarcada e F5 no celular. São validações com dados
 fictícios; não representam login Master em produção. Referências:
-https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/43025724568
-e https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/43025724585.
+https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/43031175890
+e https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/43031175853.
 
 A checagem independente do domínio identificou a moldura do Streamlit Cloud:
 o aplicativo está no iframe da mesma origem em `/~/+/`. O verificador foi
@@ -82,12 +82,25 @@ corrigido para observar esse quadro e possui regressões que rejeitam marcadores
 em origens de terceiros. A falha do script externo de analytics da plataforma
 não é usada como evidência de falha da aplicação.
 
-O navegador anônimo abriu o formulário de login real, sem tabelas ou indicadores
-expostos. Entretanto, a versão observada ainda não apresenta o marcador
-`web-integrada-20261111.2` nem a opção de manter o acesso. Portanto a incorporação
-do código no GitHub está confirmada, mas a atualização do processo do Streamlit
-ainda precisa ser comprovada. Não confundir domínio acessível com deploy novo.
-Secrets e sessão Master não são compartilhados no chat.
+Inicialmente o processo do Streamlit ainda servia o código antigo. A hospedagem
+informou `isOwner=false` para a sessão disponível, sem acesso para reiniciar o
+processo. O proprietário executou Reboot app e confirmou o reinício no chat.
+Não foi preciso mudar branch, recriar o aplicativo ou editar Secrets.
+
+Em 11/11/2026 às 13:47:32 UTC, o navegador do GitHub Actions observou o release
+`web-integrada-20261111.2` no domínio real. Uma segunda execução independente no
+Chromium do ambiente confirmou o mesmo release e a opção de manter acesso. Ambas
+validaram login em 1440 e 390 pixels, ausência de rolagem horizontal, nenhuma
+tabela/indicador sem autenticação e recusa de uma credencial fictícia inexistente.
+A logo como imagem e a paleta clara também foram conferidas nas capturas.
+Resultado e capturas anônimas estão no artefato `verificacao-publicada`:
+https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/43031780655.
+O resumo sem dados pessoais está em `evidencias/publicacao-20261111.json`.
+
+Isso comprova a atualização da aplicação e esses fluxos públicos. Não representa
+login Master ou validação de operações com dados empresariais na URL. Sessão,
+senha e Secrets do proprietário não foram solicitados nem compartilhados. A
+versão integrada está pronta para a auditoria independente da Issue #3.
 
 Clientes/cidades reais e ML produtivo dependem do OpenAPI autorizado, finalidade
 LGPD, histórico confirmado e auditoria. A conta Master existente não é recriada.

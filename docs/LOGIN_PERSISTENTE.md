@@ -51,10 +51,21 @@ Master, seus atributos e os Secrets. O backend deve ter o segredo já registrado
 no projeto nos Secrets protegidos. Sem isso, o login normal funciona, mas a tela
 informa que não conseguiu lembrar o navegador. Não informe o segredo no chat.
 
-A validação usa testes de criptografia, retomada, rotação entre abas, negações,
-RLS, expiração, revogação e Auth/PostgREST real em ambiente descartável. O teste
-de navegador precisa efetuar login fictício, F5, fechar/reabrir aba, Sair e
-reabrir sem cookie. As evidências devem ser registradas depois da execução.
+A validação executada cobre criptografia, retomada, rotação entre abas, negações,
+RLS, expiração, revogação e Auth/PostgREST real em ambiente descartável. O
+Chromium aprovou F5, fechar/reabrir aba, isolamento de navegadores, Sair,
+desativação, opção desmarcada e F5 no celular. Os resultados estão no
+[CI da integração](https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/43031175853).
+
+A migração foi aplicada ao projeto existente após backup e preservação dos
+registros/Master. Em 11/11/2026, a opção de manter acesso e o release
+`web-integrada-20261111.2` foram observados no domínio publicado. O teste público
+recusou credencial fictícia inválida, sem entrar como Master. O ciclo de retomada
+produtiva com a conta real ainda depende da conferência do proprietário.
+
+Na primeira entrada após a atualização, autentique-se normalmente e deixe a
+opção marcada para lembrar esse navegador. Uma sessão antiga sem referência de
+dispositivo não pode ser retomada retroativamente.
 
 Referências: [contexto de cookies do Streamlit](https://docs.streamlit.io/develop/api-reference/caching-and-state/st.context)
 e [sessões do Supabase](https://supabase.com/docs/guides/auth/sessions).
