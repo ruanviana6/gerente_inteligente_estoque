@@ -125,6 +125,36 @@ class Service:
         return self.auth.context()
 
     @_operation
+    def dashboard(self):
+        """Consulta apenas o resumo pronto, com autorização antes e depois."""
+        result, original = self.auth.rpc_with_context("dashboard_payload", {}, "dashboard.view")
+        atual = self.auth.require("dashboard.view")
+        self._same_identity(original, atual)
+        if original.permissions != atual.permissions:
+            raise AuthorizationError("As permissões mudaram durante a consulta do resumo.")
+        if not isinstance(result, dict):
+            raise ValueError("Resumo indisponível.")
+        return result
+
+    @_operation
+    def refresh_dashboard(self):
+        """Recalcula por ação explícita do Master, fora da navegação normal."""
+        from web.dashboard import preparar_resumo
+
+        original = self.auth.require("dashboard.view")
+        if original.profile.role != "Master":
+            raise AuthorizationError("Somente o Master pode publicar os resumos.")
+        source = self.auth.rpc("dashboard_source", {}, "dashboard.view")
+        if not source.get("batch_id"):
+            raise ValueError("Importe uma base antes de preparar o resumo.")
+        data = self.load_inventory("dashboard.view")
+        rules = self.replenishment_rules(data["metadata"]["snapshot_date"])
+        summary = preparar_resumo(data, rules)
+        self._same_identity(original, self.auth.require("dashboard.view"))
+        return self.auth.rpc("dashboard_publish", {"p_batch": source["batch_id"],
+            "p_revision": source["revision"], "p_summary": summary}, "dashboard.view")
+
+    @_operation
     def load_inventory(self, module: str, month: object | None = None) -> dict:
         """Obtém somente o lote permitido e calcula indicadores com o mesmo motor."""
         if module not in MODULOS:

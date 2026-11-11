@@ -249,10 +249,12 @@ def measure_ui(fixture, probe, size, iterations, latency):
         if app.error:
             raise AssertionError("A interface exibiu erro durante o benchmark: " + str(app.error[0].value))
 
-    results = {"primeira_carga": summarize([probe.sample(scenario, execute, ui=True)])}
+    results = {"primeira_carga": summarize([probe.sample(scenario, execute, ui=True)]),
+               "preparacao_resumo": {"seconds": getattr(scenario, "dashboard_preparation_seconds", None),
+                    "nota": "Cálculo controlado anterior à navegação; custo não foi eliminado."}}
     for name in ("Painel", "Estoque", "Reposição", "Relatórios"):
         navigation = next(item for item in app.sidebar.radio if item.label == "Navegação")
-        destino = "Reposição Inteligente" if name == "Reposição" and "Reposição Inteligente" in navigation.options else name
+        destino = "Visão Geral" if name == "Painel" and "Visão Geral" in navigation.options else ("Reposição Inteligente" if name == "Reposição" and "Reposição Inteligente" in navigation.options else name)
         navigation.set_value(destino)
         samples = [probe.sample(scenario, execute, ui=True) for _ in range(iterations)]
         results[name] = summarize(samples)

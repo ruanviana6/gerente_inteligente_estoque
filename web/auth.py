@@ -29,10 +29,11 @@ PERMISSIONS = frozenset({
     "audit.view", "users.manage", "permissions.manage", "integrations.manage", "reports.view",
     "reports.export", "reports.receive", "reports.manage",
     "commercial.view", "commercial.customer_detail", "commercial.manage",
+    "fiscal.view", "fiscal.create_request", "fiscal.approve_pending", "fiscal.audit", "fiscal.manage",
 })
 ROLES = ("Master", "Administrador", "Operador", "Visualizador")
 MASTER_ONLY_PERMISSIONS = frozenset({
-    "users.manage", "permissions.manage", "reports.manage", "integrations.manage", "commercial.manage",
+    "users.manage", "permissions.manage", "reports.manage", "integrations.manage", "commercial.manage", "fiscal.manage",
 })
 
 

@@ -15,7 +15,6 @@ import pandas as pd
 import streamlit as st
 
 from dados import hoje_local
-from motor import somar_valores_financeiros
 from reposicao.apresentacao import projetar_painel
 from reposicao.embalagens import ler_embalagens
 from web.downloads import csv_export
@@ -25,7 +24,11 @@ from web.reports import filtrar_relatorio
 from web.theme import metric_card, page_header, status_badge, surface
 
 PERMISSOES = {
-    "dashboard.view": "Painel e insights",
+    "dashboard.view": "Visão Geral e insights",
+    "fiscal.view": "Visualizar solicitações fiscais",
+    "fiscal.create_request": "Criar solicitações fiscais DEMO",
+    "fiscal.approve_pending": "Autorizar pedidos Em andamento",
+    "fiscal.audit": "Consultar auditoria fiscal",
     "inventory.view": "Estoque e histórico",
     "inventory.export": "Exportar estoque",
     "replenishment.view": "Sugestões de reposição",
@@ -197,53 +200,9 @@ def _flash(painel: pd.DataFrame, contexto: Any) -> None:
 
 
 def _painel(servico: Any, contexto: Any) -> None:
-    """Organiza KPIs, prioridades e insights sem executar novamente o motor."""
-    page_header("Visão geral", "O que merece atenção no estoque agora.")
-    dados = _carregar(servico, "dashboard.view", contexto)
-    if dados is None:
-        return
-    painel = dados["panel"]
-    colunas = st.columns(4 if contexto.can("replenishment.view") else 3, gap="small", wrap=True)
-    with colunas[0]:
-        metric_card("Produtos", len(painel), key="flatter_kpi_produtos", note="No catálogo atual", width="stretch")
-    with colunas[1]:
-        metric_card("Em ruptura", int(painel["status"].eq("Ruptura").sum()),
-                    key="flatter_kpi_ruptura", tone="danger", note="Saldo observado igual a zero", width="stretch")
-    with colunas[2]:
-        metric_card("Risco antes da entrega", int(painel["risco_prazo"].sum()),
-                    key="flatter_kpi_risco", tone="warning", note="Conferir prazo do fornecedor", width="stretch")
-    if contexto.can("replenishment.view"):
-        with colunas[3]:
-            metric_card("Produtos com sugestão", int(painel["quantidade_sugerida"].gt(0).sum()),
-                        key="flatter_kpi_sugestoes", tone="brand", note="Revisão humana necessária", width="stretch")
-    if contexto.can("finance.view"):
-        parados = painel.loc[painel["status"].isin(["Parado", "Excesso"]), "capital_estoque"]
-        colunas_financeiras = st.columns(2, gap="small", wrap=True)
-        with colunas_financeiras[0]:
-            metric_card("Capital conhecido em estoque", _moeda(somar_valores_financeiros(painel["capital_estoque"])),
-                        key="flatter_kpi_capital", width="stretch", note="A custo informado, não receita")
-        with colunas_financeiras[1]:
-            metric_card("Capital em parados/excesso", _moeda(0.0 if parados.empty else somar_valores_financeiros(parados)),
-                        key="flatter_kpi_excesso", width="stretch", note="Somente custos conhecidos")
-        if painel["capital_estoque"].isna().any():
-            st.caption("Capital parcial: há custos ausentes ou não calculáveis.")
-    _flash(painel, contexto)
-    if contexto.can("inventory.view"):
-        with surface("flatter_prioridades"):
-            st.subheader("Prioridades de hoje")
-            with st.container(horizontal=True, wrap=True, gap="small"):
-                st.button("Conferir rupturas", on_click=_navegar, args=("Estoque", "ruptura"),
-                          key="prioridade_ruptura", icon=":material/error_outline:")
-                st.button("Conferir risco no prazo", on_click=_navegar, args=("Estoque", "risco"),
-                          key="prioridade_risco", icon=":material/schedule:")
-                st.button("Revisar qualidade dos dados", on_click=_navegar, args=("Estoque", "qualidade"),
-                          key="prioridade_qualidade", icon=":material/fact_check:")
-            _tabela(painel.head(12), COLUNAS_ESTOQUE, key="painel_prioridades", paginar=False)
-    with surface("flatter_situacoes"):
-        st.subheader("Situação do estoque")
-        st.bar_chart(painel["status"].value_counts().rename("Produtos"), horizontal=True, height=260)
-    if painel["requer_revisao"].any():
-        st.warning("Há histórico insuficiente ou disponibilidade incerta. Confira as limitações antes de decidir.")
+    """Reutiliza a página inicial com leitura exclusiva dos resumos prontos."""
+    from web.dashboard_page import visao_geral
+    visao_geral(servico, contexto)
 
 
 def _filtros(painel: pd.DataFrame, prefixo: str) -> tuple[pd.DataFrame, dict]:
@@ -364,6 +323,22 @@ def _explicar_reposicao(item: pd.Series) -> None:
 
 
 def _reposicao(servico: Any, contexto: Any) -> None:
+    """Integra ações à reposição, sem conceder leitura de estoque ao registrador."""
+    areas = []
+    if contexto.can("replenishment.view"):
+        areas.append("Planejamento")
+    if contexto.can("decisions.write"):
+        areas.append("Acompanhamento de Ações")
+    if not areas:
+        raise AuthorizationError("Seu acesso não permite consultar reposição.")
+    area = st.radio("Área da reposição", areas, horizontal=True, key="reposicao_area")
+    if area == "Acompanhamento de Ações":
+        _decisoes(servico, contexto)
+    else:
+        _planejamento_reposicao(servico, contexto)
+
+
+def _planejamento_reposicao(servico: Any, contexto: Any) -> None:
     """Apresenta ciclos explicáveis sem depender de fornecedores ou alterar o ERP."""
     page_header("Reposição Inteligente", "Planeje solicitações à indústria com revisão humana.")
     modulo = "replenishment.view" if contexto.can("replenishment.view") else "trends.view"
@@ -768,20 +743,67 @@ def _redefinir_usuario(servico: Any, usuarios: list[dict]) -> None:
                 st.success("Acesso redefinido. A senha temporária vence em 24 horas e exige troca no próximo acesso.")
 
 
+ADMIN_PERMISSIONS = frozenset({"inventory.import", "parameters.edit", "integrations.manage", "audit.view", "fiscal.audit", "fiscal.manage"})
+
+
 def _administracao(servico: Any, contexto: Any) -> None:
+    """Agrupa configurações preservando o acesso granular de usuários não Master."""
+    from web.fiscal_service import FiscalService
+    from web.integration_page import integracoes
+
+    page_header("Administração", "Configurações e operações disponíveis para suas permissões.")
+    master = _perfil(contexto, "role") == "Master"
+    opcoes = {}
+    if master:
+        opcoes["Usuários e permissões"] = _usuarios_e_permissoes
+    if master and contexto.can("reports.manage"):
+        opcoes["Relatórios por e-mail"] = None
+    if contexto.can("parameters.edit"):
+        opcoes["Regras de Reposição"] = _parametros
+    if contexto.can("inventory.import"):
+        opcoes["Importação manual / DEMO"] = _importacao
+    if master and contexto.can("integrations.manage"):
+        opcoes["Integrações"] = integracoes
+    if contexto.can("audit.view"):
+        opcoes["Auditoria"] = _auditoria
+    if master and contexto.can("fiscal.manage"):
+        opcoes["Configuração fiscal"] = None
+    if contexto.can("fiscal.audit"):
+        opcoes["Auditoria fiscal"] = None
+    if not opcoes:
+        raise AuthorizationError("Nenhuma área administrativa foi autorizada.")
+    if st.session_state.get("admin_area") not in opcoes:
+        st.session_state["admin_area"] = next(iter(opcoes))
+    area = st.radio("Área administrativa", list(opcoes), horizontal=True, key="admin_area")
+    if opcoes[area] is not None:
+        opcoes[area](servico, contexto)
+    elif area == "Relatórios por e-mail":
+        _configurar_relatorios(servico, servico.admin_list_users())
+    elif area == "Configuração fiscal":
+        fiscal = FiscalService(servico.auth)
+        config = fiscal.configuracao()
+        st.info("Executor: Supabase Edge Functions · Emissão real bloqueada · Sem XML/PDF.")
+        habilitado = st.checkbox("Habilitar módulo DEMO", value=config['demo_enabled'])
+        if st.button("Salvar configuração fiscal"):
+            fiscal.configurar(habilitado)
+            st.success("Configuração DEMO salva. A emissão real permanece bloqueada.")
+    else:
+        fiscal = FiscalService(servico.auth)
+        registros = fiscal.auditar()
+        _tabela(pd.DataFrame(registros), key="admin_fiscal_requests")
+        if registros:
+            alvo = st.selectbox("Solicitação fiscal para auditoria", [r['id'] for r in registros], index=None)
+            if alvo and st.button("Consultar transições fiscais"):
+                _tabela(pd.DataFrame(fiscal.historico(alvo)), key="admin_fiscal_events")
+
+
+def _usuarios_e_permissoes(servico: Any, contexto: Any) -> None:
     """Carrega apenas a área administrativa escolhida, mantendo o acesso Master."""
-    page_header("Administração", "Usuários, permissões e rotina mensal sob controle do Master.")
+    st.subheader("Usuários e permissões")
     if _perfil(contexto, "role") != "Master":
         st.error("A administração de usuários é restrita ao Master.")
         return
-    areas = ["Usuários e permissões"]
-    if contexto.can("reports.manage"):
-        areas.append("Relatórios por e-mail")
-    area = st.radio("Área administrativa", areas, horizontal=True, key="admin_area")
     usuarios = servico.admin_list_users()
-    if area == "Relatórios por e-mail":
-        _configurar_relatorios(servico, usuarios)
-        return
     _tabela(pd.DataFrame(usuarios), ["display_name", "email", "role", "active"], key="admin_usuarios")
     if not (contexto.can("users.manage") and contexto.can("permissions.manage")):
         st.info("A gestão de acessos exige as permissões administrativas do Master.")
@@ -839,12 +861,8 @@ def _auditoria(servico: Any, contexto: Any) -> None:
 
 
 PAGES = {
-    "Painel": ("dashboard.view", _painel),
+    "Visão Geral": ("dashboard.view", _painel),
     "Estoque": ("inventory.view", _estoque),
     "Reposição Inteligente": ("replenishment.view", _reposicao),
     "Relatórios": ("reports.view", _relatorios),
-    "Importação": ("inventory.import", _importacao),
-    "Regras de Reposição": ("parameters.edit", _parametros),
-    "Acompanhamento de Ações": ("decisions.write", _decisoes),
-    "Auditoria": ("audit.view", _auditoria),
 }

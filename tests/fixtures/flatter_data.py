@@ -45,7 +45,7 @@ def make_payload(size: int = 100, month: str = "2026-09-01") -> dict:
     meta = {
         "batch_id": str(UUID(int=501)), "snapshot_date": fechamento.isoformat(),
         "period_start": inicio.isoformat(), "period_end": fechamento.isoformat(),
-        "created_at": fechamento.isoformat() + "T18:00:00Z", "source": "Amostra fictícia Flatter",
+        "created_at": fechamento.isoformat() + "T18:00:00Z", "source": "DEMO: amostra fictícia Flatter",
         "month_complete": True,
     }
     return {"products": produtos, "sales": vendas, "snapshots": fotos, "metadata": meta,
@@ -75,15 +75,27 @@ class Scenario:
         operador = {"dashboard.view", "inventory.view", "replenishment.view", "trends.view",
                     "decisions.write", "reports.view"}
         self.permissions = set(PERMISSIONS) if role == "Master" else (
-            set(PERMISSIONS) - {"users.manage", "permissions.manage", "reports.manage", "integrations.manage"}
+            set(PERMISSIONS) - {"users.manage", "permissions.manage", "reports.manage", "integrations.manage", "commercial.manage", "commercial.view", "commercial.customer_detail", "fiscal.view", "fiscal.create_request", "fiscal.approve_pending", "fiscal.audit", "fiscal.manage"}
             if role == "Administrador" else operador if role == "Operador" else {"dashboard.view"}
         )
         self.calls: Counter[str] = Counter()
         self.http_seconds: Counter[str] = Counter()
         self._payloads = {"2026-09-01": make_payload(size)}
+        import importlib.util
+        if importlib.util.find_spec('web.dashboard') is not None:
+            self.prepare_dashboard()
         self.decisions: list[dict] = []
         self.users = [{"user_id": str(UUID(int=103)), "display_name": "Operador fictício",
                        "role": "Operador", "active": True, "permissions": {}}]
+
+    def prepare_dashboard(self):
+        """Prepara o resumo antes da medição de leitura, registrando o custo separado."""
+        from web.dashboard import preparar_resumo
+        from web.service import normalizar_payload
+        inicio = time.perf_counter()
+        dados = normalizar_payload(copy.deepcopy(self._payloads['2026-09-01']), True)
+        self.dashboard_summary = preparar_resumo(dados, {'configuration': {}, 'rules': []})
+        self.dashboard_preparation_seconds = time.perf_counter() - inicio
 
     def reset_counts(self) -> None:
         """Reinicia apenas os contadores sanitizados, mantendo a mesma amostra."""
@@ -133,6 +145,25 @@ class Scenario:
         elif chave == "rpc_replenishment_rules":
             resultado = {"configuration": {"cycle_primary": 14, "cycle_alternative": 21, "reference_boxes": 80},
                          "rules": [], "revisions": {}}
+        elif chave == "rpc_dashboard_payload":
+            if 'dashboard.view' not in self.permissions:
+                status, resultado = 403, {}
+            else:
+                resumo = copy.deepcopy(getattr(self, 'dashboard_summary', None))
+                if resumo:
+                    if 'finance.view' not in self.permissions:
+                        resumo.pop('finance', None)
+                    if 'replenishment.view' not in self.permissions:
+                        resumo.pop('replenishment', None)
+                    if 'trends.view' not in self.permissions:
+                        resumo.pop('sales', None)
+                resultado = {'summary': resumo, 'metadata': self._payloads['2026-09-01']['metadata'],
+                             'calculated_at': '2026-11-11T13:00:00Z', 'stale': False}
+        elif chave == "rpc_dashboard_source":
+            resultado = {'batch_id': self._payloads['2026-09-01']['metadata']['batch_id'], 'revision': 'demo'}
+        elif chave == "rpc_dashboard_publish":
+            self.dashboard_summary = copy.deepcopy(parametros['p_summary'])
+            resultado = {'published': True}
         elif chave == "rpc_load_inventory":
             if parametros.get("p_module") not in self.permissions:
                 status = 403

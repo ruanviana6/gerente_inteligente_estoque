@@ -93,6 +93,24 @@ class ServicoFicticio:
         # O serviço real já remove custos; este fake testa também a defesa na UI.
         return {**self.dados, "_access_context": self.context()}
 
+    def dashboard(self):
+        """Entrega a cópia compacta do cenário, sem consultar o histórico na tela."""
+        from web.dashboard import preparar_resumo
+        self.context()
+        self.consultas.append("dashboard_summary")
+        if self.falhar_dados:
+            raise ServiceUnavailable("DETALHE_INTERNO_FICTICIO")
+        if not hasattr(self, "_resumo"):
+            self._resumo = preparar_resumo(self.dados, {"configuration": {}, "rules": []})
+        resumo = dict(self._resumo)
+        if "finance.view" not in self.permissoes:
+            resumo.pop("finance", None)
+        if "replenishment.view" not in self.permissoes:
+            resumo.pop("replenishment", None)
+        if "trends.view" not in self.permissoes:
+            resumo.pop("sales", None)
+        return {"summary": resumo, "metadata": self.dados['metadata'], "calculated_at": "2026-11-11T13:00:00Z", "stale": False}
+
     def list_decisions(self):
         """Fornece histórico vazio sem persistência externa."""
         return []
@@ -255,13 +273,14 @@ def test_painel_exibe_kpis_do_motor_e_somente_navegacao_autorizada(monkeypatch):
     servico = ServicoFicticio(["dashboard.view"])
     app, _ = abrir(monkeypatch, servico)
     assert not app.exception
-    assert app.sidebar.radio[0].options == ["Painel"]
+    assert app.sidebar.radio[0].options == ["Visão Geral"]
     metricas = {m.label: m.value for m in app.metric}
-    assert metricas["Produtos"] == str(len(servico.dados["panel"]))
-    assert metricas["Risco antes da entrega"] == str(int(servico.dados["panel"]["risco_prazo"].sum()))
+    assert len(metricas) == 6
+    assert metricas["Em ruptura"] == str(int(servico.dados["panel"]["status"].eq("Ruptura").sum()))
+    assert metricas["Risco antes da chegada"] == str(int(servico.dados["panel"]["risco_prazo"].sum()))
     assert "Capital conhecido em estoque" not in metricas
     assert "Produtos com sugestão" not in metricas
-    assert set(servico.consultas) == {"dashboard.view"}
+    assert set(servico.consultas) == {"dashboard_summary"}
 
 
 def test_estoque_omite_financeiro_mesmo_se_transporte_retornar_colunas(monkeypatch):

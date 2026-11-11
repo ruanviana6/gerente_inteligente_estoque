@@ -204,6 +204,14 @@ class SupabaseAPI:
         return self._request("PUT", "/auth/v1/admin/users/" + user_id,
                              {"password": password}, administrative=True)
 
+    def fiscal_demo(self, request_id: str, reconcile: bool, access_token: str):
+        """Invoca somente a função DEMO autenticada, com identidade do funcionário."""
+        if not re.fullmatch(r"[0-9a-f-]{36}", request_id) or type(reconcile) is not bool or not access_token:
+            raise AuthorizationError("Solicitação fiscal inválida.")
+        return self._request("POST", "/functions/v1/fiscal-demo", {
+            "request_id": request_id, "action": "reconcile_demo" if reconcile else "execute_demo",
+        }, access_token)
+
     def job_rpc(self, name: str, payload: dict) -> Any:
         """Limita o worker sem sessão às três funções protegidas pelo segredo dedicado."""
         if name not in {"report_job_claim", "report_job_authorize", "report_job_finish"}:

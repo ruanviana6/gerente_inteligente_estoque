@@ -183,6 +183,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/sql/reposicao.sql 2>&1 | tee -a evidencias-banco.txt
           psql -v ON_ERROR_STOP=1 -f tests/sql/commercial.sql 2>&1 | tee -a evidencias-banco.txt
           psql -v ON_ERROR_STOP=1 -f tests/sql/persistent_sessions.sql 2>&1 | tee -a evidencias-banco.txt
+          psql -v ON_ERROR_STOP=1 -f tests/sql/fiscal.sql 2>&1 | tee -a evidencias-banco.txt
       - name: Verificar backup e restauração descartáveis
         run: |
           pg_dump --format=custom --file=/tmp/estoque-teste.dump
@@ -195,6 +196,7 @@ jobs:
           PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/reposicao.sql
           PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/commercial.sql
           PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/persistent_sessions.sql
+          PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/fiscal.sql
       - name: Testar vínculo concorrente de usuário
         env:
           GERENTE_DISPOSABLE_DATABASE: '1'
@@ -210,4 +212,11 @@ jobs:
           path: |
             evidencias-banco.txt
             supabase/migrations/
+  executor-fiscal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Verificar tipos e cenários adversariais do executor Deno
+        run: npx --yes deno@2.6.5 test --check supabase/functions/fiscal-demo/handler_test.ts
 
