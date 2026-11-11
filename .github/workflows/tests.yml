@@ -39,7 +39,18 @@ jobs:
           assert valores['auth']['email']['enable_signup'] is True
           PY
           npx --yes supabase@2.122.0 start --help
-          npx --yes supabase@2.122.0 start > /tmp/supabase-start.log 2>&1
+          if ! npx --yes supabase@2.122.0 start > /tmp/supabase-start.log 2>&1; then
+            python - <<'PY'
+          from pathlib import Path
+          for linha in Path('/tmp/supabase-start.log').read_text(errors='replace').splitlines():
+              minuscula = linha.lower()
+              if any(p in minuscula for p in ('error', 'failed', 'sqlstate', 'unhealthy')) and not any(
+                  p in minuscula for p in ('key', 'password', 'token', 'secret', 'postgresql://', 'postgres://')
+              ):
+                  print(linha[:400])
+          PY
+            exit 1
+          fi
       - name: Testar Auth e PostgREST reais
         run: python -m pytest tests/live_supabase.py -ra --junitxml=resultado-auth-real.xml
       - name: Guardar resultado sem credenciais locais

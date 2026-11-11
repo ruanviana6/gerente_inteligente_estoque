@@ -126,16 +126,16 @@ create function public.persistent_register(p_selector uuid,p_validator_hash text
 returns jsonb language sql security invoker set search_path=''
 as $$select private.persistent_register(p_selector,p_validator_hash,p_encrypted_session,p_backend_secret)$$;
 create function public.persistent_claim(p_selector uuid,p_validator text,p_backend_secret text)
-returns jsonb language sql security definer set search_path=''
+returns jsonb language sql security invoker set search_path=''
 as $$select private.persistent_claim(p_selector,p_validator,p_backend_secret)$$;
 create function public.persistent_finish(p_selector uuid,p_claim uuid,p_encrypted_session text,p_backend_secret text)
 returns jsonb language sql security invoker set search_path=''
 as $$select private.persistent_finish(p_selector,p_claim,p_encrypted_session,p_backend_secret)$$;
 create function public.persistent_release(p_selector uuid,p_claim uuid,p_revoke boolean,p_backend_secret text)
-returns jsonb language sql security definer set search_path=''
+returns jsonb language sql security invoker set search_path=''
 as $$select private.persistent_release(p_selector,p_claim,p_revoke,p_backend_secret)$$;
 create function public.persistent_forget(p_selector uuid,p_validator text,p_backend_secret text)
-returns jsonb language sql security definer set search_path=''
+returns jsonb language sql security invoker set search_path=''
 as $$select private.persistent_forget(p_selector,p_validator,p_backend_secret)$$;
 
 revoke all on function private.persistent_register(uuid,text,text,text),public.persistent_register(uuid,text,text,text),
@@ -146,8 +146,9 @@ grant execute on function private.persistent_register(uuid,text,text,text),publi
 revoke all on function private.persistent_claim(uuid,text,text),public.persistent_claim(uuid,text,text),
   private.persistent_release(uuid,uuid,boolean,text),public.persistent_release(uuid,uuid,boolean,text),
   private.persistent_forget(uuid,text,text),public.persistent_forget(uuid,text,text) from public,anon,authenticated,service_role;
-grant execute on function public.persistent_claim(uuid,text,text),public.persistent_release(uuid,uuid,boolean,text),
-  public.persistent_forget(uuid,text,text) to anon,authenticated;
+grant execute on function private.persistent_claim(uuid,text,text),public.persistent_claim(uuid,text,text),
+  private.persistent_release(uuid,uuid,boolean,text),public.persistent_release(uuid,uuid,boolean,text),
+  private.persistent_forget(uuid,text,text),public.persistent_forget(uuid,text,text) to anon,authenticated;
 
 create or replace function public.app_context(p_supported_permissions text[]) returns jsonb
 language sql stable security invoker set search_path='' as $$
