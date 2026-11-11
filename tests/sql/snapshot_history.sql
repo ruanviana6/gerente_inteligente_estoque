@@ -2,7 +2,7 @@
 \set ON_ERROR_STOP on
 begin;
 do $$begin
-  if (select count(*) from information_schema.columns where table_schema='auth' and table_name='users')<>4 then
+  if (select count(*) from information_schema.columns where table_schema='auth' and table_name='users')<>5 then
     raise exception 'Fixture Auth descartável exigida.';
   end if;
 end $$;

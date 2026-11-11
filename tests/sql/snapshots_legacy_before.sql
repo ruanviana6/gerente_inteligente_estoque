@@ -2,7 +2,7 @@
 \set ON_ERROR_STOP on
 begin;
 do $$begin
-  if (select count(*) from information_schema.columns where table_schema='auth' and table_name='users')<>4
+  if (select count(*) from information_schema.columns where table_schema='auth' and table_name='users')<>5
     or to_regclass('public.inventory_snapshot_versions') is not null then
     raise exception 'Exigido esquema descartável anterior à migração de snapshots.';
   end if;
