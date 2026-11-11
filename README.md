@@ -112,6 +112,21 @@ A [documentação da interface](docs/UX_FLATTER.md) explica as cores, a marca em
 
 ## Limites e próximos passos
 
+A versão integrada reúne a [Central de Acessos](docs/CENTRAL_ACESSOS.md), a
+[Reposição Inteligente](docs/REPOSICAO_INTELIGENTE.md) e a Inteligência Comercial.
+O [registro da integração](docs/INTEGRACAO_WEB_20261111.md) distingue código,
+migrações, testes e validação no endereço publicado. A conta Master existente é
+preservada. Usuários novos recebem acesso temporário e precisam definir sua
+senha pessoal antes de consultar dados.
+
+A evolução da [Inteligência Comercial](docs/INTELIGENCIA_COMERCIAL.md) reúne clientes,
+cidades e produtos comprados juntos em uma área. A interface consome resultados
+pré-calculados. Os modelos locais são comparados a regras simples em validação
+temporal; não há treino na navegação nem probabilidades inventadas de abandono.
+Clientes e cidades reais aguardam o contrato autorizado da API e a avaliação de
+privacidade. Há medição de ocupação restrita ao Master, resumos incrementais e
+versionamento com reversão, sem exclusão automática de histórico.
+
 O acesso autenticado na URL publicada precisa de validação do proprietário após a revisão e publicação autorizadas da candidata. O envio de e-mail permanece em simulação até autorização e configuração do provedor. O cadastro público deve ser desligado no painel Auth; os testes do ambiente descartável não alteram automaticamente essa configuração externa.
 
 Depois da implementação e da ativação, será feita a auditoria independente da Issue #3. Dados empresariais só podem ser usados com autorização e validação apropriadas. A ativação real do GestãoClick depende das condições documentadas. NF-e, compras automáticas, sincronização reversa e previsão sazonal avançada continuam fora do escopo.

@@ -252,7 +252,8 @@ def measure_ui(fixture, probe, size, iterations, latency):
     results = {"primeira_carga": summarize([probe.sample(scenario, execute, ui=True)])}
     for name in ("Painel", "Estoque", "Reposição", "Relatórios"):
         navigation = next(item for item in app.sidebar.radio if item.label == "Navegação")
-        navigation.set_value(name)
+        destino = "Reposição Inteligente" if name == "Reposição" and "Reposição Inteligente" in navigation.options else name
+        navigation.set_value(destino)
         samples = [probe.sample(scenario, execute, ui=True) for _ in range(iterations)]
         results[name] = summarize(samples)
     generate_buttons = [item for item in app.button if item.label == "Gerar relatório"]

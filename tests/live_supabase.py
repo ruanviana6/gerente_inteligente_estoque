@@ -23,6 +23,7 @@ from web.service import Service
 from web.settings import PROJECT_URL, Settings
 
 SENHA = "Senha-ficticia-local-2026!"
+SENHA_PESSOAL = "Senha-pessoal-ficticia-2026!"
 SEGREDO_BACKEND = "segredo-exclusivo-do-backend-ficticio-2026"
 
 
@@ -83,6 +84,10 @@ def ambiente():
     master = AuthService(api)
     master.login("master@example.invalid", SENHA)
     operador_id = master.create_user("operador@example.invalid", SENHA, "Operador fictício", "Operador")
+    primeiro_acesso = AuthService(SupabaseAPI(config, transporte))
+    assert primeiro_acesso.login("operador@example.invalid", SENHA) is None
+    assert primeiro_acesso.password_change_required
+    primeiro_acesso.finish_initial_password(SENHA_PESSOAL)
     return {"api": api, "master": master, "operador_id": operador_id, "transport": transporte,
             "anon": status["ANON_KEY"], "chamadas": chamadas}
 
@@ -91,7 +96,7 @@ def operador(ambiente):
     """Reativa o operador com as permissões iniciais antes de cada cenário."""
     Service(ambiente["master"]).admin_set_user(ambiente["operador_id"], "Operador fictício", "Operador", True, {})
     auth = AuthService(SupabaseAPI(ambiente["api"].settings, ambiente["transport"]))
-    auth.login("operador@example.invalid", SENHA)
+    auth.login("operador@example.invalid", SENHA_PESSOAL)
     return auth
 
 
@@ -149,6 +154,24 @@ def test_refresh_e_logout_invalidam_acesso_real(ambiente):
         ambiente["api"].rpc("app_context", {}, token)
 
 
+def test_redefinicao_master_bloqueia_sessao_e_exige_nova_senha(ambiente):
+    """Confere o fluxo completo com Auth e RLS reais em contas descartáveis."""
+    uid = ambiente["master"].create_user("recuperar@example.invalid", SENHA, "Funcionário teste", "Operador")
+    conta = AuthService(SupabaseAPI(ambiente["api"].settings, ambiente["transport"]))
+    assert conta.login("recuperar@example.invalid", SENHA) is None
+    conta.finish_initial_password(SENHA_PESSOAL)
+    conta.login("recuperar@example.invalid", SENHA_PESSOAL)
+    token_antigo = conta.session.access_token
+    temporaria = "Temporaria-ficticia-2026!"
+    ambiente["master"].reset_employee_password(uid, temporaria, SENHA)
+    with pytest.raises((AuthenticationError, AuthorizationError)):
+        ambiente["api"].rpc("app_context", {}, token_antigo)
+    nova = AuthService(SupabaseAPI(ambiente["api"].settings, ambiente["transport"]))
+    assert nova.login("recuperar@example.invalid", temporaria) is None
+    nova.finish_initial_password("Senha-final-ficticia-2026!")
+    assert nova.login("recuperar@example.invalid", "Senha-final-ficticia-2026!").profile.user_id == uid
+
+
 def test_painel_sem_estoque_nao_le_base_bruta_pela_api(ambiente):
     """O backend calcula o painel, mas a identidade não acessa o catálogo pela API."""
     Service(ambiente["master"]).import_csv(
@@ -160,7 +183,9 @@ def test_painel_sem_estoque_nao_le_base_bruta_pela_api(ambiente):
         "visualizador@example.invalid", SENHA, "Visualizador fictício", "Visualizador",
     )
     auth = AuthService(SupabaseAPI(ambiente["api"].settings, ambiente["transport"]))
-    auth.login("visualizador@example.invalid", SENHA)
+    assert auth.login("visualizador@example.invalid", SENHA) is None
+    auth.finish_initial_password(SENHA_PESSOAL)
+    auth.login("visualizador@example.invalid", SENHA_PESSOAL)
     assert auth.context().can("dashboard.view")
     assert not auth.context().can("inventory.view")
     assert not Service(auth).load_inventory("dashboard.view")["panel"].empty

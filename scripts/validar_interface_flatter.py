@@ -112,7 +112,7 @@ def navegar(pagina, destino: str) -> None:
     grupo.get_by_text(destino, exact=True).click()
     expect(grupo.get_by_role("radio", name=destino, exact=True)).to_be_checked()
     titulos = {"Painel": "Visão geral", "Estoque": "Estoque e histórico",
-               "Reposição": "Reposição por fornecedor", "Relatórios": "Relatório mensal",
+               "Reposição Inteligente": "Reposição Inteligente", "Relatórios": "Relatório mensal",
                "Administração": "Administração"}
     if destino in titulos:
         pagina.get_by_role("heading", name=titulos[destino], exact=True).wait_for()

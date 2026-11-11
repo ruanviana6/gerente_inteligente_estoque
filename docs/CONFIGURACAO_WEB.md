@@ -33,11 +33,11 @@ select private.bootstrap_master(
 
 A função exige conta confirmada, cria a organização e registra auditoria. Guarde o UUID da organização devolvido pelo comando para a configuração seguinte. Recusa uma segunda inicialização e não pode ser chamada por `anon`, `authenticated` ou `service_role`. Não há senha padrão, promoção por formulário nem atribuição por `user_metadata`.
 
-Depois do primeiro login, a área **Administração** permite autorizar contas por UUID, ativar/desativar, escolher perfil e sobrescrever permissões individuais. Operações de gestão permanecem exclusivas do Master. A alteração de acesso vale nas consultas seguintes, inclusive para tokens antigos.
+Depois do primeiro login, a área **Administração** permite criar contas por nome e e-mail, ativar/desativar, escolher perfil e sobrescrever permissões individuais. Operações de gestão permanecem exclusivas do Master. Consulte `CENTRAL_ACESSOS.md` para a migração, a senha temporária e a recuperação segura.
 
 O Visualizador começa somente com o painel. O Operador recebe painel, estoque, reposição, tendências, decisões e visualização de relatórios. O Administrador recebe as funções operacionais, inclusive finanças e importação, mas não gerencia usuários, permissões ou destinatários. Em cada funcionalidade, o Master pode escolher **Herdar do perfil**, **Permitir** ou **Negar**, sem alterar as demais concessões ao editar o nome da conta.
 
-Para criar novas identidades dentro do app, há uma opção de criação via Auth Admin API. Ela exige a chave administrativa opcional nos Secrets e uma sessão Master validada. A chave não participa das consultas de estoque. Se preferir não armazená-la no Streamlit, crie identidades no painel Supabase e autorize seus UUIDs na aplicação.
+Para criar novas identidades dentro do app, a Auth Admin API exige chave administrativa nos Secrets e uma sessão Master validada. A chave não participa das consultas de estoque e é obtida pelo backend apenas no momento da operação.
 
 ### Configurar o segredo protegido do backend
 

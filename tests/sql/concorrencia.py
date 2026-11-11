@@ -58,7 +58,7 @@ def executar() -> None:
     if os.environ.get("GERENTE_DISPOSABLE_DATABASE") != "1":
         raise RuntimeError("Defina GERENTE_DISPOSABLE_DATABASE=1 somente no banco descartável do CI.")
     # A cópia mínima de auth.users tem quatro colunas; um Supabase verdadeiro não passa.
-    if psql("select count(*)=4 from information_schema.columns where table_schema='auth' and table_name='users'") != "t":
+    if psql("select count(*)=5 from information_schema.columns where table_schema='auth' and table_name='users'") != "t":
         raise RuntimeError("O teste recusou um schema Auth diferente do fixture descartável.")
 
     org_a, org_b, master_a, master_b, alvo, sessao_a, sessao_b = [str(uuid.uuid4()) for _ in range(7)]

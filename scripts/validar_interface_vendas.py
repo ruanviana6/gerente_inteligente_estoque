@@ -20,15 +20,15 @@ RAIZ = Path(__file__).resolve().parents[1]
 
 
 @contextmanager
-def servidor(log: Path):
+def servidor(log: Path, *, fixture="sales_browser_app.py", flag="GERENTE_SALES_BROWSER_FIXTURE"):
     """Hospeda somente em loopback e encerra o processo inclusive em falha."""
     with socket.socket() as reserva:
         reserva.bind(("127.0.0.1", 0))
         port = reserva.getsockname()[1]
-    env = {**os.environ, "GERENTE_SALES_BROWSER_FIXTURE": "1", "PYTHONPATH": str(RAIZ)}
+    env = {**os.environ, flag: "1", "PYTHONPATH": str(RAIZ)}
     with log.open("w") as output:
         process = subprocess.Popen([
-            sys.executable, "-m", "streamlit", "run", str(RAIZ / "tests/fixtures/sales_browser_app.py"),
+            sys.executable, "-m", "streamlit", "run", str(RAIZ / "tests/fixtures" / fixture),
             "--server.address=127.0.0.1", f"--server.port={port}", "--server.headless=true",
             "--browser.gatherUsageStats=false",
         ], cwd=RAIZ, env=env, stdout=output, stderr=subprocess.STDOUT)

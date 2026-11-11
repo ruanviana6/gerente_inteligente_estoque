@@ -1,5 +1,18 @@
 # Instruções para agentes de programação — Gerente Inteligente de Estoque
 
+## Autorização de integração e publicação em 11/11/2026
+
+O proprietário confirmou a URL `https://estoqueinteligente-flatter.streamlit.app/`
+e a branch publicada `implementacao/web-supabase`. Autorizou integrar PRs #12/#13
+e a Issue #11, resolver incompatibilidades, executar testes, merges, deploy e
+migrações não destrutivas com backup e validação. Esta autorização substitui as
+restrições temporárias de merge/deploy/migração abaixo. Preservar todos os dados,
+a conta Master e os Secrets; não mudar a branch do Streamlit nem recriar o app.
+Continuam proibidos serviços pagos, escrita no GestãoClick e uso de dados reais
+sem contrato, finalidade e validação autorizados. Não declarar publicação
+funcional sem conferir a versão e os fluxos no endereço real. O registro da
+integração deve distinguir testes descartáveis da validação produtiva.
+
 ## Escopo atual autorizado em 10/11/2026
 
 O pedido de execução final autoriza preparar o conector GestãoClick de leitura,

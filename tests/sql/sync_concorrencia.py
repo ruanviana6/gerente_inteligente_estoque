@@ -18,7 +18,7 @@ def executar() -> None:
     """Confere exclusão mútua, páginas idempotentes e um único commit analítico."""
     if os.environ.get('GERENTE_DISPOSABLE_DATABASE') != '1':
         raise RuntimeError('Permitido somente no PostgreSQL descartável explicitamente selecionado.')
-    if psql("select count(*)=4 from information_schema.columns where table_schema='auth' and table_name='users'") != 't':
+    if psql("select count(*)=5 from information_schema.columns where table_schema='auth' and table_name='users'") != 't':
         raise RuntimeError('O schema Auth não corresponde ao fixture descartável.')
     org, user, session, source, request_a, request_b = [str(uuid.uuid4()) for _ in range(6)]
     tag = 'sync_corrida_' + uuid.uuid4().hex[:12]

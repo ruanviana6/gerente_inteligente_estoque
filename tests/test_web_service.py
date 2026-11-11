@@ -338,3 +338,19 @@ def test_fabrica_carrega_segredo_backend_com_precedencia_dos_secrets(monkeypatch
 
     servico = create_service({})
     assert servico.auth.api.settings.backend_secret == (segredo_secrets if usar_secrets else segredo_ambiente)
+
+
+def test_fabrica_nao_guarda_chave_administrativa_no_estado(monkeypatch):
+    """O segredo administrativo só é lido ao executar uma operação protegida."""
+    import streamlit as st
+
+    chave = "sb_secret_exemplo_ficticio_123456"
+    monkeypatch.setenv("SUPABASE_URL", "https://csiqpzoudruzppfbpqqx.supabase.co")
+    monkeypatch.setenv("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_exemplo_ficticio")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", chave)
+    monkeypatch.setattr(st, "secrets", {})
+    estado = {}
+    servico = create_service(estado)
+    assert servico.auth.api.settings.service_role_key is None
+    assert chave not in repr(estado)
+    assert servico.auth.api._administrative_key_provider() == chave

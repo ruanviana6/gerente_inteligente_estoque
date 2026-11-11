@@ -17,7 +17,7 @@ from web.errors import (
     RateLimited,
     ServiceUnavailable,
 )
-from web.settings import Settings
+from web.settings import Settings, _valid_key
 
 MAX_RESPONSE_BYTES = 50 * 1024 * 1024
 
@@ -97,18 +97,21 @@ def _reject_constant(value: str) -> None:
 class SupabaseAPI:
     """Isola transporte e chaves; consultas normais sempre usam a identidade do usuário."""
 
-    def __init__(self, settings: Settings, transport: Transport | None = None) -> None:
+    def __init__(self, settings: Settings, transport: Transport | None = None,
+                 administrative_key_provider: Callable[[], str | None] | None = None) -> None:
         """Cria um cliente sem sessão compartilhada nem cache de resultados."""
         self.settings = settings
         self._transport = transport if transport is not None else _HTTPTransport()
+        self._administrative_key_provider = administrative_key_provider
 
     def _request(
         self, method: str, path: str, payload: dict | None = None,
         access_token: str | None = None, *, administrative: bool = False,
     ) -> Any:
         """Serializa JSON estrito e converte falhas externas em mensagens seguras."""
-        key = self.settings.service_role_key if administrative else self.settings.publishable_key
-        if key is None:
+        key = (self._administrative_key_provider() if self._administrative_key_provider
+               else self.settings.service_role_key) if administrative else self.settings.publishable_key
+        if key is None or (administrative and not _valid_key(key, administrative=True)):
             raise ConfigurationError("A criação de contas exige a configuração administrativa protegida.")
         headers = {"apikey": key, "Content-Type": "application/json", "Accept": "application/json"}
         bearer = key if administrative else access_token
@@ -151,6 +154,7 @@ class SupabaseAPI:
         allowed = {
             ("POST", "token?grant_type=password"), ("POST", "token?grant_type=refresh_token"),
             ("GET", "user"), ("PUT", "user"), ("POST", "logout?scope=global"),
+            ("POST", "logout?scope=local"),
             ("POST", "recover"), ("POST", "verify"),
         }
         if (method, path) not in allowed:
@@ -179,6 +183,13 @@ class SupabaseAPI:
             "POST", "/auth/v1/admin/users",
             {"email": email, "password": password, "email_confirm": True}, administrative=True,
         )
+
+    def _reset_auth_password(self, user_id: str, password: str) -> dict:
+        """Altera somente a senha de uma identidade validada pelo serviço Master."""
+        if not re.fullmatch(r"[0-9a-f-]{36}", user_id):
+            raise AppError("Identificador de conta inválido.")
+        return self._request("PUT", "/auth/v1/admin/users/" + user_id,
+                             {"password": password}, administrative=True)
 
     def job_rpc(self, name: str, payload: dict) -> Any:
         """Limita o worker sem sessão às três funções protegidas pelo segredo dedicado."""

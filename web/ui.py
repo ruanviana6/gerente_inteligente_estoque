@@ -10,11 +10,11 @@ from typing import Any
 
 import streamlit as st
 
+from web.commercial_page import comercial
 from web.errors import AppError, AuthenticationError, AuthorizationError, ConfigurationError
 from web.integration_page import integracoes
 from web.pages import PAGES, _administracao
 from web.release import RELEASE
-from web.sales_page import vendas
 from web.telemetry import measure, performance_scope
 from web.theme import apply_theme, brand_header, page_header, surface
 
@@ -150,8 +150,44 @@ def _conta(servico: Any, contexto: Any) -> None:
                 st.error("Não foi possível alterar a senha. Verifique os requisitos e tente novamente.")
 
 
+def _primeiro_acesso(servico: Any) -> None:
+    """Restringe a sessão temporária à troca de senha antes de apresentar os dados."""
+    with surface("primeiro_acesso"):
+        brand_header()
+        page_header("Defina sua senha", "O acesso aos dados será liberado após a troca.")
+        try:
+            estado = servico.auth.password_gate_status()
+        except AppError:
+            st.error("Não foi possível confirmar o acesso temporário. Procure o Master.")
+            return
+        if estado["expired"] or not estado["ready"]:
+            st.warning("O acesso temporário expirou ou ainda não está pronto. Procure o Master.")
+        else:
+            with st.form("primeiro_acesso_senha", clear_on_submit=True):
+                senha = st.text_input("Nova senha pessoal", type="password", autocomplete="new-password")
+                confirmacao = st.text_input("Confirme a nova senha", type="password", autocomplete="new-password")
+                st.caption("Use 12 a 128 caracteres, com letras, números e símbolos.")
+                if st.form_submit_button("Definir minha senha", type="primary"):
+                    if senha != confirmacao:
+                        st.error("As senhas informadas não coincidem.")
+                    else:
+                        try:
+                            servico.auth.finish_initial_password(senha)
+                            _limpar_apresentacao(servico)
+                            st.session_state["_auth_notice"] = "Senha definida. Entre novamente para continuar."
+                            st.rerun()
+                        except AppError:
+                            st.error("Não foi possível definir a senha. Confira os requisitos ou procure o Master.")
+        if st.button("Sair do acesso temporário"):
+            _encerrar_sessao(servico)
+            st.rerun()
+
+
 def _area_autenticada(servico: Any) -> None:
     """Autoriza cada renderização antes de montar menus ou consultar dados."""
+    if getattr(servico.auth, "password_change_required", False):
+        _primeiro_acesso(servico)
+        return
     try:
         contexto = servico.context()
     except (AuthenticationError, AuthorizationError):
@@ -172,8 +208,11 @@ def _area_autenticada(servico: Any) -> None:
     execucao = st.session_state.get("_render_execution", 0) + 1
     st.session_state["_render_execution"] = execucao
     permitidas = {nome: handler for nome, (permissao, handler) in PAGES.items() if contexto.can(permissao)}
-    if contexto.can("trends.view"):
-        permitidas["Inteligência de Vendas"] = vendas
+    if ("Reposição Inteligente" in PAGES and contexto.can("trends.view")
+            and not contexto.can("replenishment.view")):
+        permitidas["Reposição Inteligente"] = PAGES["Reposição Inteligente"][1]
+    if contexto.can("trends.view") or contexto.can("commercial.view"):
+        permitidas["Inteligência Comercial"] = comercial
     if _perfil(contexto, "role") == "Master":
         permitidas["Administração"] = _administracao
         if contexto.can("integrations.manage"):

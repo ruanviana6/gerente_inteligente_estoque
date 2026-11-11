@@ -19,7 +19,7 @@ def executar() -> None:
     """Reproduz importações concorrentes e verifica o fechamento completo."""
     if os.environ.get("GERENTE_DISPOSABLE_DATABASE") != "1":
         raise RuntimeError("O teste exige GERENTE_DISPOSABLE_DATABASE=1 e Auth descartável.")
-    if psql("select count(*)=4 from information_schema.columns where table_schema='auth' and table_name='users'") != "t":
+    if psql("select count(*)=5 from information_schema.columns where table_schema='auth' and table_name='users'") != "t":
         raise RuntimeError("Schema Auth incompatível com a fixture descartável.")
     org, master, session = [str(uuid.uuid4()) for _ in range(3)]
     tag = "snapshot_race_" + uuid.uuid4().hex[:12]

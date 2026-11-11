@@ -13,6 +13,8 @@ import streamlit as st
 from streamlit.components.v1 import html
 
 EXPORTACOES = {
+    "inventory": ("Preparar CSV do estoque", "estoque.csv"),
+    "industry": ("Preparar CSV para a indústria", "proposta_industria.csv"),
     "replenishment": ("Preparar CSV de reposição", "reposicao.csv"),
     "monthly": ("Preparar CSV do relatório", "relatorio_mensal.csv"),
 }

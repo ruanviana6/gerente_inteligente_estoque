@@ -1,0 +1,33 @@
+name: Verificação da versão publicada
+on:
+  push:
+    branches: [implementacao/web-supabase]
+permissions:
+  contents: read
+concurrency:
+  group: verificacao-publicada
+  cancel-in-progress: true
+jobs:
+  publicado:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Instalar navegador de teste
+        run: |
+          python -m pip install playwright==1.62.0
+          python -m playwright install --with-deps chromium
+      - name: Verificar versão, login e negação no endereço real
+        run: >-
+          python scripts/verificar_publicacao.py
+          --expected-version web-integrada-20261111.1
+          --output evidencias/publicado
+      - name: Guardar somente evidências anônimas
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: verificacao-publicada
+          path: evidencias/publicado/
