@@ -71,6 +71,10 @@ jobs:
         run: >-
           python scripts/benchmark_http_flatter.py --iterations 100
           --output evidencias/desempenho/cliente-http.json
+      - name: Comparar cálculo, resumos e arquivos comerciais fictícios
+        run: >-
+          python scripts/benchmark_comercial.py
+          --saida evidencias/desempenho/comercial.json
       - name: Guardar medições reproduzíveis sem dados comerciais
         if: always()
         uses: actions/upload-artifact@v7.0.2

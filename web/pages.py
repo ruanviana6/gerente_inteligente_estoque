@@ -34,6 +34,8 @@ PERMISSOES = {
     "reports.view": "Consultar relatórios mensais",
     "reports.export": "Exportar relatórios",
     "reports.receive": "Receber relatórios autorizados",
+    "commercial.view": "Inteligência comercial agregada",
+    "commercial.customer_detail": "Detalhes comerciais pseudonimizados por cliente",
 }
 
 COLUNAS_ESTOQUE = [

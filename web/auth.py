@@ -28,10 +28,11 @@ PERMISSIONS = frozenset({
     "finance.view", "trends.view", "inventory.import", "parameters.edit", "decisions.write",
     "audit.view", "users.manage", "permissions.manage", "integrations.manage", "reports.view",
     "reports.export", "reports.receive", "reports.manage",
+    "commercial.view", "commercial.customer_detail", "commercial.manage",
 })
 ROLES = ("Master", "Administrador", "Operador", "Visualizador")
 MASTER_ONLY_PERMISSIONS = frozenset({
-    "users.manage", "permissions.manage", "reports.manage", "integrations.manage",
+    "users.manage", "permissions.manage", "reports.manage", "integrations.manage", "commercial.manage",
 })
 
 
@@ -295,12 +296,14 @@ class AuthService:
             raise
 
     @_serialized
-    def logout(self) -> None:
+    def logout(self, scope: str = "global") -> None:
         """Revoga sessões no Auth e sempre remove os tokens locais, inclusive em falha de rede."""
+        if scope not in {"local", "global"}:
+            raise ValueError("Escopo de saída inválido.")
         try:
             if self._session is not None:
                 session = self._current_session()
-                self.api.auth("POST", "logout?scope=global", access_token=session.access_token)
+                self.api.auth("POST", f"logout?scope={scope}", access_token=session.access_token)
         except AppError:
             raise ServiceUnavailable("Sessão local encerrada; não foi possível confirmar a revogação remota.") from None
         finally:

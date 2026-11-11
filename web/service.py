@@ -27,6 +27,7 @@ from dados import (
 )
 from motor import gerar_painel
 from web.auth import AccessContext, AuthService
+from web.commercial_service import commercial_rpc
 from web.errors import AuthenticationError, AuthorizationError
 from web.exports import filtrar_painel, filtrar_reposicao
 from web.telemetry import measure, performance_scope
@@ -200,6 +201,56 @@ class Service:
     def list_decisions(self):
         """Lista decisões com escopo definido no banco, sem identificador manipulável."""
         return self.auth.rpc("list_decisions", {}, "decisions.write")
+
+    def commercial_sources(self):
+        """Lista fontes autorizadas sem ler documentos ou consultar o ERP."""
+        return commercial_rpc(self.auth, "commercial_sources", {}, "commercial.view")
+
+    def commercial_insights(self, source_id, store_id, dimension, offset=0):
+        """Consulta uma página de resultados tipados já calculados."""
+        if dimension not in {"customer", "city", "pair"} or type(offset) is not int or not 0 <= offset <= 100000:
+            raise ValueError("Visão ou página comercial inválida.")
+        if dimension == "customer":
+            self.auth.require("commercial.customer_detail")
+        return commercial_rpc(self.auth, "commercial_insights", {"p_source_id": source_id, "p_store_id": store_id,
+                              "p_dimension": dimension, "p_offset": offset}, "commercial.view")
+
+    def storage_overview(self):
+        """Consulta ocupação somente quando o usuário solicita a medição."""
+        return commercial_rpc(self.auth, "storage_overview", {}, "commercial.manage", master=True)
+
+    def record_storage_measurement(self):
+        """Guarda no máximo uma medição diária por organização."""
+        return commercial_rpc(self.auth, "record_storage_measurement", {}, "commercial.manage", master=True)
+
+    def storage_history(self):
+        """Obtém medições agregadas e limitadas do projeto."""
+        return commercial_rpc(self.auth, "storage_history", {}, "commercial.manage", master=True)
+
+    def commercial_model_status(self):
+        """Consulta manifestos e métricas compactos sem carregar ou treinar modelos."""
+        return commercial_rpc(self.auth, "commercial_model_status", {}, "commercial.manage", master=True)
+
+    def publish_commercial_batch(self, prepared):
+        """Publica o resultado validado de um processo controlado, fora da navegação."""
+        return commercial_rpc(self.auth, "publish_commercial_batch", {
+            "p_source_id": prepared["source_id"], "p_store_id": prepared["store_id"],
+            "p_start": prepared["period_start"], "p_end": prepared["period_end"],
+            "p_city_basis": prepared["city_basis"], "p_items": prepared["items"],
+        }, "commercial.manage", master=True)
+
+    def save_commercial_model(self, source, store, city, sku, manifest):
+        """Registra uma avaliação temporal concluída e suas previsões numéricas."""
+        return commercial_rpc(self.auth, "save_commercial_model", {"p_source_id": source, "p_store_id": store,
+            "p_city_code": city, "p_sku": sku or "", "p_manifest": manifest}, "commercial.manage", master=True)
+
+    def rollback_commercial(self, source, store, city=None, sku=None):
+        """Reativa a versão anterior preservando todos os resultados já registrados."""
+        name = "rollback_commercial_model" if city else "rollback_commercial_batch"
+        payload = {"p_source_id": source, "p_store_id": store}
+        if city:
+            payload.update(p_city_code=city, p_sku=sku or "")
+        return commercial_rpc(self.auth, name, payload, "commercial.manage", master=True)
 
     @_operation
     def export_replenishment(self, filters: dict | None = None) -> bytes:
