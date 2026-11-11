@@ -162,6 +162,8 @@ create table public.commercial_insights (
   median_gap_days numeric check(median_gap_days is null or median_gap_days>0),
   recency_days integer check(recency_days is null or recency_days>=0),
   mix_similarity numeric check(mix_similarity is null or mix_similarity between 0 and 1),
+  top_skus text[] not null default '{}' check(cardinality(top_skus)<=5 and array_position(top_skus,null) is null),
+  previous_top_skus text[] not null default '{}' check(cardinality(previous_top_skus)<=5 and array_position(previous_top_skus,null) is null),
   computed_at timestamptz not null default now(),
   foreign key(organization_id,source_id) references public.integration_sources(organization_id,id),
   foreign key(organization_id,batch_id) references public.commercial_batches(organization_id,id),
@@ -187,7 +189,7 @@ begin
     from public.integration_sources s where s.organization_id=org and s.active),'[]'::jsonb);
 end $$;
 
-create function private.commercial_insights(p_source_id uuid,p_store_id text,p_dimension text,p_offset integer default 0)
+create function private.commercial_insights(p_source_id uuid,p_store_id text,p_dimension text,p_offset integer default 0,p_customer_ref text default null)
 returns jsonb language plpgsql stable security definer set search_path='' as $$
 declare org uuid;
 begin
@@ -195,7 +197,8 @@ begin
   if p_dimension='customer' and not private.has_permission('commercial.customer_detail') then
     raise exception 'Detalhe de clientes não autorizado.' using errcode='42501';
   end if;
-  if p_dimension is null or p_dimension not in ('customer','city','pair') or p_offset is null or p_offset not between 0 and 100000
+  if (p_customer_ref is not null and (p_dimension<>'customer' or p_customer_ref !~ '^[0-9a-f]{8,64}$'))
+    or p_dimension is null or p_dimension not in ('customer','city','pair') or p_offset is null or p_offset not between 0 and 100000
     or not exists(select 1 from public.integration_sources s where s.id=p_source_id and s.organization_id=org
       and s.active and p_store_id=any(s.stores)) then raise exception 'Escopo inválido.' using errcode='42501'; end if;
   return coalesce((select jsonb_agg(to_jsonb(v)-'organization_id' order by abs(v.current_units-v.previous_units) desc,v.computed_at desc,v.id)
@@ -203,6 +206,7 @@ begin
       join public.commercial_active_batches a on a.organization_id=i.organization_id and a.batch_id=i.batch_id
       join public.commercial_batches b on b.organization_id=i.organization_id and b.id=i.batch_id
       where i.organization_id=org and i.source_id=p_source_id and i.store_id=p_store_id and i.dimension=p_dimension
+      and (p_customer_ref is null or i.customer_ref like p_customer_ref||'%')
       order by abs(i.current_units-i.previous_units) desc,i.computed_at desc,i.id limit 10 offset p_offset) v),'[]'::jsonb);
 end $$;
 
@@ -243,7 +247,7 @@ begin
     if jsonb_typeof(item) is distinct from 'object' or item-array['dimension','alert_code','customer_ref','city_code',
       'city_name','state','sku_a','sku_b','period_start','period_end','current_units','previous_units','current_orders',
       'previous_orders','group_customers','previous_customers','total_orders','support','confidence','lift',
-      'median_gap_days','recency_days','mix_similarity'] <> '{}'::jsonb
+      'median_gap_days','recency_days','mix_similarity','top_skus','previous_top_skus'] <> '{}'::jsonb
       or (item->>'period_start')::date is distinct from p_start or (item->>'period_end')::date is distinct from p_end
       or (p_city_basis='unknown' and item->>'city_code' is not null)
       or (item->>'dimension'='customer' and ((item->>'previous_orders')::int<2
@@ -251,7 +255,7 @@ begin
         or item->>'median_gap_days' is null)) then
       raise exception 'Indicador fora do contrato minimizado.' using errcode='22023'; end if;
     insert into public.commercial_insights select (jsonb_populate_record(null::public.commercial_insights,
-      item||jsonb_build_object('id',gen_random_uuid(),'organization_id',org,'source_id',p_source_id,'store_id',p_store_id,
+      jsonb_build_object('top_skus','[]'::jsonb,'previous_top_skus','[]'::jsonb)||item||jsonb_build_object('id',gen_random_uuid(),'organization_id',org,'source_id',p_source_id,'store_id',p_store_id,
         'batch_id',batch,'computed_at',now()))).*;
   end loop;
   select batch_id into old from public.commercial_active_batches where organization_id=org and source_id=p_source_id and store_id=p_store_id;
@@ -456,9 +460,9 @@ create function public.commercial_sources() returns jsonb language sql stable se
   as $$select private.commercial_sources()$$;
 create function public.commercial_daily(p_source_id uuid,p_store_id text,p_start date,p_end date) returns jsonb
 language sql stable security invoker set search_path='' as $$select private.commercial_daily(p_source_id,p_store_id,p_start,p_end)$$;
-create function public.commercial_insights(p_source_id uuid,p_store_id text,p_dimension text,p_offset integer default 0)
+create function public.commercial_insights(p_source_id uuid,p_store_id text,p_dimension text,p_offset integer default 0,p_customer_ref text default null)
 returns jsonb language sql stable security invoker set search_path=''
-  as $$select private.commercial_insights(p_source_id,p_store_id,p_dimension,p_offset)$$;
+  as $$select private.commercial_insights(p_source_id,p_store_id,p_dimension,p_offset,p_customer_ref)$$;
 create function public.storage_overview() returns jsonb language sql stable security invoker set search_path=''
   as $$select private.storage_overview()$$;
 create function public.record_storage_measurement() returns jsonb language sql security invoker set search_path=''
@@ -492,14 +496,14 @@ grant execute on function public.publish_commercial_batch(uuid,text,date,date,te
   public.save_commercial_model(uuid,text,text,text,jsonb),public.rollback_commercial_model(uuid,text,text,text),
   public.commercial_model_status() to authenticated;
 revoke all on function private.refresh_commercial_daily(uuid),private.commercial_daily(uuid,text,date,date),
-  private.commercial_insights(uuid,text,text,integer),private.commercial_sources(),private.storage_overview(),
+  private.commercial_insights(uuid,text,text,integer,text),private.commercial_sources(),private.storage_overview(),
   private.record_storage_measurement(),private.storage_history() from public,anon,authenticated;
 revoke all on function public.refresh_commercial_daily(uuid),public.commercial_daily(uuid,text,date,date),
-  public.commercial_insights(uuid,text,text,integer),public.commercial_sources(),public.storage_overview(),
+  public.commercial_insights(uuid,text,text,integer,text),public.commercial_sources(),public.storage_overview(),
   public.record_storage_measurement(),public.storage_history() from public,anon;
 grant execute on function private.refresh_commercial_daily(uuid),private.commercial_daily(uuid,text,date,date),
-  private.commercial_insights(uuid,text,text,integer),private.commercial_sources(),private.storage_overview(),
+  private.commercial_insights(uuid,text,text,integer,text),private.commercial_sources(),private.storage_overview(),
   private.record_storage_measurement(),private.storage_history() to authenticated;
 grant execute on function public.refresh_commercial_daily(uuid),public.commercial_daily(uuid,text,date,date),
-  public.commercial_insights(uuid,text,text,integer),public.commercial_sources(),public.storage_overview(),
+  public.commercial_insights(uuid,text,text,integer,text),public.commercial_sources(),public.storage_overview(),
   public.record_storage_measurement(),public.storage_history() to authenticated;

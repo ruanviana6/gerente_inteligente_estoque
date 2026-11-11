@@ -35,7 +35,8 @@ def preparar_publicacao(linhas, inicio: date, fim: date, *, source: str, store: 
             "group_customers": 0, "previous_customers": 0, "total_orders": 0,
             "customer_ref": None, "city_code": None, "city_name": None, "state": None,
             "sku_a": None, "sku_b": None, "support": None, "confidence": None, "lift": None,
-            "median_gap_days": None, "recency_days": None, "mix_similarity": None}
+            "median_gap_days": None, "recency_days": None, "mix_similarity": None,
+            "top_skus": [], "previous_top_skus": []}
     items = []
     for cliente in resultado["clientes"]:
         for alerta in cliente["alertas"]:
@@ -53,6 +54,8 @@ def preparar_publicacao(linhas, inicio: date, fim: date, *, source: str, store: 
             "current_units": cidade["unidades_atuais"], "previous_units": cidade["unidades_anteriores"],
             "current_orders": cidade["pedidos_atuais"], "previous_orders": cidade["pedidos_anteriores"],
             "group_customers": cidade["clientes_atuais"], "previous_customers": cidade["clientes_anteriores"]})
+        items[-1].update(top_skus=[s for s, _ in cidade["produtos_mais_pedidos"]],
+                         previous_top_skus=[s for s, _ in cidade["produtos_anteriores"]])
     cestas = resultado["cestas"] or {}
     if cestas.get("disponivel"):
         for par in cestas["pares"]:
@@ -63,7 +66,13 @@ def preparar_publicacao(linhas, inicio: date, fim: date, *, source: str, store: 
                              r["dimension"], r["customer_ref"] or r["city_code"] or r["sku_a"] or "", r["alert_code"]))
     # O limite limita o custo de leitura. O detalhe de pedidos continua fora do
     # resumo e nunca é apagado para caber neste limite.
-    items = items[:500]
+    contagens = {"customer": 0, "city": 0, "pair": 0}
+    selecionados = []
+    for item in items:
+        if contagens[item["dimension"]] < 150:
+            selecionados.append(item)
+            contagens[item["dimension"]] += 1
+    items = selecionados
     payload = {"source_id": source, "store_id": store, "city_basis": city_basis, "items": items,
                "period_start": inicio.isoformat(), "period_end": fim.isoformat()}
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)

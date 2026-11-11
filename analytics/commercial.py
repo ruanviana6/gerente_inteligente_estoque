@@ -181,13 +181,22 @@ def analisar_comercial(linhas: Sequence[Mapping], inicio: date, fim: date, *, so
         if len({o["customer"] for o in current}) < min_clientes_cidade or len({o["customer"] for o in previous}) < min_clientes_cidade:
             continue
         old, new = sum(o["units"] for o in previous), sum(o["units"] for o in current)
-        products = Counter(product for order in current for product in order["products"])
+        compradores = {"current": defaultdict(set), "previous": defaultdict(set)}
+        for periodo, pedidos_periodo in (("current", current), ("previous", previous)):
+            for pedido in pedidos_periodo:
+                for produto in pedido["products"]:
+                    compradores[periodo][produto].add(pedido["customer"])
+        products = Counter(product for order in current for product in order["products"]
+                           if len(compradores["current"][product]) >= min_clientes_cidade)
+        old_products = Counter(product for order in previous for product in order["products"]
+                               if len(compradores["previous"][product]) >= min_clientes_cidade)
         result["cidades"].append({"city_code": code, "city_name": city_name, "state": state,
             "unidades_atuais": new, "unidades_anteriores": old, "pedidos_atuais": len(current),
             "pedidos_anteriores": len(previous), "variacao_pct": (new-old)/old*100 if old else None,
             "clientes_atuais": len({o["customer"] for o in current}),
             "clientes_anteriores": len({o["customer"] for o in previous}),
             "produtos_mais_pedidos": products.most_common(5),
+            "produtos_anteriores": old_products.most_common(5),
             "limitacao": "Agrupamento mínimo preservado; variação não identifica a causa."})
     sales_rows = [{"source_id": r["source_id"], "store_id": r["store_id"], "document_id": r["document_id"],
                    "line_id": r["line_id"], "product_id": r["sku"], "sku": r["sku"], "product_name": r["sku"],

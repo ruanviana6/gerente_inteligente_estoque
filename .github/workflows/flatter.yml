@@ -39,6 +39,14 @@ jobs:
         with:
           name: interface-vendas-sincronizacao
           path: evidencias/vendas/
+      - name: Validar Clientes, Cidades e Produtos Juntos no computador e celular
+        run: python scripts/validar_interface_comercial.py --output evidencias/comercial
+      - name: Guardar capturas comerciais fictícias
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: interface-comercial
+          path: evidencias/comercial/
   desempenho:
     runs-on: ubuntu-latest
     timeout-minutes: 30

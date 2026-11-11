@@ -206,14 +206,17 @@ class Service:
         """Lista fontes autorizadas sem ler documentos ou consultar o ERP."""
         return commercial_rpc(self.auth, "commercial_sources", {}, "commercial.view")
 
-    def commercial_insights(self, source_id, store_id, dimension, offset=0):
+    def commercial_insights(self, source_id, store_id, dimension, offset=0, customer_ref=None):
         """Consulta uma página de resultados tipados já calculados."""
         if dimension not in {"customer", "city", "pair"} or type(offset) is not int or not 0 <= offset <= 100000:
             raise ValueError("Visão ou página comercial inválida.")
         if dimension == "customer":
             self.auth.require("commercial.customer_detail")
+        if customer_ref is not None and (dimension != "customer" or not isinstance(customer_ref, str)
+                or not re.fullmatch(r"[0-9a-f]{8,64}", customer_ref)):
+            raise ValueError("Informe de 8 a 64 caracteres da referência autorizada.")
         return commercial_rpc(self.auth, "commercial_insights", {"p_source_id": source_id, "p_store_id": store_id,
-                              "p_dimension": dimension, "p_offset": offset}, "commercial.view")
+                              "p_dimension": dimension, "p_offset": offset, "p_customer_ref": customer_ref}, "commercial.view")
 
     def storage_overview(self):
         """Consulta ocupação somente quando o usuário solicita a medição."""

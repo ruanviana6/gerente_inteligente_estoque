@@ -107,8 +107,14 @@ def comercial(servico, contexto) -> None:
         return
     store = st.selectbox("Loja", lojas)
     dimensao = {"Clientes": "customer", "Cidades": "city", "Produtos Juntos": "pair"}[visao]
+    referencia_cliente = None
+    if dimensao == "customer":
+        referencia_cliente = st.text_input("Referência do cliente (opcional)", max_chars=64).strip() or None
+        if referencia_cliente and (len(referencia_cliente) < 8 or any(c not in "0123456789abcdef" for c in referencia_cliente)):
+            st.info("Informe pelo menos oito caracteres da referência mostrada no insight.")
+            return
     pagina = st.number_input("Página de insights", min_value=1, max_value=2001, value=1, step=1)
-    registros = servico.commercial_insights(source, store, dimensao, (int(pagina) - 1) * 10)
+    registros = servico.commercial_insights(source, store, dimensao, (int(pagina) - 1) * 10, referencia_cliente)
     _mesmo_acesso(contexto, servico.context())
     st.caption(f"Última sincronização informada: {opcoes[source].get('last_sync') or 'não disponível'}.")
     if not registros:
@@ -121,6 +127,8 @@ def comercial(servico, contexto) -> None:
                 st.write("Referência pseudonimizada:", item.get("customer_ref", "Não informada"))
             elif dimensao == "city":
                 st.write("Local:", item.get("city_name") or item.get("city_code"), item.get("state") or "")
+                st.write("Produtos com mais pedidos:", ", ".join(item.get("top_skus") or []) or "Amostra insuficiente por produto")
+                st.caption("Período anterior: " + (", ".join(item.get("previous_top_skus") or []) or "amostra insuficiente por produto"))
             else:
                 st.write("SKUs:", item.get("sku_a"), "e", item.get("sku_b"))
             st.write(f"Período analisado: {item['period_start']} a {item['period_end']}.")

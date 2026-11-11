@@ -5,7 +5,7 @@
 Uma única área reúne Clientes, Cidades e Produtos Juntos. A análise de Vendas do
 PR #8 continua acessível dentro dessa área. Cada visão comercial consulta dez
 insights prontos por página, com comparação de períodos iguais, fonte, loja,
-data de cálculo, método e limitações. Não há treino nem chamada ao ERP na navegação.
+data de cálculo, método e limitações. A busca de cliente usa a referência pseudonimizada, sob permissão específica. Não há treino nem chamada ao ERP na navegação.
 
 `analytics/commercial.py` calcula cadência mediana, recência, crescimento/redução
 de unidades e alteração do mix. Crescimento exige pelo menos duas compras no
@@ -18,7 +18,7 @@ Cidades exigem ao menos três clientes distintos em cada período. Cidade
 desconhecida não recebe município inferido. O processo exige definir se a cidade
 é de entrega, cadastro ou faturamento. Código e UF precisam ser consistentes;
 a existência do município ainda depende do contrato/cadastro autorizado.
-Produtos Juntos reutiliza os pedidos reais e as métricas do PR #8: ao menos vinte
+Os principais SKUs da cidade também exigem três compradores distintos por produto em cada período em que são exibidos. Produtos Juntos reutiliza os pedidos reais e as métricas do PR #8: ao menos vinte
 pedidos no escopo e três coocorrências, com suporte, confiança e lift explicados.
 
 ## Privacidade e permissões
