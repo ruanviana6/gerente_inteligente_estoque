@@ -123,6 +123,11 @@ def navegar(pagina, destino: str) -> None:
 def verificar_layout(pagina, nome: str, destino: Path, estrito: bool, miniaturas: bool) -> dict:
     """Registra dimensões reais, captura fictícia e alvos principais sem registrar dados."""
     aguardar_tela(pagina)
+    # O servidor pode indicar notRunning antes de o navegador aplicar o CSS
+    # enviado por st.html. Meça somente quando o tema estiver no DOM.
+    pagina.wait_for_function("""() => [...document.querySelectorAll('style')].some(
+      estilo => estilo.textContent.includes('.st-key-flatter_brand_logo')
+    )""", timeout=30000)
     pagina.evaluate("document.fonts.ready")
     medidas = pagina.evaluate("""() => {
       const raiz = document.documentElement;
