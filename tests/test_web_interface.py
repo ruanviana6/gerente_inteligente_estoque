@@ -274,10 +274,10 @@ def test_estoque_omite_financeiro_mesmo_se_transporte_retornar_colunas(monkeypat
     assert all("Classe ABC" not in texto.value for texto in app.markdown)
 
 
-def test_filtro_sem_fornecedores_exibe_vazio_sem_falhar(monkeypatch):
+def test_filtro_sem_situacoes_exibe_vazio_sem_falhar(monkeypatch):
     """A seleção vazia não acessa uma linha inexistente para mostrar detalhes."""
     app, _ = abrir(monkeypatch, permissoes=["inventory.view"])
-    next(c for c in app.multiselect if c.label == "Fornecedores").set_value([]).run()
+    next(c for c in app.multiselect if c.label == "Situações").set_value([]).run()
     assert not app.exception
     assert any(tabela.value.empty for tabela in app.dataframe)
     assert any("Nenhum produto" in aviso.value for aviso in app.info)

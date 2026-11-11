@@ -24,7 +24,7 @@ from web.errors import (
 from web.telemetry import measure
 
 PERMISSIONS = frozenset({
-    "dashboard.view", "inventory.view", "replenishment.view", "replenishment.export",
+    "dashboard.view", "inventory.view", "inventory.export", "replenishment.view", "replenishment.export",
     "finance.view", "trends.view", "inventory.import", "parameters.edit", "decisions.write",
     "audit.view", "users.manage", "permissions.manage", "integrations.manage", "reports.view",
     "reports.export", "reports.receive", "reports.manage",

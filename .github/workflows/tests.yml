@@ -168,6 +168,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/sql/security.sql 2>&1 | tee evidencias-banco.txt
           psql -v ON_ERROR_STOP=1 -f tests/sql/snapshot_history.sql 2>&1 | tee -a evidencias-banco.txt
           psql -v ON_ERROR_STOP=1 -f tests/sql/sync.sql 2>&1 | tee -a evidencias-banco.txt
+          psql -v ON_ERROR_STOP=1 -f tests/sql/reposicao.sql 2>&1 | tee -a evidencias-banco.txt
       - name: Verificar backup e restauração descartáveis
         run: |
           pg_dump --format=custom --file=/tmp/estoque-teste.dump
@@ -176,6 +177,7 @@ jobs:
           PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/security.sql
           PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/snapshot_history.sql
           PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/sync.sql
+          PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/reposicao.sql
       - name: Testar vínculo concorrente de usuário
         env:
           GERENTE_DISPOSABLE_DATABASE: '1'

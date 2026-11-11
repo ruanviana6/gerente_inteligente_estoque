@@ -201,6 +201,99 @@ class Service:
         """Lista decisões com escopo definido no banco, sem identificador manipulável."""
         return self.auth.rpc("list_decisions", {}, "decisions.write")
 
+    def replenishment_rules(self, reference_date):
+        """Lê regras internas autorizadas para a data, sem consultar o ERP."""
+        contexto = self.auth.context()
+        permissao = "replenishment.view" if contexto.can("replenishment.view") else "parameters.edit"
+        return self.auth.rpc("replenishment_rules", {"p_date": _dia(reference_date).isoformat()}, permissao)
+
+    def save_replenishment_configuration(self, primary, alternative, reference_boxes):
+        """Persiste os ciclos e a referência de caixas, sem criar capacidade fictícia."""
+        return self.auth.rpc("save_replenishment_configuration", {
+            "p_primary": primary, "p_alternative": alternative, "p_reference": reference_boxes,
+        }, "parameters.edit")
+
+    def save_replenishment_packaging(self, sku, effective, units, minimum, multiple, maximum, note, expected):
+        """Salva versão de embalagem com detecção de edição concorrente."""
+        return self.auth.rpc("save_replenishment_packaging", {
+            "p_sku": sku, "p_effective": _dia(effective).isoformat(), "p_units": units,
+            "p_minimum": minimum, "p_multiple": multiple, "p_maximum": maximum,
+            "p_note": note, "p_expected": expected,
+        }, "parameters.edit")
+
+    def save_replenishment_packaging_batch(self, rows):
+        """Persiste em uma transação as linhas de embalagem previamente validadas."""
+        return self.auth.rpc("save_replenishment_packaging_batch", {"p_rows": rows}, "parameters.edit")
+
+    def save_industry_proposal(self, cycle, reference_date, items):
+        """Registra uma proposta interna após confirmação humana e validação no banco."""
+        return self.auth.rpc("save_replenishment_proposal", {
+            "p_cycle": cycle, "p_reference": _dia(reference_date).isoformat(), "p_items": items,
+        }, "decisions.write")
+
+    def list_industry_proposals(self):
+        """Consulta versões internas preservadas, limitadas à autorização do usuário."""
+        return self.auth.rpc("list_replenishment_proposals", {}, "decisions.write")
+
+    @_operation
+    def export_inventory(self) -> bytes:
+        """Gera somente as colunas de estoque autorizadas e revalida a sessão ao fim."""
+        original = self.auth.require("inventory.export")
+        generation = getattr(self.auth, "generation", None)
+        dados = self.load_inventory("inventory.view")
+        contexto = self.auth.require("inventory.export")
+        self._same_identity(original, contexto)
+        if not contexto.can("inventory.view"):
+            raise AuthorizationError("O acesso ao estoque foi revogado.")
+        colunas = ["codigo", "nome", "estoque", "status"]
+        if contexto.can("finance.view"):
+            colunas.extend(["custo_unitario", "capital_estoque"])
+        tabela = dados["panel"].reindex(columns=colunas).copy()
+        tabela["data_referencia"] = (dados.get("metadata") or {}).get("snapshot_date", "")
+        conteudo = exportar_csv_seguro(tabela)
+        self._validate_export(contexto, generation, "inventory.export")
+        return conteudo
+
+    @_operation
+    def export_industry_proposal(self, filters: dict) -> bytes:
+        """Recalcula a proposta solicitada com dados e permissões atuais."""
+        from reposicao.apresentacao import projetar_painel
+
+        original = self.auth.require("replenishment.export")
+        generation = getattr(self.auth, "generation", None)
+        dados = self.load_inventory("replenishment.view")
+        contexto = self.auth.require("replenishment.export")
+        self._same_identity(original, contexto)
+        if not contexto.can("replenishment.view"):
+            raise AuthorizationError("O acesso à reposição foi revogado.")
+        ciclo = filters.get("ciclo")
+        espera = filters.get("espera", 0)
+        aceitar = filters.get("aceitar", False)
+        if type(ciclo) is not int or type(espera) is not int or type(aceitar) is not bool:
+            raise ValueError("Parâmetros do cenário são inválidos.")
+        referencia = _dia((dados.get("metadata") or {}).get("snapshot_date"))
+        regras = self.replenishment_rules(hoje_local().date())
+        painel = dados["panel"]
+        if filters.get("status") is not None:
+            painel = painel.loc[painel["status"].isin(filters["status"])]
+        busca = str(filters.get("busca", "")).strip()
+        if busca:
+            painel = painel.loc[painel["codigo"].str.contains(busca, case=False, regex=False)
+                                | painel["nome"].str.contains(busca, case=False, regex=False)]
+        prioridade = filters.get("prioridade")
+        if prioridade == "ruptura":
+            painel = painel.loc[painel["status"].eq("Ruptura")]
+        elif prioridade == "risco":
+            painel = painel.loc[painel["risco_prazo"]]
+        elif prioridade == "qualidade":
+            painel = painel.loc[painel["requer_revisao"]]
+        tabela = projetar_painel(painel, regras, referencia, ciclo, espera, aceitar)
+        colunas = ["codigo", "nome", "estoque", "status", "previsao_30", "caixas", "unidades",
+                   "solicitar_ate", "chegada", "observacao"]
+        conteudo = exportar_csv_seguro(tabela.reindex(columns=colunas))
+        self._validate_export(contexto, generation, "replenishment.export")
+        return conteudo
+
     @_operation
     def export_replenishment(self, filters: dict | None = None) -> bytes:
         """Reconsulta a autorização e os dados antes de gerar um CSV permitido."""
@@ -317,13 +410,16 @@ class Service:
         recalcula e revalida Auth e banco antes e depois da geração.
         """
         permissions = {
+            "inventory": ("inventory.view", "inventory.export"),
+            "industry": ("replenishment.view", "replenishment.export"),
             "replenishment": ("replenishment.view", "replenishment.export"),
             "monthly": ("reports.view", "reports.export"),
         }
         if kind not in permissions or (params is not None and not isinstance(params, dict)):
             raise ValueError("Tipo ou parâmetros de exportação inválidos.")
         parameters = deepcopy(params or {})
-        allowed = ({"month"} if kind == "monthly" else
+        allowed = ({"month"} if kind == "monthly" else set() if kind == "inventory" else
+                   {"ciclo", "espera", "aceitar", "status", "busca", "prioridade"} if kind == "industry" else
                    {"fornecedor", "status", "busca", "somente_sugestao", "prioridade"})
         if parameters.keys() - allowed:
             raise ValueError("Há parâmetros desconhecidos na exportação.")
@@ -352,8 +448,14 @@ class Service:
             """Gera um arquivo autorizado por clique, sem reutilizar bytes anteriores."""
             with self.auth.operation(), performance_scope("export"), measure("export"), self.execution():
                 validate()
-                content = (self.export_replenishment(parameters) if kind == "replenishment"
-                           else self.export_monthly_report(parameters["month"]))
+                if kind == "replenishment":
+                    content = self.export_replenishment(parameters)
+                elif kind == "inventory":
+                    content = self.export_inventory()
+                elif kind == "industry":
+                    content = self.export_industry_proposal(parameters)
+                else:
+                    content = self.export_monthly_report(parameters["month"])
                 # Um novo escopo força GET Auth novamente no fim, mesmo que a
                 # geração tenha levado tempo ou a conta tenha sido revogada.
                 with self.execution():

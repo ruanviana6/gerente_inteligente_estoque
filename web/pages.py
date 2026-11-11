@@ -5,6 +5,8 @@ de navegação e filtros; cálculos e permissões continuam na fachada e no banc
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from collections.abc import Mapping
 from typing import Any
@@ -14,6 +16,8 @@ import streamlit as st
 
 from dados import hoje_local
 from motor import somar_valores_financeiros
+from reposicao.apresentacao import projetar_painel
+from reposicao.embalagens import ler_embalagens
 from web.downloads import csv_export
 from web.errors import AuthorizationError
 from web.insights import gerar_insights
@@ -23,6 +27,7 @@ from web.theme import metric_card, page_header, status_badge, surface
 PERMISSOES = {
     "dashboard.view": "Painel e insights",
     "inventory.view": "Estoque e histórico",
+    "inventory.export": "Exportar estoque",
     "replenishment.view": "Sugestões de reposição",
     "replenishment.export": "Exportar reposição",
     "finance.view": "Custos e indicadores financeiros",
@@ -37,8 +42,7 @@ PERMISSOES = {
 }
 
 COLUNAS_ESTOQUE = [
-    "codigo", "nome", "fornecedor", "status", "estoque", "venda_media_diaria",
-    "cobertura_dias", "prazo_entrega_dias", "risco_prazo", "aviso_qualidade",
+    "codigo", "nome", "estoque", "venda_media_diaria", "cobertura_dias", "status",
 ]
 COLUNAS_REPOSICAO = [
     "fornecedor", "codigo", "nome", "status", "estoque", "reservas", "pedidos_pendentes",
@@ -62,6 +66,8 @@ ROTULOS = {
     "snapshot_date": "Data do estoque", "period_start": "Início do histórico",
     "period_end": "Fim do histórico", "source": "Origem", "action": "Ação",
     "quantidade": "Quantidade (un.)", "observacao": "Observação",
+    "previsao_30": "Demanda em 30 dias", "caixas": "Caixas sugeridas", "unidades": "Unidades sugeridas",
+    "solicitar_ate": "Solicitar até", "chegada": "Chegada estimada",
 }
 TONS_STATUS = {"Ruptura": "danger", "Crítico": "danger", "Baixo": "warning",
                "Excesso": "warning", "Parado": "info", "Saudável": "success"}
@@ -181,7 +187,7 @@ def _flash(painel: pd.DataFrame, contexto: Any) -> None:
                       disabled=len(insights) < 2, key="insight_proximo")
             if contexto.can("replenishment.view") and insight.prioridade in {0, 2}:
                 foco = "risco" if insight.prioridade == 0 else ""
-                st.button("Conferir reposição", on_click=_navegar, args=("Reposição", foco),
+                st.button("Conferir reposição", on_click=_navegar, args=("Reposição Inteligente", foco),
                           key="insight_acao", type="primary")
             elif contexto.can("inventory.view"):
                 st.button("Conferir produtos", on_click=_navegar, args=("Estoque", ""),
@@ -240,15 +246,11 @@ def _painel(servico: Any, contexto: Any) -> None:
 
 def _filtros(painel: pd.DataFrame, prefixo: str) -> tuple[pd.DataFrame, dict]:
     """Mantém busca direta e filtros visíveis, sem alterar o conjunto recebido."""
-    fornecedores = sorted(painel["fornecedor"].fillna("").unique().tolist())
     estados = sorted(painel["status"].unique().tolist())
     with surface("flatter_filtros_" + prefixo):
         busca = st.text_input("Buscar por nome ou SKU", key=prefixo + "_busca", max_chars=120,
                               placeholder="Digite o código ou o nome do produto").strip()
-        a, b = st.columns(2)
-        selecionados = a.multiselect("Fornecedores", fornecedores, default=fornecedores,
-                                      key=prefixo + "_fornecedores")
-        status = b.multiselect("Situações", estados, default=estados, key=prefixo + "_status")
+        status = st.multiselect("Situações", estados, default=estados, key=prefixo + "_status")
         opcoes = {"": "Todos os produtos", "ruptura": "Em ruptura", "risco": "Risco antes da entrega",
                   "qualidade": "Qualidade a revisar"}
         # Um atalho deve substituir a seleção anterior da mesma página. Apenas
@@ -260,7 +262,7 @@ def _filtros(painel: pd.DataFrame, prefixo: str) -> tuple[pd.DataFrame, dict]:
                               key=prefixo + "_prioridade")
         st.button("Limpar filtros", on_click=_limpar_filtros, args=(prefixo,),
                   key=prefixo + "_limpar")
-    vista = painel.loc[painel["fornecedor"].isin(selecionados) & painel["status"].isin(status)].copy()
+    vista = painel.loc[painel["status"].isin(status)].copy()
     if busca:
         vista = vista.loc[vista["codigo"].str.contains(busca, case=False, regex=False)
                           | vista["nome"].str.contains(busca, case=False, regex=False)]
@@ -270,7 +272,7 @@ def _filtros(painel: pd.DataFrame, prefixo: str) -> tuple[pd.DataFrame, dict]:
         vista = vista.loc[vista["risco_prazo"]]
     elif filtro == "qualidade":
         vista = vista.loc[vista["requer_revisao"]]
-    return vista, {"fornecedor": selecionados, "status": status, "busca": busca, "prioridade": filtro}
+    return vista, {"status": status, "busca": busca, "prioridade": filtro}
 
 
 def _estoque(servico: Any, contexto: Any) -> None:
@@ -282,6 +284,8 @@ def _estoque(servico: Any, contexto: Any) -> None:
     vista, _ = _filtros(dados["panel"], "estoque")
     colunas = COLUNAS_ESTOQUE + (["custo_unitario", "capital_estoque"] if contexto.can("finance.view") else [])
     _tabela(vista, colunas, key="estoque_tabela")
+    if contexto.can("inventory.export"):
+        csv_export(servico, "inventory", {}, contexto)
     if vista.empty:
         st.info("Nenhum produto corresponde aos filtros.")
         return
@@ -290,7 +294,7 @@ def _estoque(servico: Any, contexto: Any) -> None:
     item = vista.loc[vista["codigo"].eq(codigo)].iloc[0]
     with surface("flatter_produto"):
         st.subheader(str(item["nome"]))
-        st.caption(f"SKU {codigo} · Fornecedor: {item['fornecedor'] or 'Não informado'}")
+        st.caption(f"SKU {codigo}")
         status_badge(str(item["status"]), tone=TONS_STATUS.get(str(item["status"]), "neutral"))
         if item["risco_prazo"]:
             status_badge("Risco antes da entrega", tone="danger")
@@ -304,7 +308,7 @@ def _estoque(servico: Any, contexto: Any) -> None:
             metric_card("Cobertura", f"{item['cobertura_dias']:.1f} dias" if pd.notna(item["cobertura_dias"]) else "Indefinida",
                         key="flatter_detalhe_cobertura", width="stretch")
         with colunas[3]:
-            metric_card("Prazo do fornecedor", f"{int(item['prazo_entrega_dias'])} dias",
+            metric_card("Prazo de reposição", f"{int(item['prazo_entrega_dias'])} dias",
                         key="flatter_detalhe_prazo", width="stretch")
         if item["requer_revisao"]:
             st.warning(str(item["aviso_qualidade"]))
@@ -358,38 +362,75 @@ def _explicar_reposicao(item: pd.Series) -> None:
 
 
 def _reposicao(servico: Any, contexto: Any) -> None:
-    """Prioriza fornecedor e urgência; exportação só é produzida após clique."""
-    page_header("Reposição por fornecedor", "Uma lista prática para conferir antes de decidir.")
-    dados = _carregar(servico, "replenishment.view", contexto)
+    """Apresenta ciclos explicáveis sem depender de fornecedores ou alterar o ERP."""
+    page_header("Reposição Inteligente", "Planeje solicitações à indústria com revisão humana.")
+    modulo = "replenishment.view" if contexto.can("replenishment.view") else "trends.view"
+    dados = _carregar(servico, modulo, contexto)
     if dados is None:
         return
     vista, filtros = _filtros(dados["panel"], "reposicao")
-    somente = st.checkbox("Somente itens com sugestão", value=True)
-    filtros["somente_sugestao"] = somente
-    if somente:
-        vista = vista.loc[vista["quantidade_sugerida"].gt(0)]
-    vista = vista.sort_values(["risco_prazo", "fornecedor", "nome"], ascending=[False, True, True])
-    _tabela(vista, COLUNAS_REPOSICAO, key="reposicao_tabela")
-    if vista.empty:
-        st.info("Nenhum item corresponde aos filtros de reposição.")
-    else:
-        with surface("flatter_resumo_fornecedores"):
-            st.subheader("Resumo por fornecedor")
-            resumo = vista.groupby("fornecedor", as_index=False).agg(
-                produtos=("codigo", "count"), unidades_sugeridas=("quantidade_sugerida", "sum"),
-            )
-            _tabela(resumo, key="reposicao_fornecedores")
+    if not contexto.can("replenishment.view"):
+        st.caption("Sua conta possui acesso às tendências, sem permissão para consultar sugestões de reposição.")
+        _tabela(vista, ["codigo", "nome", "venda_media_diaria", "tendencia"], key="reposicao_tendencias")
+        return
+    try:
+        referencia = pd.Timestamp((dados.get("metadata") or {})["snapshot_date"]).date()
+    except (KeyError, ValueError, TypeError):
+        st.warning("A data do estoque não está disponível. Atualize os dados antes de simular.")
+        return
+    regras = servico.replenishment_rules(hoje_local().date())
+    if referencia < hoje_local().date():
+        st.warning("A simulação usa um estoque de data anterior. Atualize o saldo antes de solicitar à indústria.")
+    config = regras["configuration"]
+    ciclo = st.radio("Ciclo de reposição", [config["cycle_primary"], config["cycle_alternative"]], horizontal=True)
+    espera = st.selectbox("Quando solicitar", [0, config["cycle_primary"], config["cycle_alternative"]],
+                         format_func=lambda n: "Hoje" if n == 0 else f"Em {n} dias")
+    aceitar = st.checkbox("Revisei as limitações do histórico e aceito uma estimativa com disponibilidade incerta.")
+    projecao = projetar_painel(vista, regras, referencia, ciclo, espera, aceitar)
+    previsoes = projecao["previsao_30"].dropna()
+    caixas = projecao["caixas"].dropna()
+    colunas = st.columns(3, gap="small", wrap=True)
+    with colunas[0]:
+        metric_card("Demanda em 30 dias", f"{previsoes.sum():.1f}" if not previsoes.empty else "Não calculável",
+                    key="flatter_demanda_30", note="Soma parcial dos produtos estimáveis", width="stretch")
+    with colunas[1]:
+        metric_card("Caixas estimadas", int(caixas.sum()) if not caixas.empty else "Não calculável",
+                    key="flatter_caixas", note=f"Referência habitual: {config['reference_boxes']} caixas", width="stretch")
+    with colunas[2]:
+        metric_card("Itens com risco", int(projecao["risco"].sum()), key="flatter_risco_ciclo", tone="warning", width="stretch")
+    st.caption("A referência de caixas não é um limite de capacidade. Pendências sem data confirmada não entram na projeção.")
+    tabela = projecao.copy()
+    for campo in ("previsao_30", "caixas", "unidades", "solicitar_ate"):
+        tabela[campo] = tabela[campo].map(lambda valor: "Não calculável" if pd.isna(valor) else str(valor))
+    colunas_tabela = ["codigo", "nome", "estoque", "status", "previsao_30", "caixas", "unidades", "solicitar_ate", "observacao"]
+    if contexto.can("trends.view"):
+        colunas_tabela.insert(4, "tendencia")
+    _tabela(tabela, colunas_tabela, key="reposicao_tabela")
+    if not projecao.empty:
         opcoes = vista.set_index("codigo")["nome"].to_dict()
         codigo = st.selectbox("Produto para conferir a sugestão", list(opcoes),
                               format_func=lambda sku: f"{sku} · {opcoes[sku]}")
-        with st.expander("Memória da sugestão selecionada", expanded=False):
+        with st.expander("Por que sugeriu?", expanded=False):
             item = vista.loc[vista["codigo"].eq(codigo)].iloc[0]
             _explicar_reposicao(item)
+            st.write(projecao.loc[projecao["codigo"].eq(codigo), ["necessidade_liquida", "chegada", "ruptura", "observacao"]])
             if item["requer_revisao"]:
                 st.warning(str(item["aviso_qualidade"]))
-    st.caption("Não há compra automática nem alterações no ERP. Confira as limitações e embalagens do fornecedor.")
     if contexto.can("replenishment.export"):
-        csv_export(servico, "replenishment", filtros, contexto)
+        filtros.update(ciclo=ciclo, espera=espera, aceitar=aceitar)
+        csv_export(servico, "industry", filtros, contexto)
+    if contexto.can("decisions.write"):
+        elegiveis = projecao.loc[projecao["unidades"].notna() & projecao["unidades"].gt(0)]
+        nao_calculaveis = int(projecao["unidades"].isna().sum())
+        if nao_calculaveis:
+            st.warning(f"{nao_calculaveis} produto(s) sem quantidade calculável não entram na proposta.")
+        confirmar = st.checkbox("Revisei as quantidades e os itens sem cálculo; desejo registrar uma proposta interna.")
+        if st.button("Registrar proposta interna", disabled=not confirmar or elegiveis.empty):
+            _validar_contexto(contexto, servico.context())
+            itens = [{"sku": linha["codigo"], "units": int(linha["unidades"]), "boxes": int(linha["caixas"]),
+                      "packaging_id": linha["embalagem_id"]} for linha in elegiveis.to_dict("records")]
+            servico.save_industry_proposal(ciclo, referencia, itens)
+            st.success("Proposta interna registrada. Nenhum pedido foi enviado à indústria ou ao ERP.")
 
 
 def _tendencias(servico: Any, contexto: Any) -> None:
@@ -533,16 +574,28 @@ def _importacao(servico: Any, contexto: Any) -> None:
 
 def _parametros(servico: Any, contexto: Any) -> None:
     """Edita parâmetros de cálculo do gerente, preservando os saldos oficiais."""
-    page_header("Parâmetros de reposição", "Prazo, segurança e cobertura-alvo por produto.")
+    page_header("Regras de Reposição", "Ciclos e embalagens permanecem apenas no Gerente.")
     dados = _carregar(servico, "parameters.edit", contexto)
     if dados is None:
         return
     produtos = dados["products"].set_index("codigo", drop=False)
+    hoje = hoje_local().date()
+    regras = servico.replenishment_rules(hoje)
+    config = regras["configuration"]
+    with st.expander("Ciclos e referência do caminhão"):
+        with st.form("configuracao_ciclos"):
+            primario = st.number_input("Ciclo principal (dias)", min_value=1, max_value=365, value=config["cycle_primary"])
+            alternativo = st.number_input("Ciclo alternativo (dias)", min_value=1, max_value=365, value=config["cycle_alternative"])
+            referencia = st.number_input("Referência habitual de caixas", min_value=1, max_value=100000, value=config["reference_boxes"])
+            st.caption("A referência é informativa; não é um limite físico de carga.")
+            if st.form_submit_button("Salvar ciclos"):
+                servico.save_replenishment_configuration(primario, alternativo, referencia)
+                st.success("Ciclos atualizados.")
     codigo = st.selectbox("Produto para parametrizar", list(produtos.index),
                           format_func=lambda sku: f"{sku} · {produtos.loc[sku, 'nome']}")
     item = produtos.loc[codigo]
     with st.form("parametros_" + codigo):
-        prazo = st.number_input("Prazo de entrega (dias)", min_value=0, max_value=2147483647,
+        prazo = st.number_input("Prazo de produção e transporte (dias)", min_value=0, max_value=365,
                                 value=int(item["prazo_entrega_dias"]), step=1)
         seguranca = st.number_input("Estoque de segurança (unidades)", min_value=0, max_value=2147483647,
                                     value=int(item["estoque_seguranca"]), step=1)
@@ -553,11 +606,59 @@ def _parametros(servico: Any, contexto: Any) -> None:
             servico.update_parameters(codigo, {"prazo_entrega_dias": prazo,
                                                "estoque_seguranca": seguranca, "cobertura_alvo_dias": alvo})
             st.success("Parâmetros salvos. Os novos valores serão usados na próxima análise.")
+    st.subheader("Embalagens por produto")
+    atuais = {r["sku"]: r for r in regras.get("rules", [])}
+    atual = atuais.get(codigo, {})
+    if atual:
+        st.caption(f"Embalagem vigente: 1 caixa = {atual['units_per_box']} unidades desde {atual['effective_on']}.")
+    else:
+        st.info("Cadastro de embalagem necessário para calcular caixas deste produto.")
+    with st.form("embalagem_" + codigo):
+        unidades = st.number_input("Unidades por caixa", min_value=1, max_value=100000,
+                                   value=atual.get("units_per_box"), step=1, placeholder="Informe a conversão")
+        vigencia = st.date_input("Data de vigência", value=hoje)
+        minimo = st.number_input("Lote mínimo (unidades)", min_value=0, max_value=2147483647,
+                                 value=atual.get("minimum_lot", 0), step=1)
+        multiplo = st.number_input("Múltiplo de produção (unidades)", min_value=1, max_value=2147483647,
+                                   value=atual.get("production_multiple", 1), step=1)
+        usar_maximo = st.checkbox("Definir limite máximo de unidades", value=atual.get("maximum_units") is not None)
+        maximo = st.number_input("Limite máximo (unidades)", min_value=1, max_value=2147483647,
+                                 value=atual.get("maximum_units") or 1, step=1, disabled=not usar_maximo)
+        observacao = st.text_area("Observação da embalagem", value=atual.get("note", ""), max_chars=500)
+        if st.form_submit_button("Salvar embalagem", type="primary"):
+            if unidades is None:
+                st.error("Informe a quantidade de unidades por caixa.")
+            else:
+                servico.save_replenishment_packaging(codigo, vigencia, unidades, minimo, multiplo,
+                                                    maximo if usar_maximo else None, observacao,
+                                                    regras.get("revisions", {}).get(codigo))
+                st.success("Nova versão salva para uso nas próximas simulações.")
+    with st.expander("Importar embalagens por CSV"):
+        st.caption("Cabeçalhos: sku;unidades_por_caixa;vigencia. Opcional: lote_minimo;multiplo;maximo;observacao.")
+        arquivo = st.file_uploader("CSV de embalagens", type=["csv"], key="csv_embalagens")
+        if arquivo is not None:
+            try:
+                linhas = ler_embalagens(arquivo.getvalue(), set(produtos.index), regras.get("revisions", {}))
+                digest = hashlib.sha256(json.dumps(linhas, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+                if st.button("Preparar prévia de embalagens"):
+                    st.session_state["_embalagens_previa"] = digest
+                if st.session_state.get("_embalagens_previa") == digest:
+                    _tabela(pd.DataFrame(linhas), ["sku", "units_per_box", "effective_on", "minimum_lot", "production_multiple", "maximum_units"],
+                            key="embalagens_previa")
+                    confirmar = st.checkbox("Conferi as versões e confirmo esta importação interna.")
+                    if st.button("Confirmar importação de embalagens", disabled=not confirmar):
+                        servico.save_replenishment_packaging_batch(linhas)
+                        st.session_state.pop("_embalagens_previa", None)
+                        st.success("Embalagens registradas. Nenhuma informação foi enviada ao ERP.")
+                elif st.session_state.get("_embalagens_previa"):
+                    st.warning("Arquivo ou versões mudaram. Prepare uma nova prévia antes de confirmar.")
+            except ValueError as erro:
+                st.error(str(erro))
 
 
 def _decisoes(servico: Any, contexto: Any) -> None:
     """Registra a decisão humana e consulta o histórico somente quando solicitado."""
-    page_header("Decisões de reposição", "Registre sua avaliação, sem criar pedidos no ERP.")
+    page_header("Acompanhamento de Ações", "Registre uma decisão humana, sem criar pedidos no ERP.")
     dados = _carregar(servico, "decisions.write", contexto)
     if dados is None:
         return
@@ -565,7 +666,7 @@ def _decisoes(servico: Any, contexto: Any) -> None:
     with st.form("decisao", clear_on_submit=True):
         codigo = st.selectbox("Produto da decisão", list(painel.index),
                               format_func=lambda sku: f"{sku} · {painel.loc[sku, 'nome']}")
-        acao = st.selectbox("Decisão", ["Avaliar compra", "Ignorar"])
+        acao = st.selectbox("Decisão", ["Em análise", "Adiada", "Solicitar à indústria", "Descartada", "Concluída"])
         quantidade = st.number_input("Quantidade avaliada", min_value=0, max_value=2147483647, value=0, step=1)
         observacao = st.text_area("Observação opcional", max_chars=500)
         if st.form_submit_button("Registrar decisão", type="primary"):
@@ -573,6 +674,8 @@ def _decisoes(servico: Any, contexto: Any) -> None:
             st.success("Decisão registrada. Nenhum pedido foi criado.")
     if st.button("Consultar decisões anteriores"):
         _tabela(pd.DataFrame(servico.list_decisions()), key="decisoes_historico", paginar=False)
+    if contexto.can("replenishment.view") and st.button("Consultar propostas internas"):
+        _tabela(pd.DataFrame(servico.list_industry_proposals()), key="propostas_historico", paginar=False)
 
 
 def _permissoes_formulario(atuais: Mapping[str, bool] | None = None) -> dict[str, bool]:
@@ -712,11 +815,10 @@ def _auditoria(servico: Any, contexto: Any) -> None:
 PAGES = {
     "Painel": ("dashboard.view", _painel),
     "Estoque": ("inventory.view", _estoque),
-    "Reposição": ("replenishment.view", _reposicao),
-    "Tendências": ("trends.view", _tendencias),
+    "Reposição Inteligente": ("replenishment.view", _reposicao),
     "Relatórios": ("reports.view", _relatorios),
     "Importação": ("inventory.import", _importacao),
-    "Parâmetros": ("parameters.edit", _parametros),
-    "Decisões": ("decisions.write", _decisoes),
+    "Regras de Reposição": ("parameters.edit", _parametros),
+    "Acompanhamento de Ações": ("decisions.write", _decisoes),
     "Auditoria": ("audit.view", _auditoria),
 }

@@ -128,6 +128,9 @@ class Scenario:
             resultado = {"id": self.user_id, "is_anonymous": False}
         elif chave == "rpc_app_context":
             resultado = self._context()
+        elif chave == "rpc_replenishment_rules":
+            resultado = {"configuration": {"cycle_primary": 14, "cycle_alternative": 21, "reference_boxes": 80},
+                         "rules": [], "revisions": {}}
         elif chave == "rpc_load_inventory":
             if parametros.get("p_module") not in self.permissions:
                 status = 403

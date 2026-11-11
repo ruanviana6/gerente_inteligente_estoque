@@ -171,6 +171,9 @@ def _area_autenticada(servico: Any) -> None:
     execucao = st.session_state.get("_render_execution", 0) + 1
     st.session_state["_render_execution"] = execucao
     permitidas = {nome: handler for nome, (permissao, handler) in PAGES.items() if contexto.can(permissao)}
+    if ("Reposição Inteligente" in PAGES and contexto.can("trends.view")
+            and not contexto.can("replenishment.view")):
+        permitidas["Reposição Inteligente"] = PAGES["Reposição Inteligente"][1]
     if contexto.can("trends.view"):
         permitidas["Inteligência de Vendas"] = vendas
     if _perfil(contexto, "role") == "Master":
