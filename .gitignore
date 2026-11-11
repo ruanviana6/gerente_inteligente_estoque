@@ -15,6 +15,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .venv/
+.venv*/
 venv/
 *.py[cod]
 .DS_Store

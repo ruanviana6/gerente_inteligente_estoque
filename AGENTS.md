@@ -1,5 +1,17 @@
 # Instruções para agentes de programação — Gerente Inteligente de Estoque
 
+## Escopo atual autorizado em 10/11/2026
+
+O pedido de execução final autoriza preparar o conector GestãoClick de leitura,
+sincronização manual Master e a primeira Inteligência de Vendas determinística.
+Esta autorização substitui as proibições temporárias de implementação abaixo;
+a regra permanente de nunca escrever no ERP continua integralmente válida.
+Não ativar consultas reais sem contrato OpenAPI conferido, credenciais protegidas,
+autorização da empresa, reconciliação e autorização explícita da carga completa.
+Não fazer merge, deploy, alteração de Secrets ou migração produtiva automaticamente.
+Base: implementacao/web-supabase. Preservar Flatter, motor e segurança existentes.
+As novas análises usam trends.view e não incluem indicadores financeiros.
+
 ## Diretiva de execução integral aprovada em 28/10/2026
 
 O proprietário autorizou o **desenvolvimento da versão web completa** antes de conectar a API GestãoClick. O Codex deve ler e executar:

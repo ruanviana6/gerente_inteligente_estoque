@@ -211,16 +211,68 @@ def gerar_relatorio_mensal(
     return resultado
 
 
+COLUNAS_RELATORIO = {
+    "periodo": ("inicio", "fim"),
+    "fonte": ("batch_id", "atualizado_em", "origem"),
+    "resumo": ("unidades_vendidas", "produtos_com_venda", "variacao_unidades_pct"),
+    "mais_vendidos": ("codigo", "nome", "quantidade"),
+    "estoque": ("codigo", "nome", "estoque", "status", "cobertura_dias", "risco_prazo", "dias_sem_venda"),
+    "reposicao": (
+        "codigo", "nome", "fornecedor", "estoque", "venda_media_diaria", "prazo_entrega_dias",
+        "estoque_seguranca", "reservas", "pedidos_pendentes", "posicao_estoque", "ponto_pedido",
+        "estoque_alvo", "quantidade_sugerida", "demanda_estimavel", "risco_prazo",
+    ),
+    "tendencias": ("codigo", "nome", "venda_media_diaria", "media_longa", "tendencia", "classe_abc"),
+    "financeiro": ("base", "capital_estoque", "capital_parado", "custos_parciais", "limite_excedido"),
+}
+CAUTELAS_RELATORIO = frozenset({
+    "Vendas expressas em unidades; o relatório não estima faturamento ou margem.",
+    "A abrangência do histórico foi declarada na importação e deve ser conferida na origem.",
+    "Mês anterior sem vendas positivas; variação percentual indefinida.",
+    "Mês anterior incompleto; comparação percentual indisponível.",
+    "Sem fechamento comparável do mês anterior.",
+    "Há dias sem snapshot; disponibilidade desconhecida não comprova ruptura.",
+    "Existem vendas com saldo zero no mesmo dia; as vendas foram preservadas.",
+    "Há produtos sem dias elegíveis; as recomendações exigem revisão humana.",
+    "O histórico não cobre 90 dias; tendências e ABC têm referência limitada.",
+    "O histórico não cobre toda a janela de análise.",
+})
+
+
 def filtrar_relatorio(relatorio: dict, permissoes: Iterable[str]) -> dict:
-    """Reaplica permissões atuais sem reutilizar blocos revogados em memória."""
+    """Reaplica concessões e contratos por bloco, negando novos campos por padrão.
+
+    A lista de blocos não basta: um indicador futuro inserido em um bloco já
+    conhecido também precisa de revisão explícita para entrar na exportação.
+    """
     acessos = set(permissoes)
     _exigir(acessos, "reports.view")
-    permitido = {"periodo", "fonte", "resumo", "mais_vendidos", "cautelas"}
+    permitido = {"periodo", "fonte", "resumo", "mais_vendidos"}
     permitido.update(bloco for bloco, permissao in BLOCOS_PERMISSOES.items() if permissao in acessos)
-    seguro = copy.deepcopy({chave: valor for chave, valor in relatorio.items() if chave in permitido})
-    if "finance.view" not in acessos:
-        for linha in seguro.get("tendencias", []):
-            linha.pop("classe_abc", None)
+    seguro = {}
+    for bloco in relatorio:
+        if bloco not in permitido:
+            continue
+        valor = relatorio[bloco]
+        colunas = set(COLUNAS_RELATORIO[bloco])
+        if bloco == "tendencias" and "finance.view" not in acessos:
+            colunas.discard("classe_abc")
+        if isinstance(valor, dict):
+            seguro[bloco] = copy.deepcopy({campo: item for campo, item in valor.items() if campo in colunas})
+        elif isinstance(valor, list):
+            seguro[bloco] = [
+                copy.deepcopy({campo: item for campo, item in linha.items() if campo in colunas})
+                for linha in valor if isinstance(linha, dict)
+            ]
+    if "cautelas" in relatorio:
+        seguro["cautelas"] = []
+        for aviso in relatorio["cautelas"]:
+            if not isinstance(aviso, str) or aviso not in CAUTELAS_RELATORIO:
+                continue
+            if aviso == "O histórico não cobre 90 dias; tendências e ABC têm referência limitada.":
+                if not {"trends.view", "finance.view"}.issubset(acessos):
+                    aviso = "O histórico não cobre toda a janela de análise."
+            seguro["cautelas"].append(aviso)
     return seguro
 
 

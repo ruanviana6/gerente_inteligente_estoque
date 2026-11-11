@@ -11,7 +11,9 @@ from typing import Any
 import streamlit as st
 
 from web.errors import AppError, AuthenticationError, AuthorizationError, ConfigurationError
+from web.integration_page import integracoes
 from web.pages import PAGES, _administracao
+from web.sales_page import vendas
 from web.telemetry import measure, performance_scope
 from web.theme import apply_theme, brand_header, page_header, surface
 
@@ -169,8 +171,12 @@ def _area_autenticada(servico: Any) -> None:
     execucao = st.session_state.get("_render_execution", 0) + 1
     st.session_state["_render_execution"] = execucao
     permitidas = {nome: handler for nome, (permissao, handler) in PAGES.items() if contexto.can(permissao)}
+    if contexto.can("trends.view"):
+        permitidas["Inteligência de Vendas"] = vendas
     if _perfil(contexto, "role") == "Master":
         permitidas["Administração"] = _administracao
+        if contexto.can("integrations.manage"):
+            permitidas["Integrações"] = integracoes
     with st.sidebar, st.container(key="flatter_sidebar"):
         brand_header(compact=True)
         if permitidas:

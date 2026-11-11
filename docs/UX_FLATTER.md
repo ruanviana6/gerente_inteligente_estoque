@@ -5,33 +5,34 @@ A Issue #6 reorganiza a aplicação web existente em Streamlit. As páginas usam
 ## Organização
 
 - `.streamlit/config.toml`: cores, fontes do sistema, bordas e configuração nativa dos widgets.
-- `web/theme.py`: marca em texto, cabeçalho, cartões de indicadores, superfícies e status. Não consulta dados nem guarda estado de usuários.
+- `web/theme.py`: imagem local da marca, cabeçalho, cartões de indicadores, superfícies e status. Não consulta dados nem guarda estado de usuários.
 - `web/ui.py`: entrada, login, sessão, monitoramento de autorização e navegação.
 - `web/pages.py`: páginas operacionais, filtros, detalhe, relatórios e administração.
 - `web/downloads.py`: preparação autorizada e entrega direta do CSV à página.
 
-O CSS complementar usa as classes `st-key-` documentadas para containers. Não depende de hashes, `data-testid`, posição dos elementos ou scripts de terceiros. `st.html` recebe apenas CSS e marca estáticos. Produtos, fornecedores, nomes de pessoas e indicadores passam pelos widgets nativos, sem interpolação em HTML.
+O CSS complementar usa as classes `st-key-` documentadas para containers. Não depende de hashes, `data-testid`, posição dos elementos ou scripts de terceiros. `st.html` recebe apenas CSS estático. Produtos, fornecedores, nomes de pessoas e indicadores passam pelos widgets nativos, sem interpolação em HTML.
 
 ## Cores e marca
 
 | Uso | Cor |
 | --- | --- |
-| Fundo | `#101720` |
-| Barra lateral | `#151E2B` |
-| Cartões | `#1C2937` |
-| Ação e fundo da marca | `#B55440` |
-| Texto principal | `#F5F7FA` |
-| Texto secundário | `#B8C2CE` |
-| Links e destaque em texto | `#D97963` |
-| Borda de controles | `#6C7A8B` |
+| Fundo | `#FBF8F6` |
+| Barra lateral | `#F4ECE8` |
+| Cartões | `#FFFFFF` |
+| Ação e fundo da marca | `#9C4438` |
+| Texto principal | `#2D1C25` |
+| Texto secundário | `#66575F` |
+| Links e destaque em texto | `#8B332E` |
+| Destaque ameixa | `#61334D` |
+| Borda de controles | `#8A727A` |
 
-O terracota original é usado como fundo de ação, com texto claro. Textos terracota sobre os cartões usam a variação mais clara `#D97963` para manter contraste. Status também mostram nomes, como risco e atenção, sem depender exclusivamente de cor.
+O terracota da Flatter, o vinho do Êxtase e o ameixa do Êxtase Elixir orientam a paleta. As superfícies claras deixam os indicadores legíveis; ações terracota usam texto branco. Status também mostram nomes, como risco e atenção, sem depender exclusivamente de cor.
 
-O arquivo original da marca não estava disponível nesta implementação. A entrada mostra **Flatter como texto branco em fonte serifada do sistema**, sobre terracota. Isso é uma identificação textual provisória, não uma reprodução do logo oficial.
+A entrada e a barra lateral exibem a imagem local `assets/flatter-logo.jpg`, carregada por `st.image` com descrição acessível. O arquivo é uma cópia sem alterações da imagem do [perfil público da Flatter](https://graph.facebook.com/323978121026634/picture?type=large), que apresenta uma variante azul sobre branco. Na interface, filtros CSS a apresentam em branco sobre terracota; nenhum recurso externo é carregado durante o uso. A imagem mostrada pelo usuário na conversa não estava disponível como arquivo no ambiente, portanto esta variante pode ser substituída posteriormente pelo arquivo exato da identidade desejada.
 
 Para alterar as cores, ajuste `.streamlit/config.toml`, `PALETTE` e as constantes CSS de `web/theme.py` em conjunto. Execute `python -m pytest tests/test_flatter_theme.py` e a validação visual antes de aceitar a alteração. Evite clarear apenas o fundo ou escurecer apenas o texto, pois isso pode comprometer o contraste.
 
-Quando houver um arquivo oficial autorizado, adicione o arquivo local em `assets/` e troque somente a apresentação em `brand_header`. Preserve um nome acessível, uma largura limitada ao container e uma alternativa textual. Não carregue logos remotos nem use recortes de screenshots.
+Para usar outra versão autorizada da marca, substitua o arquivo local e ajuste os filtros de `brand_header` conforme a imagem. Preserve um nome acessível, uma largura limitada ao container e uma alternativa textual. Não carregue logos remotos nem use recortes de screenshots.
 
 ## Acessibilidade e celular
 
@@ -41,12 +42,11 @@ As razões abaixo foram calculadas localmente com a fórmula de luminância rela
 
 | Combinação | Contraste |
 | --- | --- |
-| Texto principal / cartão | 13,76:1 |
-| Texto secundário / cartão | 8,19:1 |
-| Terracota claro / cartão | 4,83:1 |
-| Texto principal / botão terracota | 4,54:1 |
-| Branco / fundo da marca | 4,88:1 |
-| Borda de controle / cartão | 3,37:1 |
+| Texto principal / cartão | 16,10:1 |
+| Texto secundário / cartão | 6,79:1 |
+| Destaque em texto / cartão | 8,04:1 |
+| Branco / botão terracota | 6,37:1 |
+| Borda de controle / cartão | 4,40:1 |
 
 Textos normais têm meta mínima de 4,5:1; bordas necessárias para identificar controles, 3:1. As bordas decorativas dos cartões não identificam campos editáveis e usam um tom mais discreto.
 
@@ -71,3 +71,7 @@ Use **Preparar CSV** para gerar o arquivo, depois **Salvar CSV** para salvá-lo.
 Essa escolha evita depender do isolamento de callbacks diferidos do Streamlit 1.66.1. Uma sessão diferente não recebe um identificador global que execute a geração em nome de outra pessoa. Dados já entregues ao navegador, como qualquer arquivo baixado, não podem ser apagados retroativamente por revogação. Toda nova preparação exige nova autorização.
 
 A opção `client.disableDataExport` oculta os controles de CSV e cópia das tabelas, concentrando a exportação nos fluxos autorizados. Ela não impede a extração de informações que o próprio usuário já recebeu na tela.
+
+## Navegação de vendas e integração
+
+Inteligência de Vendas usa trends.view, uma fonte/loja por análise, filtros em formulário e geração explícita. Integrações exige Master e integrations.manage, com prévia separada da confirmação. As telas compartilham o tema Flatter. scripts/validar_interface_vendas.py verifica oito capturas e os fluxos DEMO em 390/1440 px; a fixture nunca é a entrada app.py.

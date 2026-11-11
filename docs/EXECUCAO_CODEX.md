@@ -1,5 +1,8 @@
 # Ordem principal para o Codex: finalizar a aplicação web
 
+> Atualização de escopo em 10/11/2026: o proprietário autorizou preparar a integração de leitura e a primeira Inteligência de Vendas. As restrições temporárias históricas deste documento são substituídas por esse pedido; ativação real continua condicionada ao contrato, às autorizações e à validação. Consulte `ATIVACAO_GESTAOCLICK.md` e `ENTREGA_EVOLUCAO.md`. Escrita no ERP permanece proibida.
+
+
 ## Regra permanente: GestãoClick SEMPRE somente leitura
 
 **Regra do proprietário, inclusive depois da integração com a API:** o Gerente Inteligente de Estoque **nunca pode modificar nada no GestãoClick**. A integração será **unidirecional**: GestãoClick → Gerente (consulta/sincronização de dados), sem envio de comandos operacionais de volta ao ERP.

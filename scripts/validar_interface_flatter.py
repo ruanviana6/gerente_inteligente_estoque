@@ -123,6 +123,11 @@ def navegar(pagina, destino: str) -> None:
 def verificar_layout(pagina, nome: str, destino: Path, estrito: bool, miniaturas: bool) -> dict:
     """Registra dimensões reais, captura fictícia e alvos principais sem registrar dados."""
     aguardar_tela(pagina)
+    # O servidor pode indicar notRunning antes de o navegador aplicar o CSS
+    # enviado por st.html. Meça somente quando o tema estiver no DOM.
+    pagina.wait_for_function("""() => [...document.querySelectorAll('style')].some(
+      estilo => estilo.textContent.includes('.st-key-flatter_brand_logo')
+    )""", timeout=30000)
     pagina.evaluate("document.fonts.ready")
     medidas = pagina.evaluate("""() => {
       const raiz = document.documentElement;
@@ -208,6 +213,12 @@ def verificar_fluxos(browser, base: str, destino: Path, controle: Path, estrito:
             pagina = contexto.new_page()
             pagina.goto(base + "?perfil=Master", wait_until="domcontentloaded")
             pagina.get_by_role("button", name="Entrar", exact=True).wait_for()
+            logo = pagina.get_by_alt_text("Logotipo da Flatter")
+            expect(logo).to_be_visible()
+            pagina.wait_for_function("""() => {
+                const logo = document.querySelector('img[alt="Logotipo da Flatter"]');
+                return logo && logo.complete && logo.naturalWidth > 0;
+            }""")
             resultados["telas"][f"login-{largura}"] = verificar_layout(
                 pagina, f"login-{largura}", destino, estrito, miniaturas,
             )

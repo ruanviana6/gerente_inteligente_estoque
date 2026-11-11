@@ -2,7 +2,7 @@
 
 Criei este projeto para entender melhor o estoque no dia a dia. Saber o saldo de um produto nem sempre é suficiente para decidir quando repor, quanto pedir ou o que merece atenção.
 
-O gerente transforma catálogo, vendas e histórico de disponibilidade em indicadores explicáveis. O GestãoClick continua sendo a fonte operacional oficial da empresa. **Esta versão não se conecta à sua API e nunca deve alterar dados no ERP, inclusive em uma integração futura.**
+O gerente transforma catálogo, vendas e histórico de disponibilidade em indicadores explicáveis. O GestãoClick continua sendo a fonte operacional oficial da empresa. O conector de consulta está preparado e desativado por padrão. A ativação exige o contrato da conta e autorização; ele nunca pode alterar dados no ERP.
 
 O desenvolvimento acontece com apoio de IA e Vibe Coding: eu defini o problema e as necessidades da rotina, e a IA ajuda a escrever, revisar e testar o código. O objetivo é ter uma ferramenta útil e aprender Python, SQL, Engenharia de Software, dados e logística. As sugestões continuam dependendo de conferência humana.
 
@@ -10,7 +10,15 @@ O desenvolvimento acontece com apoio de IA e Vibe Coding: eu defini o problema e
 
 A aplicação tem uma única entrada, **app.py**, em Streamlit, com Supabase Auth e PostgreSQL. O projeto Supabase utilizado é o já existente em São Paulo, csiqpzoudruzppfbpqqx. SQLite fica apenas como referência técnica do MVP e suporte aos seus testes de regressão; não armazena os dados da web.
 
-O código da versão web está no [PR #5](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/5), incorporando as correções auditadas do PR #4. O endereço informado pelo proprietário é [estoqueinteligente-flatter.streamlit.app](https://estoqueinteligente-flatter.streamlit.app/). A reformulação Flatter da Issue #6 está no [PR #7](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/7), em branch própria para revisão e sem publicação automática. Testar a candidata em CI não comprova o funcionamento autenticado desse endereço.
+O código da versão web está no [PR #5](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/5), incorporando as correções auditadas do PR #4. O endereço informado pelo proprietário é [estoqueinteligente-flatter.streamlit.app](https://estoqueinteligente-flatter.streamlit.app/). A reformulação Flatter do [PR #7](https://github.com/ruanviana6/gerente_inteligente_estoque/pull/7) foi incorporada à branch web. Esta evolução usa essa base e aguarda revisão, sem publicação automática. Testar a candidata em CI não comprova o funcionamento autenticado desse endereço.
+
+## Evolução preparada para revisão
+
+A nova área **Inteligência de Vendas** analisa unidades líquidas, pedidos concluídos, crescimento, calendário e produtos comprados juntos. Ela usa `trends.view`, lê somente a cópia autorizada no Supabase e não apresenta faturamento ou custos. Cestas exigem pedidos reais identificados e amostra mínima. Séries curtas mostram variação observada, sem prometer sazonalidade.
+
+O Master pode preparar uma carga DEMO em **Integrações**, conferir a prévia e confirmar a persistência separadamente. O conector GestãoClick aceita apenas GET documentado, com OpenAPI e mapas de campos protegidos. Nenhuma consulta real ao ERP foi executada nesta entrega. Catálogo e saldo do motor continuam usando CSV: a ligação desses campos à API depende do contrato real, sem interpretar uma extração incremental como importação completa.
+
+O projeto Supabase foi encontrado `INACTIVE` e, ao final da verificação, estava `ACTIVE_HEALTHY`. A leitura remota confirmou as 16 tabelas atuais com RLS. Migrações novas são testadas em banco descartável e não foram aplicadas ao projeto publicado. Veja [ativação segura](docs/ATIVACAO_GESTAOCLICK.md), [contrato do conector](docs/CONTRATO_GESTAOCLICK.md), [análises](docs/INTELIGENCIA_VENDAS.md) e [evidências da evolução](docs/ENTREGA_EVOLUCAO.md).
 
 ## O que o aplicativo faz
 
@@ -106,6 +114,6 @@ A [documentação da interface](docs/UX_FLATTER.md) explica as cores, a marca em
 
 O acesso autenticado na URL publicada precisa de validação do proprietário após a revisão e publicação autorizadas da candidata. O envio de e-mail permanece em simulação até autorização e configuração do provedor. O cadastro público deve ser desligado no painel Auth; os testes do ambiente descartável não alteram automaticamente essa configuração externa.
 
-Depois da implementação e da ativação, será feita a auditoria independente da Issue #3. Dados empresariais só podem ser usados com autorização e validação apropriadas. GestãoClick, NF-e, compras automáticas, associação de produtos e previsão sazonal avançada continuam fora desta etapa.
+Depois da implementação e da ativação, será feita a auditoria independente da Issue #3. Dados empresariais só podem ser usados com autorização e validação apropriadas. A ativação real do GestãoClick depende das condições documentadas. NF-e, compras automáticas, sincronização reversa e previsão sazonal avançada continuam fora do escopo.
 
 Quero que o projeto economize tempo na rotina e continue simples de entender e manter, sem transformar uma necessidade pessoal em uma infraestrutura desnecessária.
