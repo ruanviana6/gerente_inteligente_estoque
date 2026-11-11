@@ -13,6 +13,7 @@ import streamlit as st
 from web.errors import AppError, AuthenticationError, AuthorizationError, ConfigurationError
 from web.integration_page import integracoes
 from web.pages import PAGES, _administracao
+from web.release import RELEASE
 from web.sales_page import vendas
 from web.telemetry import measure, performance_scope
 from web.theme import apply_theme, brand_header, page_header, surface
@@ -210,6 +211,7 @@ def run_app(service_factory: Callable | None = None) -> None:
     with performance_scope("rerun"), measure("rerun"):
         with measure("bootstrap"):
             apply_theme()
+            st.html(f'<span hidden data-flatter-release="{RELEASE}"></span>')
             if service_factory is None:
                 from web.service import create_service
 

@@ -25,6 +25,23 @@ ORG = "00000000-0000-0000-0000-000000000010"
 PASSWORD = "Senha-ficticia-12345"
 
 
+def test_permissao_futura_do_banco_nao_bloqueia_login_nem_concede_acesso(backend):
+    """Permite rollout aditivo do schema sem tornar permissões desconhecidas utilizáveis."""
+    auth, transport = backend
+    transport.contexts[USER_A]["permissions"] = ["inventory.view", "funcionalidade.futura"]
+    contexto = auth.login("operador@example.test", PASSWORD)
+    assert contexto.can("inventory.view")
+    assert not contexto.can("funcionalidade.futura")
+
+
+def test_estrutura_de_permissao_invalida_continua_negada(backend):
+    """A compatibilidade não aceita objetos ou valores não textuais como concessão."""
+    auth, transport = backend
+    transport.contexts[USER_A]["permissions"] = [{"inventory.view": True}]
+    with pytest.raises(AuthenticationError):
+        auth.login("operador@example.test", PASSWORD)
+
+
 class FakeAuthTransport:
     """Emula contratos HTTP; não valida RLS, que possui testes PostgreSQL separados."""
 
