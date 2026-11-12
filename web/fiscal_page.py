@@ -64,34 +64,33 @@ def _pedido(servico, contexto):
         st.info('Seu acesso permite consulta. Solicitar uma nota exige permissão fiscal específica.')
         return
     st.subheader('Dados fiscais manuais')
-    tem_previa = bool(st.session_state.get('_fiscal_preview_id'))
-    # As duas escolhas são enviadas juntas. Isso evita rerenders que fecham o
-    # seletor no celular e congela os valores já conferidos numa prévia.
-    with st.form('fiscal_escolhas_manuais'):
-        frete = st.selectbox('Modalidade do frete', list(MODALIDADES_FRETE), index=None,
-                        format_func=lambda codigo: f'{codigo} · {MODALIDADES_FRETE[codigo]}',
-                        placeholder='Selecione uma modalidade', key='fiscal_frete', disabled=tem_previa)
-        contribuinte = st.selectbox('Tipo de contribuinte', list(TIPOS_CONTRIBUINTE), index=None,
-                               format_func=lambda codigo: f'{codigo} · {TIPOS_CONTRIBUINTE[codigo]}',
-                               placeholder='Selecione a situação fiscal validada', key='fiscal_contribuinte', disabled=tem_previa)
-        preparar = st.form_submit_button('Gerar prévia DEMO', type='primary', disabled=tem_previa)
-    st.caption('FOB é uma escolha manual. Isento (2) e não contribuinte (9) são situações distintas. '
-               'A ausência de inscrição estadual não define essa escolha.')
-    if preparar:
-        previa = servico.preparar(numero, frete, contribuinte)
-        st.session_state['_fiscal_preview_id'] = previa['id']
-        st.session_state.pop('fiscal_confirmacao', None)
-        st.session_state.pop('fiscal_aprovacao', None)
-        st.rerun()
     identificador = st.session_state.get('_fiscal_preview_id')
     if not identificador:
+        # As duas escolhas são enviadas juntas, evitando rerenders que fecham
+        # o seletor no celular. Nenhum valor padrão é reaproveitado de pedidos.
+        with st.form('fiscal_escolhas_manuais'):
+            frete = st.selectbox('Modalidade do frete', list(MODALIDADES_FRETE), index=None,
+                                format_func=lambda codigo: f'{codigo} · {MODALIDADES_FRETE[codigo]}',
+                                placeholder='Selecione uma modalidade', key='fiscal_frete')
+            contribuinte = st.selectbox('Tipo de contribuinte', list(TIPOS_CONTRIBUINTE), index=None,
+                                       format_func=lambda codigo: f'{codigo} · {TIPOS_CONTRIBUINTE[codigo]}',
+                                       placeholder='Selecione a situação fiscal validada', key='fiscal_contribuinte')
+            preparar = st.form_submit_button('Gerar prévia DEMO', type='primary')
+        st.caption('FOB é uma escolha manual. Isento (2) e não contribuinte (9) são distintos. A ausência de IE não escolhe o código.')
+        if preparar:
+            previa = servico.preparar(numero, frete, contribuinte)
+            st.session_state['_fiscal_preview_id'] = previa['id']
+            st.session_state.pop('fiscal_confirmacao', None)
+            st.session_state.pop('fiscal_aprovacao', None)
+            st.rerun()
         return
+    # A prévia usa exclusivamente os valores imutáveis recuperados do banco.
+    # Trocar disabled em widgets de formulário pode reiniciar o estado deles.
+    # A edição tem ação própria, invalida a prévia e exige nova confirmação.
     st.button('Alterar regras e gerar nova prévia', on_click=_invalidar_previa)
     previa = servico.previa(identificador)
-    if previa['choices'] != {'modalidade_frete': frete, 'tipo_contribuinte': contribuinte}:
-        _invalidar_previa()
-        st.info('As escolhas mudaram. Gere uma nova prévia.')
-        return
+    frete = previa['choices']['modalidade_frete']
+    contribuinte = previa['choices']['tipo_contribuinte']
     with surface('fiscal_previa'):
         st.subheader('Prévia de cadastro da NF-e · DEMO')
         st.write(f'Pedido {numero}, FLT Comércio → Flagship - Flatter · Destinatário {pedido["cliente"]} · UF {pedido["uf"]}')

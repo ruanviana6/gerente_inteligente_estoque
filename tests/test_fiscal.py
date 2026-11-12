@@ -195,9 +195,9 @@ def test_interface_nao_emite_ao_abrir_e_exige_duas_escolhas(monkeypatch):
     clicar(app, 'Consultar pedido DEMO')
     assert all(s.value is None for s in app.selectbox)
     assert not gateway.previews and not gateway.requests
-    app.selectbox[0].set_value(1).run()
+    app.selectbox[0].set_value(1)
     assert app.selectbox[1].value is None and not gateway.requests
-    app.selectbox[1].set_value(2).run()
+    app.selectbox[1].set_value(2)
     clicar(app, 'Gerar prévia DEMO')
     assert next(b for b in app.button if b.label == 'Confirmar cadastro da NF-e · DEMO').disabled
     next(c for c in app.checkbox if c.key == 'fiscal_confirmacao').check().run()
@@ -213,14 +213,15 @@ def test_editar_escolha_invalida_previa(monkeypatch):
     app, gateway = abrir_fiscal(monkeypatch)
     app.text_input[0].set_value('1001')
     clicar(app, 'Consultar pedido DEMO')
-    app.selectbox[0].set_value(1).run()
-    app.selectbox[1].set_value(2).run()
+    app.selectbox[0].set_value(1)
+    app.selectbox[1].set_value(2)
     clicar(app, 'Gerar prévia DEMO')
     assert any(b.label == 'Confirmar cadastro da NF-e · DEMO' for b in app.button)
-    assert app.selectbox[0].disabled and app.selectbox[1].disabled
+    assert not app.selectbox
     next(c for c in app.checkbox if c.key == 'fiscal_confirmacao').check().run()
     clicar(app, 'Alterar regras e gerar nova prévia')
-    app.selectbox[1].set_value(9).run()
+    app.selectbox[0].set_value(1)
+    app.selectbox[1].set_value(9)
     assert all(b.label != 'Confirmar cadastro da NF-e · DEMO' for b in app.button)
     clicar(app, 'Gerar prévia DEMO')
     assert next(c for c in app.checkbox if c.key == 'fiscal_confirmacao').value is False
