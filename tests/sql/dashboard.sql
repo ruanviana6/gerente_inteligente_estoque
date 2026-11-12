@@ -34,7 +34,7 @@ select dashboard_test.denied('select public.dashboard_payload()','42501','anôni
 set local role authenticated;
 select dashboard_test.login(1);
 select dashboard_test.check((public.dashboard_payload()->>'missing')::boolean,'sem histórico não inventa indicadores');
-select public.import_inventory('[{"codigo":"001","nome":"Produto DEMO","estoque":10,"prazo_entrega_dias":7,"estoque_seguranca":2,"pedidos_pendentes":0,"reservas":0,"cobertura_alvo_dias":30}]','[]','2020-01-31','2020-01-01','2020-01-31');
+select public.import_inventory('[{"codigo":"001","nome":"Produto DEMO","fornecedor":"Fornecedor fictício","estoque":10,"prazo_entrega_dias":7,"estoque_seguranca":2,"pedidos_pendentes":0,"reservas":0,"cobertura_alvo_dias":30}]','[]','2020-01-31','2020-01-01','2020-01-31');
 select public.dashboard_source()->>'batch_id' batch,public.dashboard_source()->>'revision' revision \gset
 select public.dashboard_publish(:'batch',:'revision',dashboard_test.summary());
 select dashboard_test.check(not (public.dashboard_payload()->>'stale')::boolean,'revisão coerente');
@@ -51,7 +51,7 @@ select dashboard_test.denied('select * from public.dashboard_snapshots','42501',
 select dashboard_test.login(3);
 select dashboard_test.check(public.dashboard_payload()->'summary'='null','outra organização não recebe cache');
 select dashboard_test.login(1);
-select public.import_inventory('[{"codigo":"001","nome":"Produto DEMO","estoque":12,"prazo_entrega_dias":7,"estoque_seguranca":2,"pedidos_pendentes":0,"reservas":0,"cobertura_alvo_dias":30}]','[]','2020-02-29','2020-01-01','2020-02-29');
+select public.import_inventory('[{"codigo":"001","nome":"Produto DEMO","fornecedor":"Fornecedor fictício","estoque":12,"prazo_entrega_dias":7,"estoque_seguranca":2,"pedidos_pendentes":0,"reservas":0,"cobertura_alvo_dias":30}]','[]','2020-02-29','2020-01-01','2020-02-29');
 select dashboard_test.check((public.dashboard_payload()->>'stale')::boolean,'novo lote sinaliza desatualização sem reler histórico bruto');
 select dashboard_test.check(public.dashboard_payload()->'metadata'->>'snapshot_date'='2020-01-31','resumo antigo preserva data original');
 reset role;

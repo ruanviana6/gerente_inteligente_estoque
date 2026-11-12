@@ -32,7 +32,7 @@ def _processar(servico, identificador, reconciliar=False):
 def _pedido(servico, contexto):
     """Pesquisa somente pedidos fictícios declarados; abrir a tela não solicita nota."""
     with st.form('fiscal_busca'):
-        numero = st.text_input('Número do pedido do Atacado', max_chars=20, placeholder='Exemplo DEMO: 1001')
+        numero = st.text_input('Número do pedido da FLT Comércio', max_chars=20, placeholder='Exemplo DEMO: 1001')
         pesquisar = st.form_submit_button('Consultar pedido DEMO')
     if pesquisar:
         numero = numero.strip()
@@ -41,13 +41,13 @@ def _pedido(servico, contexto):
         st.session_state['_fiscal_number'] = numero
     numero = st.session_state.get('_fiscal_number')
     if not numero:
-        st.info('Cenários fictícios: 1001 autorizada; 1002 rejeitada; 1003 Em andamento; 1004 outra UF; '
+        st.info('Cenários fictícios: 1001 cadastrada, sem emissão; 1002 cadastro recusado; 1003 Em andamento; 1004 outra UF; '
                 '1005 situação bloqueada; 1006 nota existente; 1007/1008 timeout; 1009 cadastro incompleto; 1010 denegada.')
         return
     pedido = servico.consultar(numero)
     with surface('fiscal_pedido'):
         st.subheader(f'Pedido {pedido["numero"]} · DEMO')
-        st.write(f'Origem: Atacado · Emissora: Varejo · Destino: {pedido["uf"]}')
+        st.write(f'Origem: FLT Comércio · Cadastro: Flagship - Flatter · UF: {pedido["uf"]}')
         st.write(f'Destinatário fictício: {pedido["cliente"]} · Situação: {pedido["situacao"]}')
         st.dataframe(pedido['itens'], hide_index=True, width='stretch', key='fiscal_itens')
         st.write(f'Valor total fictício: R$ {pedido["valor_total"]:.2f}')
@@ -56,7 +56,7 @@ def _pedido(servico, contexto):
         if pedido.get('nota_existente') or pedido.get('solicitacao_existente'):
             st.warning('Existe nota ou solicitação anterior. Não será criada outra nota automaticamente.')
             return
-        if not liberado and pedido['situacao'] != 'Em andamento':
+        if not liberado and not elegibilidade(pedido, autorizacao=True)[0]:
             st.warning('Pedido bloqueado para solicitação.')
             return
     if not contexto.can('fiscal.create_request'):
@@ -69,6 +69,10 @@ def _pedido(servico, contexto):
     contribuinte = st.selectbox('Tipo de contribuinte', list(TIPOS_CONTRIBUINTE), index=None,
                                format_func=lambda codigo: f'{codigo} · {TIPOS_CONTRIBUINTE[codigo]}',
                                placeholder='Selecione a situação fiscal validada', key='fiscal_contribuinte', on_change=_invalidar_previa)
+    if frete is not None:
+        st.caption(f'Transporte selecionado: {frete} · {MODALIDADES_FRETE[frete]}')
+    if contribuinte is not None:
+        st.caption(f'Contribuinte selecionado: {contribuinte} · {TIPOS_CONTRIBUINTE[contribuinte]}')
     st.caption('FOB é uma escolha manual. Isento (2) e não contribuinte (9) são situações distintas. '
                'A ausência de inscrição estadual não define essa escolha.')
     if st.button('Gerar prévia DEMO', type='primary'):
@@ -83,8 +87,8 @@ def _pedido(servico, contexto):
         st.info('As escolhas mudaram. Gere uma nova prévia.')
         return
     with surface('fiscal_previa'):
-        st.subheader('Prévia da NF-e · DEMO')
-        st.write(f'Pedido {numero}, Atacado → Varejo · Destinatário {pedido["cliente"]} · UF {pedido["uf"]}')
+        st.subheader('Prévia de cadastro da NF-e · DEMO')
+        st.write(f'Pedido {numero}, FLT Comércio → Flagship - Flatter · Destinatário {pedido["cliente"]} · UF {pedido["uf"]}')
         st.write(f'Situação: {pedido["situacao"]} · Total fictício: R$ {pedido["valor_total"]:.2f}')
         st.write(f'Frete {frete}: {MODALIDADES_FRETE[frete]}')
         st.write(f'Contribuinte {contribuinte}: {TIPOS_CONTRIBUINTE[contribuinte]}')
@@ -98,8 +102,9 @@ def _pedido(servico, contexto):
                 aprovacao = st.checkbox('Autorizo explicitamente este pedido Em andamento para a simulação', key='fiscal_aprovacao')
             else:
                 st.info('A solicitação ficará aguardando aprovação de um usuário habilitado.')
-        confirmacao = st.checkbox('Conferi a prévia e confirmo somente a solicitação DEMO, sem emissão real', key='fiscal_confirmacao')
-        if st.button('Confirmar solicitação DEMO', type='primary', disabled=not confirmacao):
+        st.info('A confirmação cadastra somente a nota na DEMO. A emissão será manual no GestãoClick. Nenhuma venda ou pedido é criado no varejo.')
+        confirmacao = st.checkbox('Conferi a prévia e autorizo somente o cadastro DEMO da NF-e; a emissão será manual no ERP', key='fiscal_confirmacao')
+        if st.button('Confirmar cadastro da NF-e · DEMO', type='primary', disabled=not confirmacao):
             resultado = servico.confirmar(identificador, confirmacao, aprovacao)
             if resultado.get('duplicate'):
                 st.warning('Solicitação já registrada. A repetição não iniciou outra nota.')
@@ -131,7 +136,7 @@ def _historico(servico, contexto):
             item = por_id[selecionada]
             st.write(f'Frete {item["freight"]}: {MODALIDADES_FRETE[item["freight"]]} · '
                      f'Contribuinte {item["taxpayer"]}: {TIPOS_CONTRIBUINTE[item["taxpayer"]]}')
-            st.caption('Origem: DEMO-ATACADO · Emissora: DEMO-VAREJO · Escolhas preservadas após a confirmação.')
+            st.caption('API única · Origem: FLT Comércio · Cadastro: Flagship - Flatter · Escolhas preservadas. Emissão manual no ERP.')
             if item.get('invoice_number'):
                 st.write('Número fictício: ' + item['invoice_number'])
             if item.get('invoice_key'):
@@ -143,7 +148,9 @@ def _historico(servico, contexto):
                 if st.button('Autorizar pedido DEMO', disabled=not confirma):
                     servico.aprovar(selecionada, confirma)
                     st.rerun()
-            if contexto.can('fiscal.create_request') and item['state'] in {'confirmed', 'needs_reconciliation'}:
+            if item.get('policy_version') != 2:
+                st.info('Registro anterior à regra de cadastro por loja, preservado sem reexecução automática.')
+            if contexto.can('fiscal.create_request') and item.get('policy_version') == 2 and item['state'] in {'confirmed', 'needs_reconciliation'}:
                 reconciliar = item['state'] == 'needs_reconciliation'
                 if st.button('Reconciliar DEMO' if reconciliar else 'Processar simulação'):
                     _processar(servico, selecionada, reconciliar)
@@ -160,8 +167,11 @@ def _historico(servico, contexto):
 
 def fiscal(servico, contexto):
     """Renderiza uma única área fiscal; nenhuma leitura da tela executa o emissor."""
-    page_header('Automação / Notas Fiscais', 'Solicitações do Atacado para a conta Varejo, com conferência humana.')
-    st.warning('DEMONSTRAÇÃO · Emissão real desabilitada. Nenhuma chamada ao GestãoClick. Sem armazenamento de XML/PDF.')
+    page_header('Automação / Notas Fiscais', 'Uma API · FLT Comércio → Flagship - Flatter · Somente cadastro de NF-e.')
+    st.warning('DEMONSTRAÇÃO · Emissão exclusivamente manual no GestãoClick. A automação nunca emite, cria vendas ou pedidos. Sem chamadas reais e sem XML/PDF.')
+    with st.expander('Regras aplicadas ao cadastro'):
+        st.write('Destino Ceará: CE, Ceará ou Ceara. Em separação e Concretizada permitem solicitação. Em andamento exige aprovação identificada. Nota existente ou resultado incerto exige conferência e reconciliação.')
+        st.write('Frete e contribuinte são escolhas manuais, sem padrão. CFOP, NCM, CST/CSOSN e impostos dependem da validação fiscal e da API; não recebem valores inventados.')
     if not contexto.can('fiscal.view'):
         st.error('Acesso fiscal não autorizado.')
         return

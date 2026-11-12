@@ -2,7 +2,7 @@
 
 Criei este projeto para entender melhor o estoque no dia a dia. Saber o saldo de um produto nem sempre é suficiente para decidir quando repor, quanto pedir ou o que merece atenção.
 
-O gerente transforma catálogo, vendas e histórico de disponibilidade em indicadores explicáveis. O GestãoClick continua sendo a fonte operacional oficial da empresa. O conector analítico de consulta está preparado e desativado por padrão; ele nunca pode alterar dados no ERP. A preparação fiscal funciona exclusivamente em DEMO, por um executor separado. Qualquer emissão real futura exige contrato, homologação e nova autorização, somente no Varejo.
+O gerente transforma catálogo, vendas e histórico de disponibilidade em indicadores explicáveis. O GestãoClick continua sendo a fonte operacional oficial da empresa. O conector analítico de consulta está preparado e desativado por padrão; ele nunca pode alterar dados no ERP. A preparação fiscal funciona exclusivamente em DEMO, por um executor separado. Somente o cadastro futuro da NF-e será permitido na loja Flagship - Flatter, por uma API única compartilhada com a origem FLT Comércio. A emissão é exclusivamente manual no ERP e nunca será executada pela automação.
 
 O desenvolvimento acontece com apoio de IA e Vibe Coding: eu defini o problema e as necessidades da rotina, e a IA ajuda a escrever, revisar e testar o código. O objetivo é ter uma ferramenta útil e aprender Python, SQL, Engenharia de Software, dados e logística. As sugestões continuam dependendo de conferência humana.
 
@@ -22,11 +22,11 @@ O Master pode preparar uma carga DEMO em **Administração → Integrações**, 
 
 As dez migrações versionadas foram aplicadas ao projeto Supabase existente após backups cifrados e validação de preservação dos dados e da conta Master. Migrações, RLS e autorização também foram testadas em bancos descartáveis. Veja [ativação segura do conector](docs/ATIVACAO_GESTAOCLICK.md), [contrato](docs/CONTRATO_GESTAOCLICK.md), [análises de vendas](docs/INTELIGENCIA_VENDAS.md) e [Inteligência Comercial](docs/INTELIGENCIA_COMERCIAL.md). O conector real continua desativado.
 
-## Interface consolidada e módulo fiscal DEMO
+## Interface consolidada e cadastro fiscal DEMO
 
 A navegação reúne Visão Geral, Estoque, Reposição Inteligente, Inteligência Comercial, Automação / Notas Fiscais e Relatórios. Acompanhamento de Ações fica em Reposição. Usuários, regras, importação, integrações e auditoria ficam em Administração, conforme as permissões de cada pessoa.
 
-A área fiscal permite consultar pedidos fictícios, escolher manualmente frete e contribuinte, conferir a prévia e confirmar a simulação. Em andamento exige aprovação identificada. Solicitações únicas, histórico e resultados ficam no Supabase. O executor Edge é isolado, não baixa XML/PDF e permanece sem integração real com o ERP. Nenhum perfil nãoMaster recebe os novos acessos por padrão. Consulte [o fluxo DEMO e as permissões](docs/FISCAL_DEMO.md), [o registro da consolidação](docs/CONSOLIDACAO_FISCAL_20261111.md) e [o checklist da API](docs/CHECKLIST_ATIVACAO_API_GESTAOCLICK.md).
+A aba Automação / Notas Fiscais permite consultar pedidos fictícios, escolher manualmente frete e contribuinte, conferir a prévia e confirmar somente o cadastro da NF-e. Origem: FLT Comércio. Destino: Flagship - Flatter. O modelo usa uma API com lojas distintas. Em andamento exige aprovação identificada. Solicitações únicas, histórico e resultados ficam no Supabase. O executor Edge é isolado, apenas cadastra a nota DEMO e encerra o processo. A emissão é exclusivamente manual no ERP. Usa o modelo de uma API com lojas, sem criar venda ou pedido no varejo, baixar XML/PDF ou acessar a API real. Nenhum perfil nãoMaster recebe os novos acessos por padrão. Consulte [o fluxo DEMO e as permissões](docs/FISCAL_DEMO.md), [o registro da consolidação](docs/CONSOLIDACAO_FISCAL_20261111.md) e [o checklist da API](docs/CHECKLIST_ATIVACAO_API_GESTAOCLICK.md).
 
 ## O que o aplicativo faz
 
@@ -150,6 +150,6 @@ versionamento com reversão, sem exclusão automática de histórico.
 
 Os fluxos autenticados foram testados com usuários fictícios e Supabase descartável. A conferência final com a conta real na URL publicada cabe ao proprietário, sem compartilhar senha ou sessão. O envio de e-mail permanece em simulação até autorização e configuração do provedor. O cadastro público deve ser desligado no painel Auth; os testes descartáveis não alteram essa configuração externa.
 
-A versão web integrada está pronta para a auditoria independente da Issue #3. Dados empresariais só podem ser usados com autorização e validação apropriadas. A ativação real do GestãoClick depende das condições documentadas. Emissão real de NF-e, compras automáticas, sincronização reversa e previsão sazonal avançada continuam bloqueadas. O fluxo fiscal DEMO é a preparação atual, não uma homologação da API.
+A versão web integrada está pronta para a auditoria independente da Issue #3. Dados empresariais só podem ser usados com autorização e validação apropriadas. A ativação real do GestãoClick depende das condições documentadas. Emissão automática de NF-e é permanentemente proibida. Compras automáticas, sincronização reversa e previsão sazonal avançada continuam bloqueadas. O fluxo fiscal DEMO é a preparação atual, não uma homologação da API.
 
 Quero que o projeto economize tempo na rotina e continue simples de entender e manter, sem transformar uma necessidade pessoal em uma infraestrutura desnecessária.

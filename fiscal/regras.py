@@ -5,13 +5,14 @@ import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
-CONTRATO = json.loads(Path(__file__).with_name('contrato_v1.json').read_text())
+CONTRATO = json.loads(Path(__file__).with_name('contrato_v2.json').read_text())
 MODALIDADES_FRETE = {int(k): v for k, v in CONTRATO['modalidades_frete'].items()}
 TIPOS_CONTRIBUINTE = {int(k): v for k, v in CONTRATO['tipos_contribuinte'].items()}
 ESTADOS = {
     'awaiting_approval': 'Aguardando aprovação', 'confirmed': 'Confirmada',
-    'processing': 'Em processamento', 'authorized': 'Autorizada (DEMO)',
-    'rejected': 'Rejeitada (DEMO)', 'needs_reconciliation': 'Necessita conferência',
+    'processing': 'Cadastro em processamento', 'authorized': 'Resultado legado (DEMO)',
+    'registered': 'Cadastrada (DEMO), emissão manual no ERP',
+    'rejected': 'Cadastro recusado (DEMO)', 'needs_reconciliation': 'Necessita conferência',
     'blocked': 'Bloqueada',
 }
 

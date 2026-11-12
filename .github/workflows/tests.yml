@@ -1,9 +1,13 @@
 name: Testes Python
 on:
   push:
+    branches: [main, implementacao/web-supabase]
   pull_request:
 permissions:
   contents: read
+concurrency:
+  group: testes-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   supabase_local:
     runs-on: ubuntu-latest
@@ -23,23 +27,54 @@ jobs:
           npx --yes supabase@2.122.0 init
           python - <<'PY'
           from pathlib import Path
-          import tomllib
+          import os, socket, tomllib
           config = Path('supabase/config.toml')
           linhas = []
           secao = ''
+          # Cada job recebe portas e nomes próprios, inclusive em runners reutilizados.
+          reservadas = []
+          def porta():
+              s = socket.socket()
+              s.bind(('127.0.0.1', 0))
+              reservadas.append(s)
+              return s.getsockname()[1]
+          chaves = {'[api]': {'port'}, '[db]': {'port', 'shadow_port'},
+                    '[db.pooler]': {'port'}, '[studio]': {'port'},
+                    '[inbucket]': {'port', 'smtp_port', 'pop3_port'},
+                    '[analytics]': {'port'}, '[edge_runtime]': {'inspector_port'}}
           for linha in config.read_text().splitlines():
               if linha.startswith('['):
                   secao = linha.strip()
               if secao == '[auth]' and linha.strip().startswith('enable_signup ='):
                   linha = 'enable_signup = false'
+              if not secao and linha.strip().startswith('project_id ='):
+                  linha = 'project_id = "teste_' + os.environ['GITHUB_RUN_ID'] + '_' + os.environ['GITHUB_RUN_ATTEMPT'] + '"'
+              campo = linha.strip().split('=', 1)[0].strip()
+              if campo in chaves.get(secao, set()) and not linha.lstrip().startswith('#'):
+                  linha = campo + ' = ' + str(porta())
               linhas.append(linha)
           config.write_text('\n'.join(linhas) + '\n')
           valores = tomllib.loads(config.read_text())
           assert valores['auth']['enable_signup'] is False
           assert valores['auth']['email']['enable_signup'] is True
+          for s in reservadas:
+              s.close()
           PY
           npx --yes supabase@2.122.0 start --help
-          if ! npx --yes supabase@2.122.0 start > /tmp/supabase-start.log 2>&1; then
+          # Só componentes necessários a Auth, REST, Storage e executor DEMO.
+          # Retry limitado é apenas para download/start de containers, nunca ERP.
+          iniciou=false
+          for tentativa in 1 2 3; do
+            if npx --yes supabase@2.122.0 start --exclude studio,postgres-meta,logflare,vector,supavisor,mailpit,realtime,imgproxy > /tmp/supabase-start.log 2>&1; then
+              iniciou=true
+              break
+            fi
+            if ! rg -qi 'rate exceeded|too many requests|429|toomanyrequests' /tmp/supabase-start.log; then
+              break
+            fi
+            sleep 10
+          done
+          if [ "$iniciou" != true ]; then
             python - <<'PY'
           from pathlib import Path
           for linha in Path('/tmp/supabase-start.log').read_text(errors='replace').splitlines():

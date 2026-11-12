@@ -1,3 +1,3 @@
 """Identificador público da versão, sem dados ou configurações da aplicação."""
 
-RELEASE = "fiscal-demo-20261111.1"
+RELEASE = "cadastro-nfe-lojas-20261112.1"

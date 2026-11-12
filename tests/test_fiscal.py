@@ -158,14 +158,14 @@ class GatewayFiscalDemo:
         preview = self.previews[identificador]
         request = {'id': str(uuid4()), 'order_number': preview['order']['numero'], 'state': 'confirmed',
                    'freight': preview['choices']['modalidade_frete'], 'taxpayer': preview['choices']['tipo_contribuinte'],
-                   'created_at': '2026-11-11T17:00:00Z'}
+                   'policy_version': 2, 'created_at': '2026-11-11T17:00:00Z'}
         self.requests.append(request)
         return deepcopy(request)
 
     def executar(self, identificador, reconciliar=False):
         self.executions += 1
         request = next(r for r in self.requests if r['id'] == identificador)
-        request['state'] = 'authorized'
+        request['state'] = 'registered'
         return deepcopy(request)
 
     def listar(self, pagina=0):
@@ -199,9 +199,9 @@ def test_interface_nao_emite_ao_abrir_e_exige_duas_escolhas(monkeypatch):
     assert app.selectbox[1].value is None and not gateway.requests
     app.selectbox[1].set_value(2).run()
     clicar(app, 'Gerar prévia DEMO')
-    assert next(b for b in app.button if b.label == 'Confirmar solicitação DEMO').disabled
+    assert next(b for b in app.button if b.label == 'Confirmar cadastro da NF-e · DEMO').disabled
     next(c for c in app.checkbox if c.key == 'fiscal_confirmacao').check().run()
-    clicar(app, 'Confirmar solicitação DEMO')
+    clicar(app, 'Confirmar cadastro da NF-e · DEMO')
     assert gateway.executions == 1 and gateway.requests[0]['taxpayer'] == 2
     app.run()
     assert gateway.executions == 1
@@ -216,16 +216,22 @@ def test_editar_escolha_invalida_previa(monkeypatch):
     app.selectbox[0].set_value(1).run()
     app.selectbox[1].set_value(2).run()
     clicar(app, 'Gerar prévia DEMO')
-    assert any(b.label == 'Confirmar solicitação DEMO' for b in app.button)
+    assert any(b.label == 'Confirmar cadastro da NF-e · DEMO' for b in app.button)
     app.selectbox[1].set_value(9).run()
-    assert all(b.label != 'Confirmar solicitação DEMO' for b in app.button)
+    assert all(b.label != 'Confirmar cadastro da NF-e · DEMO' for b in app.button)
     assert not gateway.requests
 
 
-def test_contrato_sql_mesmo_conteudo_sem_campos_reais():
-    """A semente SQL e a referência Python precisam representar o mesmo catálogo."""
+def test_contratos_sql_preservam_catalogo_legado_e_regra_atual():
+    """Cada migração mantém o seu contrato; o atual só permite cadastro por loja."""
     import json
-    sql = (Path(__file__).parents[1] / 'supabase/migrations/20261111170000_fiscal_demo.sql').read_text()
-    embedded = sql.split("as $catalogo$ select '", 1)[1].split("'::jsonb $catalogo$", 1)[0]
-    assert json.loads(embedded) == CONTRATO
-    assert all(p['ambiente'] == 'demo' for p in CONTRATO['pedidos'].values())
+    root = Path(__file__).parents[1]
+    migrations = {1: '20261111170000_fiscal_demo.sql', 2: '20261112192003_cadastro_fiscal_por_loja.sql'}
+    for version, migration in migrations.items():
+        sql = (root / 'supabase/migrations' / migration).read_text()
+        embedded = sql.split("as $catalogo$ select '", 1)[1].split("'::jsonb $catalogo$", 1)[0]
+        assert json.loads(embedded) == json.loads((root / f'fiscal/contrato_v{version}.json').read_text())
+    assert CONTRATO['api_unica'] is True
+    assert CONTRATO['emissao_automatica'] is False
+    assert CONTRATO['loja_origem_nome'] == 'FLT Comércio'
+    assert CONTRATO['loja_destino_nome'] == 'Flagship - Flatter'
