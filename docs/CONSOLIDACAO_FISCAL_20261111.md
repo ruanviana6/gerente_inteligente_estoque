@@ -1,5 +1,10 @@
 # Consolidação fiscal DEMO Flatter
 
+> Registro histórico da primeira DEMO. A regra vigente é uma API com lojas e
+> somente cadastro da NF-e, com emissão manual no ERP. As referências abaixo a
+> emissão simulada, executor v1, CI em fila e duas contas descrevem aquela
+> revisão. Consulte [a validação atual](VALIDACAO_CADASTRO_20261112.md).
+
 Registro atualizado em 12/11/2026, horário de Fortaleza. Escopo: Issues #20/#21,
 PR #22 do Gerente e PR #1 da automação. O proprietário autorizou migrações
 aditivas com backup, merges e publicação DEMO. Nenhuma API real foi ativada.
