@@ -54,7 +54,8 @@ jobs:
       - name: Testar Auth e PostgREST reais
         run: |
           npx --yes supabase@2.122.0 functions serve --help > /dev/null
-          npx --yes supabase@2.122.0 functions serve fiscal-demo > /tmp/fiscal-demo-local.log 2>&1 &
+          printf 'FLATTER_LOCAL_DISPOSABLE=1\n' > /tmp/fiscal-demo-local.env
+          npx --yes supabase@2.122.0 functions serve fiscal-demo --env-file /tmp/fiscal-demo-local.env > /tmp/fiscal-demo-local.log 2>&1 &
           python -m pytest tests/live_supabase.py -ra --junitxml=resultado-auth-real.xml
       - name: Guardar resultado sem credenciais locais
         if: always()
@@ -224,5 +225,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - name: Verificar tipos e cenários adversariais do executor Deno
-        run: npx --yes deno@2.6.5 test --check supabase/functions/fiscal-demo/handler_test.ts
+        run: |
+          npx --yes deno@2.6.5 check supabase/functions/fiscal-demo/index.ts
+          npx --yes deno@2.6.5 test --check supabase/functions/fiscal-demo/handler_test.ts
 

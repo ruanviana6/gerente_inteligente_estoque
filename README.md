@@ -12,7 +12,7 @@ A aplicação tem uma única entrada, **app.py**, em Streamlit, com Supabase Aut
 
 A aplicação está em [estoqueinteligente-flatter.streamlit.app](https://estoqueinteligente-flatter.streamlit.app/), usando a branch **implementacao/web-supabase**. A versão web preserva as correções auditadas do MVP e reúne Central de Acessos, Reposição Inteligente, Inteligência Comercial e permanência do login, integradas pelos PRs #16, #17 e #18.
 
-Em 11/11/2026, após o reinício confirmado pelo proprietário, o navegador verificou a versão **web-integrada-20261111.2** no domínio real. A tela de login foi conferida no computador e no celular, uma credencial fictícia inválida foi recusada e nenhum dado ficou exposto sem login. A validação não utilizou a conta Master nem dados empresariais. O [registro da publicação](docs/INTEGRACAO_WEB_20261111.md) separa essa evidência dos testes em ambiente descartável.
+Na publicação anterior, em 11/11/2026, após o reinício confirmado pelo proprietário, o navegador verificou a versão **web-integrada-20261111.2** no domínio real. A tela de login foi conferida no computador e no celular, uma credencial fictícia inválida foi recusada e nenhum dado ficou exposto sem login. A validação não utilizou a conta Master nem dados empresariais. O [registro da publicação](docs/INTEGRACAO_WEB_20261111.md) separa essa evidência dos testes em ambiente descartável.
 
 ## Análises e integração preparada
 

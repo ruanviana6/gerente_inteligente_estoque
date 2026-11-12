@@ -184,7 +184,7 @@ def entrar(pagina, perfil: str) -> None:
 def conferir_perfil(pagina, perfil: str) -> None:
     """Confirma os menus e valores permitidos para o perfil exibido no navegador."""
     menus = pagina.get_by_role("radiogroup", name="Navegação", exact=True)
-    if perfil != "Master":
+    if perfil in {"Operador", "Visualizador"}:
         assert menus.get_by_role("radio", name="Administração", exact=True, include_hidden=True).count() == 0
     if perfil in {"Operador", "Visualizador"}:
         assert menus.get_by_role("radio", name="Importação", exact=True, include_hidden=True).count() == 0
@@ -290,6 +290,9 @@ def verificar_fluxos(browser, base: str, destino: Path, controle: Path, estrito:
             pagina.goto(base + "?perfil=" + perfil, wait_until="domcontentloaded")
             pagina.get_by_role("button", name="Entrar", exact=True).wait_for()
             entrar(pagina, perfil)
+            if perfil in {"Master", "Administrador"}:
+                pagina.get_by_text("Capital a custo · consulta financeira autorizada", exact=True).click()
+                expect(pagina.get_by_text("Capital conhecido em estoque:", exact=False)).to_be_visible()
             conferir_perfil(pagina, perfil)
             paginas[perfil] = pagina
 
