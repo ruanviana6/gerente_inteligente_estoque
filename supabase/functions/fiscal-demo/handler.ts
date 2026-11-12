@@ -60,11 +60,11 @@ export function createHandler(config: Config, transport: typeof fetch = fetch) {
       const started = await call("/rest/v1/rpc/fiscal_begin", { p_request: input.request_id, p_action: input.action });
       if (!started.ok) return answer({ code: "REQUEST_DENIED" }, [401, 403].includes(started.status) ? 403 : 409);
       const claim = await started.json();
-      if (!claim.claim) return answer({ state: claim.state, busy: claim.busy || false, environment: "demo", real_enabled: false });
+      if (!claim.claim) return answer({ state: claim.state, busy: claim.busy || false, environment: "demo", real_enabled: false, operation: "register_only", automatic_issuance: false });
       const finished = await call("/rest/v1/rpc/fiscal_worker_finish", { p_request: input.request_id, p_claim: claim.claim }, true);
       if (!finished.ok) return answer({ code: "RESULT_REQUIRES_CONFERENCE", environment: "demo" }, 409);
       const result = await finished.json();
-      return answer({ id: result.id, state: result.state, environment: "demo", real_enabled: false });
+      return answer({ id: result.id, state: result.state, environment: "demo", real_enabled: false, operation: "register_only", automatic_issuance: false });
     } catch (error) {
       // Erros, corpos, headers e tokens nunca são enviados a logs ou respostas.
       return answer({ code: error instanceof SyntaxError ? "INVALID_JSON" : "EXECUTOR_UNAVAILABLE" }, error instanceof SyntaxError ? 400 : 503);

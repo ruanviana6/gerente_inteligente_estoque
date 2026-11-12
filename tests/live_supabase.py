@@ -258,8 +258,9 @@ def test_fiscal_auth_rpc_e_edge_reais_em_demo(ambiente):
             raise AssertionError('Runtime Edge local não confirmou a recusa anônima no prazo.')
         time.sleep(0.5)
     result = fiscal.executar(request['id'])
-    assert result['state'] == 'authorized' and result['real_enabled'] is False
-    assert fiscal.executar(request['id'])['state'] == 'authorized'
+    assert result['state'] == 'registered' and result['real_enabled'] is False
+    assert result['automatic_issuance'] is False and result['operation'] == 'register_only'
+    assert fiscal.executar(request['id'])['state'] == 'registered'
     assert fiscal.listar()[0]['taxpayer'] == 2
     assert not any('gestaoclick' in path.lower() for _, path, _ in ambiente['chamadas'])
 

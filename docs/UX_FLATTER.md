@@ -1,3 +1,5 @@
+> Regra vigente em 12/11/2026: uma API e lojas FLT Comércio → Flagship - Flatter. Somente cadastro da NF-e, emissão exclusivamente manual no ERP. A aba Automação / Notas Fiscais e o login persistente são obrigatórios. Menções antigas a duas APIs/emissão automática estão superadas. Consulte [CADASTRO_NFE_POR_LOJA.md](CADASTRO_NFE_POR_LOJA.md).
+
 > Atualização vigente de 11/11/2026: a consolidação fiscal DEMO e os seis menus estão em [FISCAL_DEMO.md](FISCAL_DEMO.md). O cliente analítico permanece GET-only. Somente o executor isolado poderá futuramente criar/emitir NF-e direta no Varejo após OpenAPI, homologação e nova autorização. Sem XML/PDF, segundo banco operacional ou alterações reais no ERP nesta entrega. As instruções anteriores abaixo são históricas quando divergirem dessa decisão.
 
 # Interface Flatter

@@ -32,10 +32,10 @@ def executar():
             controller = iniciar(f"set application_name={literal(barrier+'_control')}; begin; select pg_advisory_xact_lock(hashtextextended({literal(barrier)},0));\n")
             processes.append(controller)
             aguardar(f"select exists(select 1 from pg_stat_activity where application_name={literal(barrier+'_control')} and state='idle in transaction')",'controlador fiscal')
-            first = iniciar(f"set application_name={literal(barrier+'_a')}; begin; {login} {operation}; select pg_advisory_xact_lock(hashtextextended({literal(barrier)},0)); commit;")
+            first = iniciar(f"set application_name={literal(barrier+'_a')}; begin; {login} {operation}; select pg_advisory_xact_lock(hashtextextended({literal(barrier)},0)); commit;\n")
             processes.append(first)
             aguardar(f"select exists(select 1 from pg_stat_activity where application_name={literal(barrier+'_a')} and wait_event='advisory')",'primeiro commit fiscal')
-            second = iniciar(f"set application_name={literal(barrier+'_b')}; begin; {login} {operation}; commit;")
+            second = iniciar(f"set application_name={literal(barrier+'_b')}; begin; {login} {operation}; commit;\n")
             processes.append(second)
             aguardar(f"select exists(select 1 from pg_stat_activity where application_name={literal(barrier+'_b')} and wait_event_type='Lock')",'segunda solicitação serializada')
             controller.stdin.write('commit;\n')
@@ -54,7 +54,7 @@ def executar():
         first, second = pair(f'select public.fiscal_begin({literal(request)})', '_execute')
         assert first.get('claim') and not second.get('claim') and second['busy']
         assert psql(f'select count(*) from public.fiscal_requests where organization_id={literal(org)}') == '1'
-        assert psql(f"select count(*) from public.fiscal_events where organization_id={literal(org)} and event_code='demo_creation_started'") == '1'
+        assert psql(f"select count(*) from public.fiscal_events where organization_id={literal(org)} and event_code='demo_registration_started'") == '1'
         print('APROVADO FISCAL: concorrência real mantém uma solicitação e uma única concessão de execução.')
     finally:
         for process in processes:

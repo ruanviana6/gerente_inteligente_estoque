@@ -15,8 +15,8 @@ class LeitorAtacado(Protocol):
         ...
 
 
-class EmissorVarejo(Protocol):
-    """Contrato restrito à NF-e direta, sem criação de pedido ou cadastros."""
+class CadastradorVarejo(Protocol):
+    """Uma API, loja Flagship - Flatter; só cadastro, sem venda ou emissão."""
 
     def consultar_existente(self, identidade: dict) -> dict:
         """Deverá reconciliar a identidade completa antes de qualquer criação."""
@@ -24,10 +24,6 @@ class EmissorVarejo(Protocol):
 
     def criar_nfe_direta(self, previa: dict) -> dict:
         """Depende da comprovação de NF-e sem pedido na conta Varejo."""
-        ...
-
-    def emitir_nfe(self, identificador: str) -> dict:
-        """Deverá executar uma única tentativa autorizada, sem retry de POST."""
         ...
 
     def consultar_resultado(self, identificador: str) -> dict:

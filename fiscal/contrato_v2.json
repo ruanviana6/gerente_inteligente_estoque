@@ -1,0 +1,297 @@
+{
+  "versao": 2,
+  "ambiente": "demo",
+  "origem": "DEMO-FLT-COMERCIO",
+  "destino": "DEMO-FLAGSHIP-FLATTER",
+  "modalidades_frete": {
+    "0": "CIF: por conta do remetente",
+    "1": "FOB: por conta do destinatário",
+    "2": "Por conta de terceiros",
+    "3": "Transporte próprio do remetente",
+    "4": "Transporte próprio do destinatário",
+    "9": "Sem ocorrência de transporte"
+  },
+  "tipos_contribuinte": {
+    "1": "Contribuinte do ICMS",
+    "2": "Contribuinte isento de inscrição estadual",
+    "9": "Não contribuinte do ICMS"
+  },
+  "estados_fiscais": [
+    "Em aberto",
+    "Aprovada",
+    "Reprovada",
+    "Denegada",
+    "Cancelada",
+    "Enviando",
+    "Corrigida"
+  ],
+  "pedidos": {
+    "1001": {
+      "numero": "1001",
+      "id": "DEMO-ATACADO-1001",
+      "origem": "DEMO-FLT-COMERCIO",
+      "destino": "DEMO-FLAGSHIP-FLATTER",
+      "ambiente": "demo",
+      "cliente": "Cliente DEMO 1001",
+      "uf": "CE",
+      "situacao": "Em separação",
+      "cenario": "cadastrada",
+      "itens": [
+        {
+          "sku": "DEMO-01",
+          "produto": "Produto DEMO",
+          "quantidade": 2,
+          "valor_unitario": 50,
+          "total": 100
+        }
+      ],
+      "valor_total": 100,
+      "pendencias": [
+        "Somente cadastro fictício. Emissão exclusivamente manual no ERP; tributação real não homologada."
+      ],
+      "nota_existente": false,
+      "api_scope": "DEMO-ERP-UNICO"
+    },
+    "1002": {
+      "numero": "1002",
+      "id": "DEMO-ATACADO-1002",
+      "origem": "DEMO-FLT-COMERCIO",
+      "destino": "DEMO-FLAGSHIP-FLATTER",
+      "ambiente": "demo",
+      "cliente": "Cliente DEMO 1002",
+      "uf": "Ceará",
+      "situacao": "Concretizada",
+      "cenario": "cadastro_recusado",
+      "itens": [
+        {
+          "sku": "DEMO-01",
+          "produto": "Produto DEMO",
+          "quantidade": 2,
+          "valor_unitario": 50,
+          "total": 100
+        }
+      ],
+      "valor_total": 100,
+      "pendencias": [
+        "Somente cadastro fictício. Emissão exclusivamente manual no ERP; tributação real não homologada."
+      ],
+      "nota_existente": false,
+      "api_scope": "DEMO-ERP-UNICO"
+    },
+    "1003": {
+      "numero": "1003",
+      "id": "DEMO-ATACADO-1003",
+      "origem": "DEMO-FLT-COMERCIO",
+      "destino": "DEMO-FLAGSHIP-FLATTER",
+      "ambiente": "demo",
+      "cliente": "Cliente DEMO 1003",
+      "uf": "Ceara",
+      "situacao": "Em andamento",
+      "cenario": "cadastrada",
+      "itens": [
+        {
+          "sku": "DEMO-01",
+          "produto": "Produto DEMO",
+          "quantidade": 2,
+          "valor_unitario": 50,
+          "total": 100
+        }
+      ],
+      "valor_total": 100,
+      "pendencias": [
+        "Somente cadastro fictício. Emissão exclusivamente manual no ERP; tributação real não homologada."
+      ],
+      "nota_existente": false,
+      "api_scope": "DEMO-ERP-UNICO"
+    },
+    "1004": {
+      "numero": "1004",
+      "id": "DEMO-ATACADO-1004",
+      "origem": "DEMO-FLT-COMERCIO",
+      "destino": "DEMO-FLAGSHIP-FLATTER",
+      "ambiente": "demo",
+      "cliente": "Cliente DEMO 1004",
+      "uf": "SP",
+      "situacao": "Em separação",
+      "cenario": "fora_uf",
+      "itens": [
+        {
+          "sku": "DEMO-01",
+          "produto": "Produto DEMO",
+          "quantidade": 2,
+          "valor_unitario": 50,
+          "total": 100
+        }
+      ],
+      "valor_total": 100,
+      "pendencias": [
+        "Somente cadastro fictício. Emissão exclusivamente manual no ERP; tributação real não homologada."
+      ],
+      "nota_existente": false,
+      "api_scope": "DEMO-ERP-UNICO"
+    },
+    "1005": {
+      "numero": "1005",
+      "id": "DEMO-ATACADO-1005",
+      "origem": "DEMO-FLT-COMERCIO",
+      "destino": "DEMO-FLAGSHIP-FLATTER",
+      "ambiente": "demo",
+      "cliente": "Cliente DEMO 1005",
+      "uf": "CE",
+      "situacao": "Cancelada",
+      "cenario": "bloqueado",
+      "itens": [
+        {
+          "sku": "DEMO-01",
+          "produto": "Produto DEMO",
+          "quantidade": 2,
+          "valor_unitario": 50,
+          "total": 100
+        }
+      ],
+      "valor_total": 100,
+      "pendencias": [
+        "Somente cadastro fictício. Emissão exclusivamente manual no ERP; tributação real não homologada."
+      ],
+      "nota_existente": false,
+      "api_scope": "DEMO-ERP-UNICO"
+    },
+    "1006": {
+      "numero": "1006",
+      "id": "DEMO-ATACADO-1006",
+      "origem": "DEMO-FLT-COMERCIO",
+      "destino": "DEMO-FLAGSHIP-FLATTER",
+      "ambiente": "demo",
+      "cliente": "Cliente DEMO 1006",
+      "uf": "CE",
+      "situacao": "Concretizada",
+      "cenario": "existente",
+      "itens": [
+        {
+          "sku": "DEMO-01",
+          "produto": "Produto DEMO",
+          "quantidade": 2,
+          "valor_unitario": 50,
+          "total": 100
+        }
+      ],
+      "valor_total": 100,
+      "pendencias": [
+        "Somente cadastro fictício. Emissão exclusivamente manual no ERP; tributação real não homologada."
+      ],
+      "nota_existente": true,
+      "api_scope": "DEMO-ERP-UNICO"
+    },
+    "1007": {
+      "numero": "1007",
+      "id": "DEMO-ATACADO-1007",
+      "origem": "DEMO-FLT-COMERCIO",
+      "destino": "DEMO-FLAGSHIP-FLATTER",
+      "ambiente": "demo",
+      "cliente": "Cliente DEMO 1007",
+      "uf": "CE",
+      "situacao": "Em separação",
+      "cenario": "timeout_criacao",
+      "itens": [
+        {
+          "sku": "DEMO-01",
+          "produto": "Produto DEMO",
+          "quantidade": 2,
+          "valor_unitario": 50,
+          "total": 100
+        }
+      ],
+      "valor_total": 100,
+      "pendencias": [
+        "Somente cadastro fictício. Emissão exclusivamente manual no ERP; tributação real não homologada."
+      ],
+      "nota_existente": false,
+      "api_scope": "DEMO-ERP-UNICO"
+    },
+    "1008": {
+      "numero": "1008",
+      "id": "DEMO-ATACADO-1008",
+      "origem": "DEMO-FLT-COMERCIO",
+      "destino": "DEMO-FLAGSHIP-FLATTER",
+      "ambiente": "demo",
+      "cliente": "Cliente DEMO 1008",
+      "uf": "CE",
+      "situacao": "Em separação",
+      "cenario": "timeout_apos_cadastro",
+      "itens": [
+        {
+          "sku": "DEMO-01",
+          "produto": "Produto DEMO",
+          "quantidade": 2,
+          "valor_unitario": 50,
+          "total": 100
+        }
+      ],
+      "valor_total": 100,
+      "pendencias": [
+        "Somente cadastro fictício. Emissão exclusivamente manual no ERP; tributação real não homologada."
+      ],
+      "nota_existente": false,
+      "api_scope": "DEMO-ERP-UNICO"
+    },
+    "1009": {
+      "numero": "1009",
+      "id": "DEMO-ATACADO-1009",
+      "origem": "DEMO-FLT-COMERCIO",
+      "destino": "DEMO-FLAGSHIP-FLATTER",
+      "ambiente": "demo",
+      "cliente": "Cliente DEMO 1009",
+      "uf": "CE",
+      "situacao": "Em separação",
+      "cenario": "incompleto",
+      "itens": [
+        {
+          "sku": "DEMO-01",
+          "produto": "Produto DEMO",
+          "quantidade": 2,
+          "valor_unitario": 50,
+          "total": 100
+        }
+      ],
+      "valor_total": 100,
+      "pendencias": [
+        "Somente cadastro fictício. Emissão exclusivamente manual no ERP; tributação real não homologada.",
+        "Cadastro obrigatório incompleto no cenário DEMO."
+      ],
+      "nota_existente": false,
+      "api_scope": "DEMO-ERP-UNICO"
+    },
+    "1010": {
+      "numero": "1010",
+      "id": "DEMO-ATACADO-1010",
+      "origem": "DEMO-FLT-COMERCIO",
+      "destino": "DEMO-FLAGSHIP-FLATTER",
+      "ambiente": "demo",
+      "cliente": "Cliente DEMO 1010",
+      "uf": "CE",
+      "situacao": "Concretizada",
+      "cenario": "denegada",
+      "itens": [
+        {
+          "sku": "DEMO-01",
+          "produto": "Produto DEMO",
+          "quantidade": 2,
+          "valor_unitario": 50,
+          "total": 100
+        }
+      ],
+      "valor_total": 100,
+      "pendencias": [
+        "Somente cadastro fictício. Emissão exclusivamente manual no ERP; tributação real não homologada."
+      ],
+      "nota_existente": true,
+      "api_scope": "DEMO-ERP-UNICO"
+    }
+  },
+  "api_unica": true,
+  "api_scope": "DEMO-ERP-UNICO",
+  "loja_origem_nome": "FLT Comércio",
+  "loja_destino_nome": "Flagship - Flatter",
+  "operacao": "cadastro_nfe_sem_emissao",
+  "emissao_automatica": false
+}

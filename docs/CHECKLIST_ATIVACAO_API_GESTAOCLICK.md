@@ -1,104 +1,101 @@
-# Checklist de ativação das APIs GestãoClick
+# Ativação da API GestãoClick: cadastro por loja
 
-Este documento é o procedimento vigente para os dois repositórios Flatter.
-A preparação DEMO não autoriza consultas ou emissões reais. Não cole tokens,
-senhas, dados pessoais, XML ou PDF em issues, PRs ou no chat.
+Regra vigente de 12/11/2026: uma API, lojas distintas. Origem FLT Comércio
+(atacado), destino Flagship - Flatter (varejo). A automação apenas CADASTRA
+a NF-e. Emissão exclusivamente manual no ERP, nunca automática.
+As instruções anteriores de duas APIs ou de criar e emitir estão substituídas.
 
-## Já preparado
+## Preparação já implementada
 
-- Aplicação única em Streamlit com Auth, permissões e Supabase existente.
-- Cliente analítico GET-only, separado do componente fiscal.
-- Prévia imutável, escolhas fiscais manuais, confirmação e aprovação Auth.
-- Solicitações únicas por organização, origem, ID estável do pedido, destino e
-  ambiente; diário, estados, concessão temporária e auditoria.
-- Executor Edge sob demanda exclusivamente DEMO, sem adaptador ou segredo ERP.
-- Contratos de referência e cenários compartilhados com a automação Python.
-- Bloqueio de resultado incerto, sem repetir POST nem apagar histórico.
-- Ausência de armazenamento/download automático de XML/PDF.
-- Dashboard compacto; nenhuma consulta ERP ou treinamento ao trocar de área.
+- Aplicação única com Supabase Auth, permissões, RLS e login persistente.
+- Aba Automação / Notas Fiscais com seleções manuais, prévia e confirmação.
+- Frete 0/1/2/3/4/9, sem padrão; contribuinte 1/2/9, sem confundir isento e não contribuinte.
+- Apenas Ceará; Em separação/Concretizada elegíveis, Em andamento exige aprovação Auth.
+- Solicitação única por organização, conexão, lojas, ID estável do pedido e ambiente.
+- Diário anterior ao cadastro, proteção concorrente e reconciliação após resultado incerto.
+- Executor isolado DEMO, sem emissão, venda, pedido, download ou armazenamento XML/PDF.
+- Cliente analítico somente leitura; nenhuma consulta ERP ou treinamento na navegação.
+- Adaptadores futuros com uma credencial e IDs de lojas separados, sem rotas reais presumidas.
 
-## O que o proprietário precisa fornecer
+A publicação/testes efetivos devem ser conferidos no relatório da revisão.
+Código preparado não equivale a cadastro real homologado.
 
-1. OpenAPI autorizado **da conta Atacado** e **da conta Varejo**, com versão/data,
-   base URLs, lojas/empresas e limites. Não assumir que os contratos são iguais.
-2. Confirmação da empresa sobre finalidade, usuários autorizados e tratamento
-   de dados de clientes/cidades, conforme LGPD. Definir minimização e retenção.
-3. Credenciais diferentes por conta/ambiente, inseridas somente no ambiente
-   protegido. Atacado com menor privilégio e somente leitura quando disponível.
-   Varejo com escopo mínimo de consulta e NF-e. Nunca no navegador ou Git.
-4. Responsável fiscal para validar destinatário, inscrição estadual, produtos,
-   NCM, CFOP, CST/CSOSN, tributação, natureza, transporte e pagamento aplicáveis.
-5. Nova autorização explícita para homologação real com poucos pedidos
-   identificados. A autorização de publicar DEMO não atende essa etapa.
+## O proprietário precisa fornecer
 
-Não é necessário recriar o app, Supabase, Master ou Secrets atuais.
+1. **OpenAPI autorizado da API única**, com versão/data, base URL e limites.
+2. **IDs reais das lojas** FLT Comércio e Flagship - Flatter, confirmados por
+   listagem oficial. Não inferir por nome, ordem na tela ou CNPJ da imagem.
+3. **Uma credencial da API**, em ambiente protegido, com o menor privilégio
+   disponível. Nunca enviar chaves no chat, Git ou navegador. O executor guarda
+   o segredo; o cliente analítico continua limitado a consultas.
+4. Responsável fiscal para validar cliente, inscrição estadual, produtos, NCM,
+   CFOP, CST/CSOSN, impostos, natureza, transporte e pagamento aplicáveis.
+5. Autorização da empresa para finalidade, dados pessoais e histórico, seguida
+   de autorização explícita de homologação real com poucos pedidos identificados.
+
+Não recriar Supabase, Master, app ou Secrets atuais. A configuração futura usa
+GESTAOCLICK_API_BASE_URL, GESTAOCLICK_API_ACCESS_TOKEN,
+GESTAOCLICK_API_SECRET_ACCESS, GESTAOCLICK_LOJA_ATACADO_ID e
+GESTAOCLICK_LOJA_VAREJO_ID. Os valores serão inseridos apenas no executor
+protegido. NFE_CADASTRO_REAL_HABILITADO continua falso e não basta, sozinho,
+para liberar uma operação sem adaptador homologado. Não há flag de emissão.
 
 ## Contrato a validar, sem inventar endpoints
 
-| Operação | Conta | Verificação obrigatória |
-| --- | --- | --- |
-| Autenticação e limites | Ambas | Headers oficiais, expiração, escopos, paginação, 429, timeouts e HTTPS |
-| Pedido por número/ID | Atacado | ID estável, organização, loja, status e abrangência; número não é chave global |
-| Cliente e destino | Atacado | Identidade mínima, UF, cidade e qualidade; origem de cidade de entrega/cadastro |
-| Itens/estoque/vendas | Atacado | Unidade, devolução, cancelamento, datas, reserva, estoque já baixado e histórico completo/incremental |
-| Nota existente | Varejo | Correspondência com pedido origem, cliente, itens, organização e ambiente; todos os estados |
-| Correspondência fiscal | Varejo | Cliente e produtos já existentes; **nunca criar ou editar cadastros** |
-| Criação direta de NF-e | Varejo | A API precisa permitir sem criar pedido. Caso contrário, registrar impedimento e parar |
-| Emissão | Varejo | ID externo persistido antes do comando, sem retry; resposta síncrona/assíncrona comprovada |
-| Resultado/reconciliação | Varejo | Consulta somente leitura por ID/identidade, inclusive após timeout de criação sem ID retornado |
+| Operação | Verificação obrigatória |
+| --- | --- |
+| Autenticação única | Headers, validade, escopos, empresa e lojas acessíveis |
+| Lojas | IDs estáveis e correspondência FLT Comércio/Flagship - Flatter |
+| Pedido na origem | Número e ID, loja, destinatário, UF, status, itens e abrangência |
+| Catálogo e histórico | Unidades, devoluções, cancelamentos, reservas, disponibilidade e dados completos/incrementais |
+| Nota existente | Consulta por identidade completa, inclusive rascunho, cadastro pendente, emitida e estado desconhecido |
+| Correspondência fiscal | Cliente/produto existentes na loja de destino, sem criar ou editar cadastros |
+| Cadastrar NF-e direta | Precisa funcionar SEM venda/pedido no varejo e SEM emitir ou enviar automaticamente |
+| Consultar/reconciliar | Somente leitura, por ID externo e referência de origem, inclusive depois de timeout sem ID |
 
-Os códigos internos de frete 0/1/2/3/4/9 e contribuinte 1/2/9 seguem o contrato
-da prévia. Os nomes de campos e códigos da API precisam de adaptador validado.
-Não copiar nomes XML como parâmetros presumidos. Falta de inscrição estadual
-não define isento ou não contribuinte.
+Não implementar chamada de emissão. Não usar o botão ou a operação equivalente
+a **Cadastrar e emitir**. A operação permitida equivale somente a **Cadastrar**.
+Se a API não oferecer esse comportamento, registrar o impedimento e não criar
+uma venda/pedido nem emitir como alternativa.
 
-Os rótulos conhecidos Em aberto, Aprovada, Reprovada, Denegada, Cancelada,
-Enviando e Corrigida não autorizam presumir códigos numéricos, transições ou
-nova emissão. Estado desconhecido e Reprovada exigem conferência. Pedido em
-andamento não baixa estoque; em separação/concretizada não geram segunda baixa.
+Os códigos internos de frete e contribuinte precisam de adaptador para os campos
+reais do OpenAPI. Não copiar nomes XML como parâmetros presumidos. Falta de IE
+não determina isento ou não contribuinte. Informação fiscal essencial ausente
+bloqueia cadastro real. Não inventar números de NF-e, chave ou protocolo.
 
-## Efeito sobre a emissão automática do ERP
+## Efeitos do cadastro no ERP
 
-Conferir o alerta oficial sobre emissão/cancelamento pela API e eventual
-interferência no agendamento da loja:
-https://central.gestaoclick.com.br/hc/pt-br/articles/1874-emitir-e-cancelar-nota-fiscal-pela-api-linha-fis
+Validar se o simples cadastro da nota pode movimentar estoque, gerar venda,
+acionar envio/agendamento automático ou alterar configurações da loja. Se
+houver qualquer efeito proibido ou não esclarecido, manter o cadastro real
+bloqueado e consultar documentação/suporte. A automação não altera configurações
+para contornar o problema. Emissão e seus efeitos ficam sob operação manual.
 
-Confirmar com suporte/documentação da conta **antes** de habilitar qualquer
-operação fiscal, inclusive teste autenticado que possa mudar o agendamento.
-Se o efeito não for esclarecido, manter a ativação bloqueada. Cancelar,
-inutilizar, excluir ou corrigir notas não faz parte da automação autorizada.
+Pedidos Em separação/Concretizada podem ter baixado estoque na origem: não
+realizar uma segunda baixa. Em andamento é apenas situação observada e exige
+aprovação explícita. Nota já cadastrada ou emitida bloqueia duplicidade.
+Estado desconhecido exige reconciliação, nunca retry de POST.
 
 ## Homologação e ativação controlada
 
-1. Versionar contrato sanitizado, hash e mapas de campos; revisar endpoints e
-   allowlists. Nenhum segredo ou histórico empresarial no repositório público.
-2. Validar apenas leituras autorizadas e reconciliar amostras com o ERP.
-   Confirmar integridade de pedidos/itens e limites do histórico importado.
-3. Implementar o adaptador no **único executor**. Provar journal separado antes
-   de criar e antes de emitir, ID externo persistido, consultas de reconciliação
-   e bloqueio de toda mutação fora de criar/emitir NF-e direta no Varejo.
-4. Medir duração real e limites Edge: 150 s de wall time no Free, 2 s de CPU e
-   256 MB na documentação consultada em 11/11/2026. O DEMO usa timeouts de 15 s
-   por chamada Supabase e concessão de 60 s. Ajustar somente após medições;
-   não prometer adequação à latência do ERP antes de testá-la.
-5. Testar sessão expirada, revogação, duas pessoas simultâneas, repetição,
-   nota existente, todos os estados, rejeição, 401/403/429/5xx, timeout antes e
-   depois de criar/emitir e falha ao persistir o resultado. Nunca repetir POST.
-6. Verificar backup cifrado e restauração, RLS, auditoria, cotas e chave de
-   desativação. A reversão desativa o executor e preserva solicitações incertas;
-   não desfaz nota no ERP nem libera duplicidade.
-7. Validar poucos pedidos previamente autorizados com o responsável fiscal,
-   conferir manualmente no ERP, registrar período, conta, versão e resultado.
-8. Solicitar autorização final de ativação, conceder permissões individualmente,
-   ativar por conta/ambiente e monitorar erros/cotas. Manter Atacado GET-only.
+1. Versionar contrato sanitizado/hash e mapas aprovados, sem segredos ou dados reais.
+2. Conferir leituras autorizadas e reconciliar amostras por loja com o ERP.
+3. Implementar somente cadastro direto no único executor, com allowlist mínima,
+   journal durável, ID persistido e consulta de reconciliação. Não mapear emissão.
+4. Medir latência real e limites Free da Edge Function: 150 s de wall time,
+   2 s de CPU e 256 MB na documentação consultada. A DEMO não comprova latência ERP.
+5. Testar sessões expiradas, revogação, usuários simultâneos, repetição, nota
+   anterior, dados incompletos, recusa do cadastro, 401/403/429/5xx e timeout
+   antes/depois de receber ID. Nenhum POST pode ser repetido automaticamente.
+6. Validar nova confirmação humana de solicitações expiradas sem apagar histórico
+   ou mudar a identidade. Operação já iniciada/incerta sempre exige reconciliação.
+7. Conferir backup/restauração, RLS, auditoria, cotas e desligamento do executor.
+   Desligar preserva dados e não desfaz nem modifica a nota no ERP.
+8. Com autorização específica, cadastrar poucos pedidos e conferir manualmente
+   no ERP. A emissão é feita por pessoa autorizada diretamente no GestãoClick.
+9. Obter aceite final, ativar gradualmente, monitorar e preservar leitura estrita
+   da origem e do módulo analítico. Não habilitar e-mails reais junto da mudança.
 
-Não ativar envio real de e-mails junto desta mudança. Relatórios têm configuração
-e autorização próprias. Arquivamento/exclusão de histórico exige aprovação,
-backup verificável e recuperação testada; não existe exclusão automática.
-
-## Bloqueios ainda existentes
-
-OpenAPI, credenciais protegidas, mapeamento fiscal, correspondência entre contas,
-emissão direta sem pedido, efeitos no agendamento, latência e homologação reais
-dependem das etapas acima. O adaptador real levanta erro por construção.
-Testes com dados fictícios comprovam o fluxo DEMO e suas proteções, não a API real.
+Nenhuma exclusão/arquivamento automático de histórico está autorizado. Retenção
+exige aprovação, backup verificável e recuperação testada. Serviços pagos não
+fazem parte deste procedimento.

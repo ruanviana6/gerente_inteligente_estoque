@@ -1,9 +1,13 @@
 name: Desempenho e interface Flatter
 on:
   push:
+    branches: [main, implementacao/web-supabase]
   pull_request:
 permissions:
   contents: read
+concurrency:
+  group: interface-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   navegador:
     runs-on: ubuntu-latest

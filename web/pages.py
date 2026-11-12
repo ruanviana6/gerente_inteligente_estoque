@@ -782,7 +782,7 @@ def _administracao(servico: Any, contexto: Any) -> None:
     elif area == "Configuração fiscal":
         fiscal = FiscalService(servico.auth)
         config = fiscal.configuracao()
-        st.info("Executor: Supabase Edge Functions · Emissão real bloqueada · Sem XML/PDF.")
+        st.info("Uma API · FLT Comércio → Flagship - Flatter · Somente cadastro. Emissão manual no GestãoClick, nunca pela automação. Sem XML/PDF.")
         habilitado = st.checkbox("Habilitar módulo DEMO", value=config['demo_enabled'])
         if st.button("Salvar configuração fiscal"):
             fiscal.configurar(habilitado)

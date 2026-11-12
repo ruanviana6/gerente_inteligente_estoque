@@ -42,6 +42,8 @@ select fiscal_test.denied('select public.fiscal_order(''1001'')','42501','anôni
 set local role authenticated;
 select fiscal_test.login(1);
 select fiscal_test.check(public.fiscal_settings()->>'real_enabled'='false','real permanentemente desligado');
+select fiscal_test.check(public.fiscal_settings()->>'automatic_issuance'='false'
+ and public.fiscal_settings()->>'operation'='register_only','emissão automática não é uma configuração permitida');
 select fiscal_test.denied('select * from public.fiscal_requests','42501','leitura direta negada');
 select fiscal_test.denied('delete from public.fiscal_events','42501','histórico não pode ser apagado');
 select fiscal_test.denied('select public.fiscal_worker_finish(gen_random_uuid(),gen_random_uuid())','42501','JWT humano não conclui executor');
@@ -70,7 +72,7 @@ select fiscal_test.check(:'other_request'<>:'request1','mesmo número em outra o
 set local role service_role;
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
 select fiscal_test.denied(format('select public.fiscal_worker_finish(%L,gen_random_uuid())',:'request1'),'42501','nonce incorreto recusado');
-select fiscal_test.check(public.fiscal_worker_finish(:'request1',:'claim1')->>'state'='authorized','executor DEMO autorizado');
+select fiscal_test.check(public.fiscal_worker_finish(:'request1',:'claim1')->>'state'='registered','cadastro DEMO concluído sem emissão');
 select fiscal_test.denied(format('select public.fiscal_worker_finish(%L,%L)',:'request1',:'claim1'),'42501','nonce consumido não reutilizável');
 set local role authenticated;
 select fiscal_test.login(3);
@@ -107,7 +109,7 @@ begin
 end $$;
 select fiscal_test.check(fiscal_test.finish('1002')='rejected','rejeição preservada sem repetir criação');
 select fiscal_test.check(fiscal_test.finish('1007')='needs_reconciliation','timeout na criação exige conferência');
-select fiscal_test.check(fiscal_test.finish('1008')='needs_reconciliation','timeout na emissão exige conferência');
+select fiscal_test.check(fiscal_test.finish('1008')='needs_reconciliation','timeout após cadastro exige conferência');
 select fiscal_test.check((select external_id is null from public.fiscal_requests where order_number='1007'),'timeout de criação não inventa identificador');
 select fiscal_test.check((select external_id is not null from public.fiscal_requests where order_number='1008'),'identificador após criação preservado');
 set local role authenticated;
@@ -118,7 +120,7 @@ reset role;
 select id reconciliation_id from public.fiscal_requests where order_number='1007' \gset
 set local role service_role;
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
-select fiscal_test.check(public.fiscal_worker_finish(:'reconciliation_id',:'reconciliation_claim')->>'state'='authorized','reconciliação explícita DEMO sem recriação');
+select fiscal_test.check(public.fiscal_worker_finish(:'reconciliation_id',:'reconciliation_claim')->>'state'='registered','reconciliação explícita DEMO sem recriação');
 set local role authenticated;
 select fiscal_test.login(5);
 select fiscal_test.check(jsonb_array_length(public.fiscal_audit_list())=5,'auditor consulta metadados da organização');
@@ -134,4 +136,31 @@ reset role;
 select fiscal_test.check(not exists(select 1 from public.role_permissions where permission like 'fiscal.%'),'nenhum acesso fiscal herdado automaticamente');
 select fiscal_test.check((select bool_and(relrowsecurity) from pg_class where oid in('public.fiscal_requests'::regclass,'public.fiscal_previews'::regclass,'public.fiscal_events'::regclass,'public.fiscal_configuration'::regclass)),'RLS habilitada em todas as tabelas fiscais');
 select fiscal_test.check(not has_table_privilege('service_role','public.fiscal_requests','SELECT,INSERT,UPDATE,DELETE'),'executor usa RPC específica, sem acesso direto');
+select fiscal_test.check((select bool_and(policy_version=2 and api_scope='DEMO-ERP-UNICO'
+ and source_store='DEMO-FLT-COMERCIO' and destination_store='DEMO-FLAGSHIP-FLATTER') from public.fiscal_requests),
+ 'uma conexão com lojas identificadas, sem IDs reais presumidos');
+select fiscal_test.check((select bool_and(invoice_key is null and invoice_number is null) from public.fiscal_requests),
+ 'cadastro não gera chave nem autorização fiscal');
+select fiscal_test.check((select bool_and(official_state='Em aberto') from public.fiscal_requests where state='registered'),
+ 'cadastro fica em aberto para emissão manual');
+select fiscal_test.check(not exists(select 1 from public.fiscal_events where event_code like '%emission%' or event_code like '%issuance%'),
+ 'nenhuma etapa de emissão no diário operacional');
+-- Registros anteriores à regra por loja são preservados e bloqueiam duplicidade.
+insert into public.fiscal_previews(organization_id,author_id,order_number,order_id,source_account,destination_account,freight,taxpayer,fingerprint)
+values('d3000000-0000-4000-8000-000000000002','d1000000-0000-4000-8000-000000000002','1002','DEMO-ATACADO-1002','DEMO-ATACADO','DEMO-VAREJO',1,9,repeat('e',64)) returning id legacy_preview \gset
+insert into public.fiscal_requests(organization_id,preview_id,requester_id,requester_session,requester_expiry,
+ order_number,order_id,source_account,destination_account,environment,freight,taxpayer,preview_version,fingerprint,state)
+values('d3000000-0000-4000-8000-000000000002',:'legacy_preview','d1000000-0000-4000-8000-000000000002',
+ 'd2000000-0000-4000-8000-000000000002',now()+interval '1 hour','1002','DEMO-ATACADO-1002','DEMO-ATACADO','DEMO-VAREJO','demo',1,9,1,repeat('e',64),'confirmed') returning id legacy_request \gset
+select fiscal_test.denied(format('update public.fiscal_previews set api_scope=''incompleto'' where id=%L',:'legacy_preview'),
+ '23514','escopo parcial com política nula é recusado');
+set local role authenticated;
+select fiscal_test.login(2);
+select public.fiscal_configure(true);
+select fiscal_test.denied(format('select public.fiscal_confirm(%L,true,false)',:'legacy_preview'),'42501','prévia legada não é confirmada na política nova');
+select fiscal_test.check(public.fiscal_begin(:'legacy_request')->>'legacy'='true','solicitação legada não adquire concessão nova');
+select fiscal_test.denied($q$select public.fiscal_preview('1002','{"modalidade_frete":1,"tipo_contribuinte":9}')$q$,'22023','legado incerto exige conferência antes de novo cadastro');
+reset role;
+select fiscal_test.check((select policy_version is null and state='confirmed' from public.fiscal_requests where id=:'legacy_request'),
+ 'histórico legado mantém estado e escopo originais');
 rollback;

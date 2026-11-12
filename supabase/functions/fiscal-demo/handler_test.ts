@@ -26,6 +26,11 @@ Deno.test("nega anônimo, método, tipo, corpo excessivo e campos forjados antes
     [request(body, { "Content-Type": "text/plain" }), 415],
     [request({ ...body, organization_id: id }), 400],
     [request({ ...body, approved: true }), 400],
+    [request({ ...body, source_store: "loja-forjada" }), 400],
+    [request({ ...body, destination_store: "loja-forjada" }), 400],
+    [request({ ...body, issue_now: true }), 400],
+    [request({ ...body, action: "issue_nfe" }), 400],
+    [request({ ...body, action: "create_sale" }), 400],
     [request({ ...body, action: "execute_real" }), 400],
     [request({ ...body, request_id: "../segredo" }), 400],
     [request({ ...body, padding: "a".repeat(5000) }), 413],
@@ -74,17 +79,18 @@ Deno.test("fluxo válido usa JWT individual antes do finish restrito e nunca con
     if (path.endsWith("fiscal_begin")) { check(headers.Authorization === token, "Begin sem identidade individual"); return json({ claim: id }); }
     check(path.endsWith("fiscal_worker_finish"), "RPC fora da lista permitida");
     check(headers.Authorization === `Bearer ${config.executor}`, "Finish sem credencial do executor");
-    return json({ id, state: "authorized", secret: "não-repassar" });
+    return json({ id, state: "registered", secret: "não-repassar" });
   }) as typeof fetch);
   const result = await handle(request());
   const text = await result.text();
   check(result.status === 200 && calls.length === 3, "Fluxo DEMO incompleto");
   check(!text.includes("não-repassar") && !text.includes(config.executor), "Resposta vazou campo interno");
   check(JSON.parse(text).real_enabled === false, "Modo real habilitado");
+  check(JSON.parse(text).automatic_issuance === false && JSON.parse(text).operation === "register_only", "Emissão automática permitida");
 });
 
 Deno.test("concessão ocupada ou já concluída não chama finish", async () => {
-  for (const state of ["processing", "authorized", "blocked", "needs_reconciliation"]) {
+  for (const state of ["processing", "registered", "authorized", "blocked", "needs_reconciliation"]) {
     let calls = 0;
     const handle = createHandler(config, (async () => ++calls === 1 ? json({ id }) : json({ state })) as typeof fetch);
     check((await handle(request())).status === 200 && calls === 2, "Execução repetida indevida");

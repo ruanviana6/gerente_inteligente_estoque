@@ -1,0 +1,59 @@
+{
+  "date": "2026-11-12",
+  "release": "cadastro-nfe-lojas-20261112.1",
+  "code_commit_tested": "d2db470f7923eec3d765093d82418f6b41684451",
+  "ci": {
+    "python_database_auth_deno": "https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/43298913188",
+    "browser_performance": "https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/43298913319",
+    "nfe_python": "https://github.com/ruanviana6/automacao_nf-e/actions/runs/43292881940",
+    "all_success": true
+  },
+  "tests": {
+    "manager_python_each_version": 925,
+    "manager_subtests_each_version": 66,
+    "python_versions": ["3.11", "3.12"],
+    "nfe_python": 73,
+    "live_disposable_supabase": 9,
+    "deno_adversarial": 8,
+    "deno_type_check": true,
+    "fiscal_screens": 4,
+    "fiscal_viewports": [1440, 390],
+    "persistent_login_flows": 7,
+    "postgresql_rls_restoration_concurrency": "success"
+  },
+  "production_database": {
+    "application_tables": 44,
+    "application_tables_preserved_after_migration": 44,
+    "master_credentials_preserved": true,
+    "migrations": 13,
+    "latest_migration": "20261112192003_cadastro_fiscal_por_loja",
+    "exposed_tables_without_rls": 0,
+    "fiscal_direct_grants_anon_authenticated": 0,
+    "backup_decryption_and_typed_roundtrip_verified": true,
+    "backup_scope": "Tabelas da aplicação e histórico de migrações; não é exportação integral de Auth, Storage ou Secrets",
+    "backup_sha256": "269200839bd6b9755628dbb549bb8da7696c7835b51646c4618e18de91e0e544"
+  },
+  "executor": {
+    "name": "fiscal-demo",
+    "version": 2,
+    "status": "ACTIVE",
+    "verify_jwt": true,
+    "operation": "register_only",
+    "automatic_issuance": false,
+    "real_erp_enabled": false,
+    "source_sha256": "5e8b42b8f1d76f5081b829236f9cfe69505161a5fc9ca3289ec790a80f3521fe"
+  },
+  "contract_sha256": "918b42b3fdf584203d06e673e20c65883489cc4d770c5d3b4e3330c76508d121",
+  "publication": {
+    "url": "https://estoqueinteligente-flatter.streamlit.app/",
+    "branch": "implementacao/web-supabase",
+    "new_release_verified": false,
+    "authenticated_master_tested": false,
+    "note": "Nova release depende de integração e conferência no domínio real; CI não prova publicação."
+  },
+  "limitations": [
+    "Dados e gateways de navegador fictícios; Auth/PostgREST reais somente no ambiente descartável.",
+    "OpenAPI, IDs reais das lojas e mapeamento fiscal ainda não homologados.",
+    "Nenhuma emissão, chamada ERP real, XML/PDF ou criação de venda/pedido foi executada."
+  ]
+}
