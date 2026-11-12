@@ -217,8 +217,14 @@ def test_editar_escolha_invalida_previa(monkeypatch):
     app.selectbox[1].set_value(2).run()
     clicar(app, 'Gerar prévia DEMO')
     assert any(b.label == 'Confirmar cadastro da NF-e · DEMO' for b in app.button)
+    assert app.selectbox[0].disabled and app.selectbox[1].disabled
+    next(c for c in app.checkbox if c.key == 'fiscal_confirmacao').check().run()
+    clicar(app, 'Alterar regras e gerar nova prévia')
     app.selectbox[1].set_value(9).run()
     assert all(b.label != 'Confirmar cadastro da NF-e · DEMO' for b in app.button)
+    clicar(app, 'Gerar prévia DEMO')
+    assert next(c for c in app.checkbox if c.key == 'fiscal_confirmacao').value is False
+    assert next(b for b in app.button if b.label == 'Confirmar cadastro da NF-e · DEMO').disabled
     assert not gateway.requests
 
 

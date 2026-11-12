@@ -10,7 +10,8 @@ from web.theme import page_header, surface
 
 def _invalidar_previa():
     """Uma edição exige gerar e conferir outra prévia antes de confirmar."""
-    st.session_state.pop('_fiscal_preview_id', None)
+    for chave in ('_fiscal_preview_id', 'fiscal_confirmacao', 'fiscal_aprovacao'):
+        st.session_state.pop(chave, None)
 
 
 def _reiniciar_escolhas():
@@ -63,24 +64,29 @@ def _pedido(servico, contexto):
         st.info('Seu acesso permite consulta. Solicitar uma nota exige permissão fiscal específica.')
         return
     st.subheader('Dados fiscais manuais')
-    frete = st.selectbox('Modalidade do frete', list(MODALIDADES_FRETE), index=None,
+    tem_previa = bool(st.session_state.get('_fiscal_preview_id'))
+    # As duas escolhas são enviadas juntas. Isso evita rerenders que fecham o
+    # seletor no celular e congela os valores já conferidos numa prévia.
+    with st.form('fiscal_escolhas_manuais'):
+        frete = st.selectbox('Modalidade do frete', list(MODALIDADES_FRETE), index=None,
                         format_func=lambda codigo: f'{codigo} · {MODALIDADES_FRETE[codigo]}',
-                        placeholder='Selecione uma modalidade', key='fiscal_frete', on_change=_invalidar_previa)
-    contribuinte = st.selectbox('Tipo de contribuinte', list(TIPOS_CONTRIBUINTE), index=None,
+                        placeholder='Selecione uma modalidade', key='fiscal_frete', disabled=tem_previa)
+        contribuinte = st.selectbox('Tipo de contribuinte', list(TIPOS_CONTRIBUINTE), index=None,
                                format_func=lambda codigo: f'{codigo} · {TIPOS_CONTRIBUINTE[codigo]}',
-                               placeholder='Selecione a situação fiscal validada', key='fiscal_contribuinte', on_change=_invalidar_previa)
-    if frete is not None:
-        st.caption(f'Transporte selecionado: {frete} · {MODALIDADES_FRETE[frete]}')
-    if contribuinte is not None:
-        st.caption(f'Contribuinte selecionado: {contribuinte} · {TIPOS_CONTRIBUINTE[contribuinte]}')
+                               placeholder='Selecione a situação fiscal validada', key='fiscal_contribuinte', disabled=tem_previa)
+        preparar = st.form_submit_button('Gerar prévia DEMO', type='primary', disabled=tem_previa)
     st.caption('FOB é uma escolha manual. Isento (2) e não contribuinte (9) são situações distintas. '
                'A ausência de inscrição estadual não define essa escolha.')
-    if st.button('Gerar prévia DEMO', type='primary'):
+    if preparar:
         previa = servico.preparar(numero, frete, contribuinte)
         st.session_state['_fiscal_preview_id'] = previa['id']
+        st.session_state.pop('fiscal_confirmacao', None)
+        st.session_state.pop('fiscal_aprovacao', None)
+        st.rerun()
     identificador = st.session_state.get('_fiscal_preview_id')
     if not identificador:
         return
+    st.button('Alterar regras e gerar nova prévia', on_click=_invalidar_previa)
     previa = servico.previa(identificador)
     if previa['choices'] != {'modalidade_frete': frete, 'tipo_contribuinte': contribuinte}:
         _invalidar_previa()
@@ -136,7 +142,10 @@ def _historico(servico, contexto):
             item = por_id[selecionada]
             st.write(f'Frete {item["freight"]}: {MODALIDADES_FRETE[item["freight"]]} · '
                      f'Contribuinte {item["taxpayer"]}: {TIPOS_CONTRIBUINTE[item["taxpayer"]]}')
-            st.caption('API única · Origem: FLT Comércio · Cadastro: Flagship - Flatter · Escolhas preservadas. Emissão manual no ERP.')
+            if item.get('policy_version') == 2:
+                st.caption('API única · Origem: FLT Comércio · Cadastro: Flagship - Flatter · Escolhas preservadas. Emissão manual no ERP.')
+            else:
+                st.caption('Registro legado: escopo original preservado, sem atribuir IDs novos de lojas.')
             if item.get('invoice_number'):
                 st.write('Número fictício: ' + item['invoice_number'])
             if item.get('invoice_key'):

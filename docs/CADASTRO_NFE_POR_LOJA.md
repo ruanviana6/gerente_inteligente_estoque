@@ -29,6 +29,8 @@ situação, itens, quantidades e valores e faz duas escolhas manuais:
 - Tipo de contribuinte: 1, 2 ou 9. Isento (2) e não contribuinte (9) são distintos.
 
 Após gerar a prévia, a confirmação é **Confirmar cadastro da NF-e · DEMO**.
+As seleções ficam congeladas. Para editar, use **Alterar regras e gerar nova
+prévia**; o aceite anterior é descartado e uma nova confirmação é obrigatória.
 Ela não emite a nota. Não são inventados CFOP, NCM, CST/CSOSN, alíquotas,
 natureza ou transporte. A configuração tributária real dependerá dos dados
 aprovados e do mapeamento do contrato. Informação essencial ausente bloqueia
