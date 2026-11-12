@@ -30,14 +30,14 @@ def verificar(browser, base, destino):
             results['telas'][f'fiscal-selecoes-{width}'] = verificar_layout(page, f'fiscal-selecoes-{width}', destino, True, False)
             frete = page.get_by_role('combobox', name='Modalidade do frete', exact=True)
             frete.scroll_into_view_if_needed()
-            frete.focus()
-            frete.press('ArrowDown')
+            # Abrir pelo clique reproduz o uso real. Apenas focar e enviar uma
+            # seta depende do estado do popup e falhava no Chromium do CI.
+            frete.click()
             page.get_by_role('option', name='1 · FOB: por conta do destinatário', exact=True).click()
             expect(frete).to_have_value('1 · FOB: por conta do destinatário')
             contribuinte = page.get_by_role('combobox', name='Tipo de contribuinte', exact=True)
             contribuinte.scroll_into_view_if_needed()
-            contribuinte.focus()
-            contribuinte.press('ArrowDown')
+            contribuinte.click()
             page.get_by_role('option', name='2 · Contribuinte isento de inscrição estadual', exact=True).click()
             expect(contribuinte).to_have_value('2 · Contribuinte isento de inscrição estadual')
             page.get_by_role('button', name='Gerar prévia DEMO', exact=True).click()
@@ -56,6 +56,13 @@ def verificar(browser, base, destino):
             results['telas'][f'fiscal-resultado-{width}'] = verificar_layout(page, f'fiscal-resultado-{width}', destino, True, False)
             assert page.get_by_role('button', name='Baixar XML', exact=True).count() == 0
             assert page.get_by_role('button', name='Baixar PDF', exact=True).count() == 0
+        except Exception:
+            # A fixture contém somente dados fictícios, sem Auth produtivo.
+            # Preservar o estado da falha permite diagnosticar o CI sem retry
+            # silencioso, força de clique ou remoção das verificações.
+            page.screenshot(path=str(destino / f'fiscal-falha-{width}.png'), full_page=True)
+            (destino / f'fiscal-falha-{width}.txt').write_text(page.locator('body').aria_snapshot())
+            raise
         finally:
             context.close()
     results['aprovado'] = True
