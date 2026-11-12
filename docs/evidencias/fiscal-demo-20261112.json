@@ -1,0 +1,97 @@
+{
+  "date": "2026-11-12",
+  "release": "fiscal-demo-20261111.1",
+  "python": {
+    "passed": 925,
+    "subtests": 66,
+    "skipped": 0,
+    "scope": "local"
+  },
+  "nfe_python": {
+    "passed": 64,
+    "network_blocked": true
+  },
+  "deno": {
+    "version": "2.6.5",
+    "type_check": true,
+    "passed": 8
+  },
+  "ruff": "passed",
+  "interface": {
+    "principal": {
+      "passed": true,
+      "screens": 12,
+      "scope": "Navegador real, dados e transporte fictícios.",
+      "flows": {
+        "download-mensal-sob-demanda": "aprovado",
+        "master-1440": "aprovado",
+        "master-390": "aprovado",
+        "revogacao-financeira-em-tela-aberta": "aprovado",
+        "exportacao-negada-apos-revogacao": "aprovado",
+        "logout-isolado-entre-contextos": "aprovado",
+        "desativacao-sem-interacao": "aprovado",
+        "perfis-e-financeiro": "aprovado"
+      }
+    },
+    "fiscal": {
+      "passed": true,
+      "screens": 4,
+      "scope": "Navegador real, gateway exclusivamente fictício",
+      "flows": {}
+    }
+  },
+  "performance": {
+    "antes": {
+      "100": {
+        "p50_ms": 607.54,
+        "p95_ms": 1984.71,
+        "precomputation": null
+      },
+      "1200": {
+        "p50_ms": 1050.77,
+        "p95_ms": 1054.72,
+        "precomputation": null
+      }
+    },
+    "depois": {
+      "100": {
+        "p50_ms": 228.66,
+        "p95_ms": 277.97,
+        "precomputation": {
+          "seconds": 0.2332358390049194,
+          "nota": "Cálculo controlado anterior à navegação; custo não foi eliminado."
+        }
+      },
+      "1200": {
+        "p50_ms": 288.31,
+        "p95_ms": 302.53,
+        "precomputation": {
+          "seconds": 0.8802502899998217,
+          "nota": "Cálculo controlado anterior à navegação; custo não foi eliminado."
+        }
+      }
+    }
+  },
+  "database": {
+    "migrations": [
+      "20261111170000_fiscal_demo",
+      "20261111170500_dashboard_compacto"
+    ],
+    "preexisting_tables_unchanged": 37,
+    "new_permissions": 5,
+    "master_credentials_preserved": true,
+    "backup_verified": true
+  },
+  "executor": {
+    "name": "fiscal-demo",
+    "version": 1,
+    "verify_jwt": true,
+    "mode": "demo",
+    "real_enabled": false
+  },
+  "ci_status": "queued; não equivale a aprovado",
+  "limits": [
+    "scikit-learn local 1.8.0; pin CI 1.9.1 ainda não executado nesta revisão",
+    "Auth/Edge autenticados produtivos dependem de sessão legítima, não incluída nestas evidências"
+  ]
+}

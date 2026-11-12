@@ -94,7 +94,7 @@ def abrir_vendas(monkeypatch, servico=None):
     import web.ui
 
     monkeypatch.setattr(web.sales_page, "hoje_local", lambda: datetime(2026, 9, 30))
-    monkeypatch.setattr(web.ui, "PAGES", {"Inteligência de Vendas": ("trends.view", vendas)})
+    monkeypatch.setattr(web.ui, "PAGES", {"Inteligência Comercial": ("trends.view", vendas)})
     return abrir(monkeypatch, servico or ServicoVendasFicticio())[0]
 
 

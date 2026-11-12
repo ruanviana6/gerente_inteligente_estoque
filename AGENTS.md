@@ -1,5 +1,21 @@
 # Instruções para agentes de programação — Gerente Inteligente de Estoque
 
+## Consolidação fiscal DEMO e Visão Geral, autorizada em 11/11/2026
+
+O proprietário autorizou implementar e publicar as Issues #20/#21 com o PR #1
+do repositório automacao_nf-e. Esta diretiva atualiza as restrições históricas:
+o cliente analítico do Gerente permanece estritamente GET-only. Somente um
+executor fiscal ISOLADO poderá futuramente criar/emitir NF-e exclusivamente no
+Varejo, após OpenAPI validado e nova autorização real. Atacado será sempre leitura.
+Nesta execução só DEMO: nenhuma chamada real ao GestãoClick, criação de pedido,
+edição de cadastro/estoque, cancelamento, inutilização, exclusão ou correção de NF-e.
+Não armazenar nem baixar XML/PDF. Não apagar documentos históricos. Supabase
+existente é a única base operacional; Python fornece contratos e testes, não
+outro motor fiscal produtivo. Edge Function sob demanda é a opção prioritária.
+O proprietário autorizou alterações rotineiras, commits, merges, deploy DEMO e
+migrações aditivas após backup/restauração e validação. Preservar Master, Secrets,
+usuários, dados e branch implementacao/web-supabase. Sem serviços pagos.
+
 ## Autorização de integração e publicação em 11/11/2026
 
 O proprietário confirmou a URL `https://estoqueinteligente-flatter.streamlit.app/`
@@ -35,11 +51,11 @@ Supabase aprovado: projeto `gerente-inteligente-estoque`, ref `csiqpzoudruzppfbp
 
 A implementação deverá ocorrer em branch/PR própria, verificando tanto a `main` quanto os requisitos mais recentes na branch `docs/web-unica-privada`. Não executar trabalho simultâneo que conflite com outro agente. O proprietário quer o app funcionando, mas segredos e operações nos painéis externos podem exigir sua participação. Não prometer deploy/testes concluídos sem evidência.
 
-**Integração GestãoClick fica expressamente FORA desta entrega.** O proprietário fornecerá acesso à API somente após o web estar validado. Pedidos em andamento, cestas de produtos e sazonalidade avançada continuam no backlog posterior. Não alterar ERP nem usar dados reais nesta fase.
+**Registro histórico: a integração real ficou fora daquela entrega.** O proprietário fornecerá acesso à API somente após o web estar validado. Pedidos em andamento, cestas de produtos e sazonalidade avançada continuam no backlog posterior. Não alterar ERP nem usar dados reais nesta fase.
 
 ## Regra permanente: GestãoClick SEMPRE somente leitura
 
-**Regra do proprietário, inclusive depois da integração com a API:** o Gerente Inteligente de Estoque **nunca pode modificar nada no GestãoClick**. A integração será **unidirecional**: GestãoClick → Gerente (consulta/sincronização de dados), sem envio de comandos operacionais de volta ao ERP.
+**Regra do proprietário, inclusive depois da integração com a API:** o cliente analítico do Gerente **nunca pode modificar nada no GestãoClick**. A integração será **unidirecional**: GestãoClick → Gerente (consulta/sincronização de dados), sem envio de comandos operacionais de volta ao ERP.
 
 - Permitido: autenticar-se na API autorizada, consultar produtos, saldo, vendas, pedidos, fornecedores e histórico que a API realmente disponibilizar; armazenar cópia analítica e snapshots no **próprio banco Supabase** do gerente.
 - Proibido em qualquer fase: criar, editar ou excluir produtos, preços, clientes, vendas, pedidos, status, reservas, movimentações, saldos, compras, notas fiscais ou qualquer outro objeto do GestãoClick. Não realizar baixa nem estorno no ERP.
@@ -54,7 +70,7 @@ A implementação deverá ocorrer em branch/PR própria, verificando tanto a `ma
 - Ferramenta **pessoal e gratuita** para apoiar a rotina de estoque dentro de uma empresa; **não** é um ERP, SaaS nem produto comercial.
 - **Decisão mais recente: a aplicação oficial será única, acessível via web e com acesso autorizado por usuário.** Não manter duas instalações operacionais (local + demo pública). Consulte `docs/PLANO_WEB_PRIVADO.md` antes de alterar hospedagem, autenticação, dados ou interface.
 - O GestãoClick é e continuará sendo a fonte operacional oficial. No estado atual o aplicativo só utiliza demonstração fictícia ou CSV local. **Não conecte a API antes da etapa autorizada e NUNCA escreva no ERP, inclusive após a integração.**
-- A futura integração com o outro projeto de automação de NF-e é apenas planejada; **não implemente emissão ou alteração fiscal** por iniciativa própria.
+- A preparação fiscal DEMO foi autorizada na diretiva atual acima. Nenhuma emissão real está autorizada.
 - Mantenha a solução simples e gratuita. Arquitetura-alvo: Python + Streamlit Community Cloud privado + PostgreSQL Supabase Free + autenticação e autorização por usuário. O código atual usa SQLite local, mas **SQLite não é solução de persistência na nuvem**. Evite dependências, serviços pagos e múltiplos ambientes de uso sem justificativa.
 
 ## Estilo de comunicação e apresentação

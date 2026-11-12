@@ -52,7 +52,11 @@ jobs:
             exit 1
           fi
       - name: Testar Auth e PostgREST reais
-        run: python -m pytest tests/live_supabase.py -ra --junitxml=resultado-auth-real.xml
+        run: |
+          npx --yes supabase@2.122.0 functions serve --help > /dev/null
+          printf 'FLATTER_LOCAL_DISPOSABLE=1\n' > /tmp/fiscal-demo-local.env
+          npx --yes supabase@2.122.0 functions serve fiscal-demo --env-file /tmp/fiscal-demo-local.env > /tmp/fiscal-demo-local.log 2>&1 &
+          python -m pytest tests/live_supabase.py -ra --junitxml=resultado-auth-real.xml
       - name: Guardar resultado sem credenciais locais
         if: always()
         uses: actions/upload-artifact@v7.0.2
@@ -183,6 +187,8 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/sql/reposicao.sql 2>&1 | tee -a evidencias-banco.txt
           psql -v ON_ERROR_STOP=1 -f tests/sql/commercial.sql 2>&1 | tee -a evidencias-banco.txt
           psql -v ON_ERROR_STOP=1 -f tests/sql/persistent_sessions.sql 2>&1 | tee -a evidencias-banco.txt
+          psql -v ON_ERROR_STOP=1 -f tests/sql/fiscal.sql 2>&1 | tee -a evidencias-banco.txt
+          psql -v ON_ERROR_STOP=1 -f tests/sql/dashboard.sql 2>&1 | tee -a evidencias-banco.txt
       - name: Verificar backup e restauração descartáveis
         run: |
           pg_dump --format=custom --file=/tmp/estoque-teste.dump
@@ -195,6 +201,8 @@ jobs:
           PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/reposicao.sql
           PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/commercial.sql
           PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/persistent_sessions.sql
+          PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/fiscal.sql
+          PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/dashboard.sql
       - name: Testar vínculo concorrente de usuário
         env:
           GERENTE_DISPOSABLE_DATABASE: '1'
@@ -202,6 +210,7 @@ jobs:
           python tests/sql/concorrencia.py
           python tests/sql/snapshot_concurrency.py
           python tests/sql/sync_concorrencia.py
+          python tests/sql/fiscal_concurrency.py
       - name: Guardar evidências do banco
         if: always()
         uses: actions/upload-artifact@v7.0.2
@@ -210,4 +219,13 @@ jobs:
           path: |
             evidencias-banco.txt
             supabase/migrations/
+  executor-fiscal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Verificar tipos e cenários adversariais do executor Deno
+        run: |
+          npx --yes deno@2.6.5 check supabase/functions/fiscal-demo/index.ts
+          npx --yes deno@2.6.5 test --check supabase/functions/fiscal-demo/handler_test.ts
 

@@ -31,14 +31,16 @@ def clicar(app, rotulo):
     assert not app.exception
 
 
-def test_flash_reutiliza_unica_base_do_painel(monkeypatch):
-    """A primeira renderização não consulta nem calcula outra base para o flash."""
+def test_visao_geral_le_somente_resumo_precalculado(monkeypatch):
+    """Visitar e atualizar a página não lê estoque bruto nem recalcula indicadores."""
     app, scenario = abrir_cenario(monkeypatch)
-    assert scenario.calls["rpc_load_inventory"] == 1
+    assert scenario.calls["rpc_load_inventory"] == 0
+    assert scenario.calls["rpc_dashboard_payload"] == 1
     scenario.reset_counts()
-    clicar(app, "Próximo insight")
-    assert scenario.calls["rpc_load_inventory"] == 1
-    assert any("LEITURA DO ESTOQUE" in legenda.value for legenda in app.caption)
+    app.run()
+    assert scenario.calls["rpc_load_inventory"] == 0
+    assert scenario.calls["rpc_dashboard_payload"] == 1
+    assert len(app.metric) == 6
 
 
 def test_reposicao_nao_gera_exportacao_na_renderizacao(monkeypatch):
@@ -108,7 +110,7 @@ def test_relatorio_exige_geracao_explicita(monkeypatch):
 def test_catalogo_pagina_exibicao_sem_reduzir_indicadores(monkeypatch):
     """A tabela envia 50 registros inicialmente e o KPI considera o catálogo todo."""
     app, _ = abrir_cenario(monkeypatch, size=120)
-    assert next(m for m in app.metric if m.label == "Produtos").value == "120"
+    assert len(app.metric) == 6
     app.sidebar.radio[0].set_value("Estoque").run()
     assert not app.exception
     assert len(app.dataframe[0].value) == 50
@@ -133,7 +135,7 @@ def test_graficos_produto_somente_quando_solicitados(monkeypatch):
 def test_prioridade_abre_filtro_real_de_ruptura(monkeypatch):
     """A ação do painel leva ao catálogo filtrado, sem recalcular regras na UI."""
     app, _ = abrir_cenario(monkeypatch)
-    clicar(app, "Conferir rupturas")
+    next(b for b in app.button if b.key == "overview_acao_1").click().run()
     assert app.sidebar.radio[0].value == "Estoque"
     assert not app.dataframe[0].value.empty
     assert app.dataframe[0].value["status"].eq("Ruptura").all()
@@ -142,9 +144,9 @@ def test_prioridade_abre_filtro_real_de_ruptura(monkeypatch):
 def test_retorno_prioridade_substitui_filtro_anterior(monkeypatch):
     """Uma segunda ação do painel atualiza o filtro mesmo com widget já criado."""
     app, scenario = abrir_cenario(monkeypatch)
-    clicar(app, "Conferir rupturas")
-    app.sidebar.radio[0].set_value("Painel").run()
-    clicar(app, "Conferir risco no prazo")
+    next(b for b in app.button if b.key == "overview_acao_1").click().run()
+    app.sidebar.radio[0].set_value("Visão Geral").run()
+    next(b for b in app.button if b.key == "overview_acao_0").click().run()
     painel = scenario.service_factory({}).load_inventory("inventory.view")["panel"]
     codigos_risco = set(painel.loc[painel["risco_prazo"], "codigo"])
     assert set(app.dataframe[0].value["codigo"]).issubset(codigos_risco)
@@ -158,7 +160,7 @@ def test_perfis_sem_financeiro_nao_recebem_metricas_ou_admin(monkeypatch, perfil
     assert all("Capital" not in m.label for m in app.metric)
     assert all("R$" not in str(m.value) for m in app.metric)
     if perfil == "Visualizador":
-        assert app.sidebar.radio[0].options == ["Painel"]
+        assert app.sidebar.radio[0].options == ["Visão Geral"]
 
 
 def test_recuperacao_nao_promete_envio_desconfigurado(monkeypatch):
@@ -183,9 +185,10 @@ def test_administracao_nao_consulta_configuracao_de_email_por_padrao(monkeypatch
 def test_revogacao_financeira_remove_valores_na_execucao_seguinte(monkeypatch):
     """Permissões alteradas não reutilizam o painel financeiro anterior na sessão."""
     app, scenario = abrir_cenario(monkeypatch)
-    assert any("Capital" in metrica.label for metrica in app.metric)
+    assert any("Capital conhecido em estoque: R$" in texto.value for texto in app.markdown)
     scenario.permissions.discard("finance.view")
     app.run()
     assert not app.exception
     assert all("Capital" not in metrica.label for metrica in app.metric)
     assert all("R$" not in str(metrica.value) for metrica in app.metric)
+    assert all("Capital conhecido" not in texto.value for texto in app.markdown)

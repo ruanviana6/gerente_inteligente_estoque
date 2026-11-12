@@ -89,7 +89,7 @@ def ambiente():
     assert primeiro_acesso.password_change_required
     primeiro_acesso.finish_initial_password(SENHA_PESSOAL)
     return {"api": api, "master": master, "operador_id": operador_id, "transport": transporte,
-            "anon": status["ANON_KEY"], "chamadas": chamadas}
+            "anon": status["ANON_KEY"], "chamadas": chamadas, "local_url": destino, "cliente": cliente}
 
 
 def operador(ambiente):
@@ -173,7 +173,7 @@ def test_redefinicao_master_bloqueia_sessao_e_exige_nova_senha(ambiente):
 
 
 def test_painel_sem_estoque_nao_le_base_bruta_pela_api(ambiente):
-    """O backend calcula o painel, mas a identidade não acessa o catálogo pela API."""
+    """A navegação lê resumo compacto e não concede leitura do catálogo bruto."""
     Service(ambiente["master"]).import_csv(
         b"codigo;nome;estoque\n001;Produto ficticio;10\n",
         b"data;codigo;quantidade\n2020-01-15;001;30\n",
@@ -188,7 +188,10 @@ def test_painel_sem_estoque_nao_le_base_bruta_pela_api(ambiente):
     auth.login("visualizador@example.invalid", SENHA_PESSOAL)
     assert auth.context().can("dashboard.view")
     assert not auth.context().can("inventory.view")
-    assert not Service(auth).load_inventory("dashboard.view")["panel"].empty
+    Service(ambiente['master']).refresh_dashboard()
+    compact = Service(auth).dashboard()
+    assert compact['summary']['inventory']['products'] == 1
+    assert 'finance' not in compact['summary']
     headers = {"apikey": ambiente["anon"], "Authorization": "Bearer " + auth.session.access_token,
                "Content-Type": "application/json"}
     resposta = ambiente["transport"](
@@ -225,3 +228,61 @@ def test_reabertura_e_refresh_persistentes_com_auth_e_postgrest_reais(ambiente):
     nova.logout()
     with pytest.raises((AuthenticationError, AuthorizationError)):
         terceira.restore_browser(ticket)
+
+
+def test_fiscal_auth_rpc_e_edge_reais_em_demo(ambiente):
+    """Usa Auth, PostgreSQL e runtime Edge locais reais, sem endpoint do ERP."""
+    from web.fiscal_service import FiscalService
+    auth = operador(ambiente)
+    with pytest.raises(AuthorizationError):
+        FiscalService(auth).consultar('1001')
+    Service(ambiente['master']).admin_set_user(ambiente['operador_id'], 'Operador fictício', 'Operador', True,
+        {'fiscal.view': True, 'fiscal.create_request': True})
+    fiscal = FiscalService(auth)
+    preview = fiscal.preparar('1001', 1, 2)
+    assert preview['choices']['tipo_contribuinte'] == 2
+    request = fiscal.confirmar(preview['id'], True)
+    assert fiscal.confirmar(preview['id'], True)['duplicate'] is True
+    assert request['state'] == 'confirmed'
+    # A função precisa estar atendendo no runtime, não apenas presente em disco.
+    deadline = time.monotonic()+50
+    while True:
+        try:
+            response = ambiente['transport']('POST', PROJECT_URL+'/functions/v1/fiscal-demo',
+                {'apikey': ambiente['anon'], 'Content-Type': 'application/json'}, b'{}', 5)
+            if response.status == 401:
+                break
+        except (OSError, TimeoutError):
+            pass
+        if time.monotonic() >= deadline:
+            raise AssertionError('Runtime Edge local não confirmou a recusa anônima no prazo.')
+        time.sleep(0.5)
+    result = fiscal.executar(request['id'])
+    assert result['state'] == 'authorized' and result['real_enabled'] is False
+    assert fiscal.executar(request['id'])['state'] == 'authorized'
+    assert fiscal.listar()[0]['taxpayer'] == 2
+    assert not any('gestaoclick' in path.lower() for _, path, _ in ambiente['chamadas'])
+
+
+def test_fiscal_revogacao_bloqueia_rpc_e_edge_com_jwt_ainda_valido(ambiente):
+    """Uma chamada direta ao executor não contorna a revogação no banco."""
+    from web.fiscal_service import FiscalService
+    auth = operador(ambiente)
+    master = Service(ambiente['master'])
+    master.admin_set_user(ambiente['operador_id'], 'Operador fictício', 'Operador', True,
+                         {'fiscal.view': True, 'fiscal.create_request': True})
+    fiscal = FiscalService(auth)
+    preview = fiscal.preparar('1003', 1, 9)
+    pending = fiscal.confirmar(preview['id'], True)
+    assert pending['state'] == 'awaiting_approval'
+    with pytest.raises(AuthorizationError):
+        fiscal.aprovar(pending['id'], True)
+    FiscalService(ambiente['master']).aprovar(pending['id'], True)
+    jwt = auth.session.access_token
+    master.admin_set_user(ambiente['operador_id'], 'Operador fictício', 'Operador', True, {})
+    response = ambiente['transport']('POST', PROJECT_URL+'/functions/v1/fiscal-demo',
+        {'apikey': ambiente['anon'], 'Authorization':'Bearer '+jwt, 'Content-Type':'application/json'},
+        json.dumps({'request_id':pending['id'], 'action':'execute_demo'}).encode(),20)
+    assert response.status == 403
+    with pytest.raises(AuthorizationError):
+        fiscal.listar()

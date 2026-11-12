@@ -23,7 +23,7 @@ jobs:
       - name: Verificar versão, login e negação no endereço real
         run: >-
           python scripts/verificar_publicacao.py
-          --expected-version web-integrada-20261111.2
+          --expected-version fiscal-demo-20261111.1
           --output evidencias/publicado
       - name: Guardar somente evidências anônimas
         if: always()

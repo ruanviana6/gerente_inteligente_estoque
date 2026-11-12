@@ -13,8 +13,8 @@ import streamlit as st
 from web.browser_session import STATE_KEYS, incoming_ticket, render_browser_cookie, set_browser_cookie
 from web.commercial_page import comercial
 from web.errors import AppError, AuthenticationError, AuthorizationError, ConfigurationError
-from web.integration_page import integracoes
-from web.pages import PAGES, _administracao
+from web.fiscal_page import fiscal
+from web.pages import ADMIN_PERMISSIONS, PAGES, _administracao
 from web.release import RELEASE
 from web.telemetry import measure, performance_scope
 from web.theme import apply_theme, brand_header, page_header, surface
@@ -223,15 +223,27 @@ def _area_autenticada(servico: Any) -> None:
     execucao = st.session_state.get("_render_execution", 0) + 1
     st.session_state["_render_execution"] = execucao
     permitidas = {nome: handler for nome, (permissao, handler) in PAGES.items() if contexto.can(permissao)}
-    if ("Reposição Inteligente" in PAGES and contexto.can("trends.view")
-            and not contexto.can("replenishment.view")):
+    if contexto.can("decisions.write") and "Reposição Inteligente" in PAGES:
         permitidas["Reposição Inteligente"] = PAGES["Reposição Inteligente"][1]
-    if contexto.can("trends.view") or contexto.can("commercial.view"):
+    if (contexto.can("trends.view") or contexto.can("commercial.view")) and "Inteligência Comercial" not in permitidas:
         permitidas["Inteligência Comercial"] = comercial
-    if _perfil(contexto, "role") == "Master":
+    if contexto.can("fiscal.view"):
+        permitidas["Automação / Notas Fiscais"] = fiscal
+    ordem = ["Visão Geral", "Estoque", "Reposição Inteligente", "Inteligência Comercial", "Automação / Notas Fiscais", "Relatórios"]
+    permitidas = {nome: permitidas[nome] for nome in ordem if nome in permitidas}
+    if _perfil(contexto, "role") == "Master" or any(contexto.can(p) for p in ADMIN_PERMISSIONS):
         permitidas["Administração"] = _administracao
-        if contexto.can("integrations.manage"):
-            permitidas["Integrações"] = integracoes
+    if st.session_state.get("_pagina") == "Painel":
+        st.session_state["_pagina"] = "Visão Geral"
+    anterior = st.session_state.get("_pagina")
+    destinos_antigos = {"Importação": "Importação manual / DEMO", "Regras de Reposição": "Regras de Reposição",
+                       "Auditoria": "Auditoria", "Integrações": "Integrações"}
+    if anterior in destinos_antigos and "Administração" in permitidas:
+        st.session_state["admin_area"] = destinos_antigos[anterior]
+        st.session_state["_pagina"] = "Administração"
+    elif anterior == "Acompanhamento de Ações" and "Reposição Inteligente" in permitidas:
+        st.session_state["reposicao_area"] = "Acompanhamento de Ações"
+        st.session_state["_pagina"] = "Reposição Inteligente"
     with st.sidebar, st.container(key="flatter_sidebar"):
         brand_header(compact=True)
         if permitidas:
