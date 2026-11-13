@@ -12,7 +12,7 @@ from integracoes.runtime import build_reader
 BASE = "https://conta-ficticia.gestaoclick.com/api"
 
 
-def secrets(*, mode="documents"):
+def secrets(*, mode="documents", contract="openapi"):
     """Produz Secrets fictícios completos, sem representar o contrato da conta real."""
     parameters = [{"in": "query", "name": name} for name in (
         "pagina", "limite", "loja_id", "inicio_ficticio", "fim_ficticio", "tipo_ficticio",
@@ -26,7 +26,7 @@ def secrets(*, mode="documents"):
                "document_fields": doc_fields, "line_fields": line_fields}
     if mode == "lines":
         mapping = {"mode": mode, "fields": {**doc_fields, **line_fields}}
-    return {
+    values = {
         "GESTAOCLICK_ENABLED": True, "GESTAOCLICK_BASE_URL": BASE,
         "GESTAOCLICK_ACCESS_TOKEN": "token-ficticio", "GESTAOCLICK_SECRET_ACCESS_TOKEN": "segredo-ficticio",
         "GESTAOCLICK_SOURCE_ID": "fonte-ficticia", "GESTAOCLICK_STORE_ID": "loja-ficticia",
@@ -34,6 +34,14 @@ def secrets(*, mode="documents"):
         "GESTAOCLICK_STATUS_MAP_JSON": '{"concluida_ficticia":"completed"}',
         "GESTAOCLICK_PERIOD_FILTERS_JSON": '{"start":"inicio_ficticio","end":"fim_ficticio"}',
     }
+    if contract == "read_contract":
+        values.pop("GESTAOCLICK_OPENAPI_JSON")
+        values["GESTAOCLICK_READ_CONTRACT_JSON"] = json.dumps({
+            "version": 1, "base_url": BASE,
+            "documentation_urls": ["https://gestaoclick.com.br/referencia-ficticia"],
+            "resources": {"vendas": {"method": "GET", "filters": [item["name"] for item in parameters]}},
+        })
+    return values
 
 
 def document():
@@ -61,13 +69,14 @@ class TransporteFicticio:
 
 
 @pytest.mark.parametrize("mode", ["documents", "lines"])
-def test_reader_do_contrato_ao_resultado_canonico(mode):
+@pytest.mark.parametrize("contract", ["openapi", "read_contract"])
+def test_reader_do_contrato_ao_resultado_canonico(mode, contract):
     """Lê GET sob demanda, com filtros confirmados e mapeamento explícito de cada campo."""
     raw = document()
     if mode == "lines":
         raw = {**raw, **raw["itens_ficticios"][0]}
     transport = TransporteFicticio([raw])
-    reader = build_reader(secrets(mode=mode), transport)
+    reader = build_reader(secrets(mode=mode, contract=contract), transport)
     assert transport.calls == []
     rows = reader.read(date(2020, 1, 1), "2020-01-31")
     assert len(transport.calls) == 1
@@ -82,10 +91,16 @@ def test_reader_do_contrato_ao_resultado_canonico(mode):
     assert "token-ficticio" not in repr(reader)
 
 
-def test_reader_disabled_falha_antes_de_ler_contrato_ou_criar_transporte():
+@pytest.mark.parametrize("values", [
+    {},
+    {"GESTAOCLICK_ENABLED": False, "GESTAOCLICK_OPENAPI_JSON": "invalido",
+     "GESTAOCLICK_READ_CONTRACT_JSON": None},
+])
+def test_reader_disabled_falha_antes_de_ler_contrato_ou_criar_transporte(values):
     """Ausência de enabled mantém o conector bloqueado mesmo sem os demais Secrets."""
-    with pytest.raises(IntegracaoDesabilitada):
-        build_reader({})
+    with patch("urllib.request.build_opener", side_effect=AssertionError("Rede indevida")):
+        with pytest.raises(IntegracaoDesabilitada):
+            build_reader(values)
 
 
 @pytest.mark.parametrize("name,value", [
@@ -103,9 +118,12 @@ def test_reader_disabled_falha_antes_de_ler_contrato_ou_criar_transporte():
     ("GESTAOCLICK_FIXED_FILTERS_JSON", '{"inicio_ficticio":"2020-01-01"}'),
     ("GESTAOCLICK_FIXED_FILTERS_JSON", '{"tipo_ficticio":true}'),
 ])
-def test_secrets_incompletos_ambiguos_ou_filtros_indevidos_nao_transmitem(name, value):
+@pytest.mark.parametrize("contract", ["openapi", "read_contract"])
+def test_secrets_incompletos_ambiguos_ou_filtros_indevidos_nao_transmitem(name, value, contract):
     """Falha na montagem, antes que dados do servidor ou credenciais deixem a aplicação."""
-    values = {**secrets(), name: value}
+    if name == "GESTAOCLICK_OPENAPI_JSON" and contract == "read_contract":
+        name = "GESTAOCLICK_READ_CONTRACT_JSON"
+    values = {**secrets(contract=contract), name: value}
     transport = TransporteFicticio([])
     with pytest.raises(ContratoInvalido):
         build_reader(values, transport)
@@ -118,9 +136,10 @@ def test_secrets_incompletos_ambiguos_ou_filtros_indevidos_nao_transmitem(name, 
     lambda fields: fields.update(sku="caminho como expressao"),
     lambda fields: fields.update(sku=[]),
 ])
-def test_mapa_so_pode_projetar_colunas_permitidas_e_campos_completos(mutation):
+@pytest.mark.parametrize("contract", ["openapi", "read_contract"])
+def test_mapa_so_pode_projetar_colunas_permitidas_e_campos_completos(mutation, contract):
     """Não admite coleta pessoal, inferência de devoluções ou execução de expressões."""
-    values = secrets(mode="lines")
+    values = secrets(mode="lines", contract=contract)
     mapping = json.loads(values["GESTAOCLICK_FIELD_MAP_JSON"])
     mutation(mapping["fields"])
     values["GESTAOCLICK_FIELD_MAP_JSON"] = json.dumps(mapping)
@@ -142,18 +161,20 @@ def test_periodos_invalidos_nao_fazem_get(first, last):
     assert transport.calls == []
 
 
-def test_filtro_ignorado_pela_origem_nao_e_aceito_como_cobertura():
+@pytest.mark.parametrize("contract", ["openapi", "read_contract"])
+def test_filtro_ignorado_pela_origem_nao_e_aceito_como_cobertura(contract):
     """Uma venda fora da janela torna a prévia inválida em vez de ser descartada silenciosamente."""
     transport = TransporteFicticio([{**document(), "sale_date": "2019-12-31"}])
-    reader = build_reader(secrets(), transport)
+    reader = build_reader(secrets(contract=contract), transport)
     with pytest.raises(ContratoInvalido, match="fora do período"):
         reader.read("2020-01-01", "2020-01-31")
 
 
-def test_filtros_fixos_sao_server_only_e_nao_tem_editor_de_rotas():
+@pytest.mark.parametrize("contract", ["openapi", "read_contract"])
+def test_filtros_fixos_sao_server_only_e_nao_tem_editor_de_rotas(contract):
     """A interface recebe somente datas; recurso e filtros vêm do contrato protegido."""
     transport = TransporteFicticio([document()])
-    values = {**secrets(), "GESTAOCLICK_FIXED_FILTERS_JSON": '{"tipo_ficticio":"produto_ficticio"}'}
+    values = {**secrets(contract=contract), "GESTAOCLICK_FIXED_FILTERS_JSON": '{"tipo_ficticio":"produto_ficticio"}'}
     reader = build_reader(values, transport)
     reader.read("2020-01-01", "2020-01-31")
     assert "tipo_ficticio=produto_ficticio" in transport.calls[0]
@@ -161,9 +182,75 @@ def test_filtros_fixos_sao_server_only_e_nao_tem_editor_de_rotas():
         reader.read("2020-01-01", "2020-01-31", url="https://evil.invalid/")
 
 
-def test_reader_nao_persiste_nem_faz_chamadas_antes_da_acao():
+@pytest.mark.parametrize("contract", ["openapi", "read_contract"])
+def test_reader_nao_persiste_nem_faz_chamadas_antes_da_acao(contract):
     """Montagem da configuração e resultado vazio não disparam sincronização implícita."""
     transport = TransporteFicticio([])
     with patch("urllib.request.build_opener", side_effect=AssertionError("Rede indevida")):
-        reader = build_reader(secrets(), transport)
+        reader = build_reader(secrets(contract=contract), transport)
         assert reader.read("2020-01-01", "2020-01-31") == []
+
+
+@pytest.mark.parametrize("contract", ["openapi", "read_contract"])
+@pytest.mark.parametrize("name", [
+    "GESTAOCLICK_FIELD_MAP_JSON", "GESTAOCLICK_STATUS_MAP_JSON", "GESTAOCLICK_PERIOD_FILTERS_JSON",
+    "GESTAOCLICK_SOURCE_ID", "GESTAOCLICK_STORE_ID",
+])
+def test_contrato_alternativo_preserva_mapas_filtros_e_escopo_obrigatorios(contract, name):
+    """Trocar o formato do contrato não preenche campos nem amplia o escopo por inferência."""
+    values = secrets(contract=contract)
+    values.pop(name)
+    transport = TransporteFicticio([])
+    with pytest.raises(ContratoInvalido):
+        build_reader(values, transport)
+    assert transport.calls == []
+
+
+@pytest.mark.parametrize("other", ["", None, "{invalido}", "valido"])
+@pytest.mark.parametrize("contract", ["openapi", "read_contract"])
+def test_dois_formatos_presentes_falham_sem_escolha_silenciosa(contract, other):
+    """Mesmo um segundo Secret vazio ou nulo torna a escolha ambígua e bloqueia os parsers."""
+    values = secrets(contract=contract)
+    other_contract = "read_contract" if contract == "openapi" else "openapi"
+    key = "GESTAOCLICK_READ_CONTRACT_JSON" if other_contract == "read_contract" else "GESTAOCLICK_OPENAPI_JSON"
+    values[key] = secrets(contract=other_contract)[key] if other == "valido" else other
+    transport = TransporteFicticio([])
+    with patch("integracoes.runtime.ContratoGestaoClick.from_openapi") as openapi:
+        with patch("integracoes.runtime.ContratoGestaoClick.from_read_contract") as read_contract:
+            with pytest.raises(ContratoInvalido):
+                build_reader(values, transport)
+            openapi.assert_not_called()
+            read_contract.assert_not_called()
+    assert transport.calls == []
+
+
+def test_nenhum_formato_presente_nao_cria_contrato_implicito():
+    """Credenciais e mapas não substituem o contrato explícito da conta."""
+    values = secrets()
+    values.pop("GESTAOCLICK_OPENAPI_JSON")
+    transport = TransporteFicticio([])
+    with pytest.raises(ContratoInvalido):
+        build_reader(values, transport)
+    assert transport.calls == []
+
+
+@pytest.mark.parametrize("contract", ["openapi", "read_contract"])
+@pytest.mark.parametrize("raw", [
+    '{"conteudo-protegido":"primeiro","conteudo-protegido":"segundo"}',
+    '{"aninhado":{"conteudo-protegido":1,"conteudo-protegido":2}}',
+    '{"conteudo-protegido":"\ud800"}',
+])
+def test_json_de_contrato_ambiguo_ou_unicode_invalido_nao_vaza_nem_faz_fallback(contract, raw):
+    """Chaves repetidas e Unicode inválido falham com diagnóstico fixo e sem outro formato."""
+    values = secrets(contract=contract)
+    key = "GESTAOCLICK_OPENAPI_JSON" if contract == "openapi" else "GESTAOCLICK_READ_CONTRACT_JSON"
+    values[key] = raw
+    alternative = "from_read_contract" if contract == "openapi" else "from_openapi"
+    transport = TransporteFicticio([])
+    with patch("integracoes.runtime.ContratoGestaoClick." + alternative) as fallback:
+        with pytest.raises(ContratoInvalido) as error:
+            build_reader(values, transport)
+        fallback.assert_not_called()
+    assert "conteudo-protegido" not in str(error.value)
+    assert "token-ficticio" not in str(error.value)
+    assert transport.calls == []

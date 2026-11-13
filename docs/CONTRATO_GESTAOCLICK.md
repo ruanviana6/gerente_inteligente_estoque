@@ -20,9 +20,10 @@ que usuário e loja associados à chave podem limitar os registros visíveis,
 inclusive em respostas HTTP 200. O recurso `pedidos` pode representar a loja
 virtual; seu nome não permite inferir que seja uma venda efetivada do ERP.
 
-O OpenAPI da conta autorizada ainda é necessário. Nenhum contrato de campos de
-produto, estoque, documentos, linhas ou situação real foi presumido. Os testes
-usam uma especificação e linhas fictícias declaradas no próprio teste.
+O contrato da conta deve ser conferido na aba Referência, pelo OpenAPI ou pela
+documentação online. O arquivo OpenAPI não é obrigatório. Nenhum contrato de
+campos de produto, estoque, documentos, linhas ou situação real foi presumido.
+Os testes usam especificações e linhas fictícias declaradas no próprio teste.
 
 A API pode depender de aplicativo adicional ao plano do ERP. O proprietário deve
 confirmar acesso já habilitado e ausência de contratação não autorizada. Esta
@@ -35,7 +36,8 @@ implementação não contrata, ativa ou paga nenhum recurso.
 
 ```toml
 GESTAOCLICK_ENABLED = false
-GESTAOCLICK_BASE_URL = "COPIAR_BASE_HTTPS_DO_OPENAPI_CONFERIDO"
+GESTAOCLICK_BASE_URL = "COPIAR_BASE_HTTPS_DA_REFERENCIA_CONFERIDA"
+GESTAOCLICK_ORGANIZATION_ID = "UUID_DA_ORGANIZACAO_AUTORIZADA"
 GESTAOCLICK_ACCESS_TOKEN = "CONFIGURAR_SOMENTE_NOS_SECRETS"
 GESTAOCLICK_SECRET_ACCESS_TOKEN = "CONFIGURAR_SOMENTE_NOS_SECRETS"
 GESTAOCLICK_SOURCE_ID = "IDENTIFICADOR_INTERNO_DA_FONTE_AUTORIZADA"
@@ -50,20 +52,57 @@ Prefira usuário operacional com permissão mínima de consulta e confira IP,
 dias/horários e permissões dos recursos com o administrador da empresa.
 
 A liberação requer contrato do servidor construído por
-`ContratoGestaoClick.from_openapi`. Ele exige OpenAPI 3, servidor exato,
-GET documentado, resposta 200 e parâmetros de paginação declarados. A allowlist
+`ContratoGestaoClick.from_openapi` ou `from_read_contract`. O primeiro exige
+OpenAPI 3, servidor exato, GET documentado, resposta 200 e parâmetros de
+paginação declarados. O segundo usa o formato equivalente descrito abaixo.
+Em ambos, a resposta precisa respeitar o envelope 200/success. A allowlist
 fechada admite apenas `produtos`, `vendas`, `lojas` e `situacoes_vendas`, quando
 o GET também estiver comprovado no documento. Referências de parâmetros
 precisam ser resolvidas administrativamente antes da aprovação do contrato.
 A configuração fica no backend, nunca em um editor de rotas no navegador.
 
 O domínio deve pertencer a `gestaoclick.com` ou `gestaoclick.com.br`, com HTTPS,
-porta padrão e base `/api` ou `/v1`. Domínios diferentes eventualmente informados
+porta padrão e base `/api` ou `/v1`. A única exceção de caminho é a raiz exata
+`https://api.gestaoclick.com`, informada pelo proprietário na Referência em
+13/11/2026. Essa exceção não libera outras raízes, `/mcp` ou domínios parecidos.
+Não acrescentar `/api` automaticamente à base informada. Domínios diferentes eventualmente informados
 no OpenAPI da conta continuam bloqueados até revisão do código e comprovação
 oficial; não desative a verificação para contornar a recusa. Não há acesso a IP,
 localhost, userinfo, query/fragmento na base ou versões antigas presumidas.
 
 ## Cobertura e limites
+
+### Alternativa ao arquivo OpenAPI
+
+`GESTAOCLICK_READ_CONTRACT_JSON` aceita uma string JSON com exatamente quatro
+chaves: `version` igual a 1, `base_url`, `documentation_urls` e `resources`.
+As referências são URLs HTTPS oficiais, sem chaves em query. O parser não
+consulta essas páginas e citar uma URL não demonstra validação comercial.
+O administrador precisa conferir cada filtro na Referência da conta.
+
+Cada recurso admite somente `method: "GET"` e uma lista `filters` sem repetição,
+contendo `pagina` e `limite`. O caminho é derivado do nome permitido, nunca
+recebido do navegador ou copiado de uma URL arbitrária. Até os recursos que
+não serão usados são validados. POST, recursos fiscais, caminhos livres,
+servidor divergente e propriedades desconhecidas são recusados.
+
+Exemplo **estrutural**, insuficiente para sincronizar vendas: os filtros reais
+de período, a loja e os mapas ainda precisam ser conferidos e acrescentados.
+
+```json
+{
+  "version": 1,
+  "base_url": "https://api.gestaoclick.com",
+  "documentation_urls": ["https://api.gestaoclick.com"],
+  "resources": {
+    "vendas": {"method": "GET", "filters": ["pagina", "limite"]}
+  }
+}
+```
+
+O diagnóstico limitado de conexão é separado desse leitor e não exige os mapas
+de vendas nem cria uma fonte interna fictícia. Exige organização explícita nos
+Secrets, Master e consentimento. Consulte `ATIVACAO_GESTAOCLICK.md`.
 
 `GestaoClickClient.consultar` retorna somente depois de terminar todas as páginas
 e reconciliar as contagens. A próxima URL deve conservar domínio, caminho,
@@ -123,9 +162,10 @@ a requisição urllib sem conexão com o ERP. Isso verifica o contrato do códig
 não autenticação da conta, cobertura real de lojas, limites contratados ou
 correção dos campos oficiais. Não houve chamada autenticada ao GestãoClick.
 
-Antes de ligar a primeira sincronização real: reativar e validar o Supabase,
+Antes de ligar a primeira sincronização real: reativar o Supabase somente se
+estiver pausado e validar seu estado,
 aprovar as correções de segurança, obter autorização da empresa, conferir o
-OpenAPI, preparar mapa de linhas/status no backend, instalar os Secrets e
+contrato, preparar mapa de linhas/status no backend, instalar os Secrets e
 realizar GET de amostra pequena com autorização. Reconcilie contagens e
 quantidades com o ERP. A importação completa exige autorização explícita
 adicional após essa prévia; sincronização automática permanece desligada.
@@ -141,6 +181,9 @@ a interface não informa rota, método HTTP, mapa ou filtros arbitrários.
 Além dos valores básicos, configure nos Secrets protegidos:
 
 - `GESTAOCLICK_OPENAPI_JSON`: o documento JSON OpenAPI 3 da conta, conferido.
+- **Ou** `GESTAOCLICK_READ_CONTRACT_JSON`: contrato equivalente conferido na
+  documentação online. Configure exatamente um dos dois; uma variável vazia
+  também conta como presente e não há fallback para contornar contrato inválido.
 - `GESTAOCLICK_FIELD_MAP_JSON`: mapa explícito de campos, no formato abaixo.
 - `GESTAOCLICK_STATUS_MAP_JSON`: objeto que associa o valor real da situação ao
   status interno permitido, por exemplo `{"CODIGO_REAL_CONFERIDO":"completed"}`.

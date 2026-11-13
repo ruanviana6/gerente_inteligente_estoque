@@ -1,3 +1,16 @@
+## Leitura real autorizada em 13/11/2026
+
+O proprietário autorizou conectar a API de leitura e confirmou na Referência
+a base `https://api.gestaoclick.com`. O endereço `/mcp` é outro protocolo e não
+é a base do cliente REST. O arquivo OpenAPI não é obrigatório: um contrato
+equivalente, fechado e conferido na documentação oficial pode substituí-lo.
+Isso não dispensa confirmar campos, filtros, situações, lojas e cobertura.
+As chaves permanecem exclusivamente nos Secrets. Diagnóstico exige Master,
+permissão, consentimento e vínculo explícito da organização nos Secrets; não
+faz importação nem consulta ao navegar. Não executar testes com chaves no Git
+ou em argumentos de comandos. Fiscal real continua bloqueado, sem emissão.
+Esta diretiva atualiza a proibição temporária de leitura real abaixo.
+
 ## Regra vigente de 12/11/2026: cadastro por loja, sem emissão
 
 O usuário substituiu o modelo de duas APIs por UMA API GestãoClick com lojas.
@@ -7,7 +20,7 @@ de destino, sem criar venda/pedido. A emissão é SEMPRE MANUAL no ERP. Nenhuma
 flag pode habilitar emissão automática. O cliente analítico continua GET-only.
 Manter a aba Automação / Notas Fiscais com frete e contribuinte manuais, prévia,
 confirmação de cadastro e histórico. Preservar login após F5/reabertura.
-IDs reais de lojas dependem do OpenAPI; não inferir por nome, posição ou CNPJ.
+IDs reais de lojas dependem do contrato e da consulta oficial; não inferir por nome, posição ou CNPJ.
 Não versionar dados empresariais da imagem fornecida. Credencial única protegida.
 Continuam bloqueados integração real, pedidos/vendas no varejo, alteração de
 cadastros/saldos, cancelamento, exclusão, inutilização e qualquer emissão.
