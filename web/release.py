@@ -1,3 +1,3 @@
 """Identificador público da versão, sem dados ou configurações da aplicação."""
 
-RELEASE = "cadastro-nfe-lojas-20261112.1"
+RELEASE = "gestaoclick-conexao-20261113.1"

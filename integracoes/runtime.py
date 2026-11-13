@@ -6,7 +6,6 @@ período civil; contrato, campos, situações e filtros vêm dos Secrets revisad
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -23,6 +22,7 @@ from integracoes.gestaoclick import (
     TransporteConsulta,
     normalizar_documentos,
     normalizar_linhas,
+    parse_json_seguro,
 )
 
 _REQUIRED_FIELDS = frozenset({
@@ -34,33 +34,15 @@ _STATUS = frozenset({"potential", "separating", "completed", "cancelled", "retur
 _FORBIDDEN_FILTERS = frozenset({"pagina", "limite", "usuario_id", "loja_id"})
 
 
-def _constant(value: str) -> None:
-    """Recusa números JSON não finitos antes de validar qualquer contrato."""
-    raise ValueError("Número JSON inválido.")
-
-
-def _object(pairs: list[tuple[str, Any]]) -> dict:
-    """Recusa chaves repetidas em mapas que poderiam trocar silenciosamente o escopo."""
-    result = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError("Chave JSON repetida.")
-        result[key] = value
-    return result
-
-
 def _json(values: Mapping[str, Any], name: str, *, optional: bool = False) -> dict:
     """Lê apenas objetos JSON limitados, com mensagens que não exibem seu conteúdo."""
     raw = values.get(name, "{}" if optional else None)
-    if not isinstance(raw, str) or len(raw.encode("utf-8")) > 5 * 1024 * 1024:
+    if not isinstance(raw, str):
         raise ContratoInvalido(f"Configure {name} como JSON protegido do servidor.")
     try:
-        value = json.loads(raw, parse_constant=_constant, object_pairs_hook=_object)
-    except (ValueError, UnicodeError, RecursionError):
+        return parse_json_seguro(raw)
+    except ContratoInvalido:
         raise ContratoInvalido(f"O JSON protegido {name} é inválido.") from None
-    if not isinstance(value, dict):
-        raise ContratoInvalido(f"O JSON protegido {name} deve ser um objeto.")
-    return value
 
 
 def _path(value: Any) -> tuple[str, ...]:
@@ -124,7 +106,7 @@ class GestaoClickReader:
         normalizer = normalizar_documentos if isinstance(self._mapa, MapaDocumentoGestaoClick) else normalizar_linhas
         rows = normalizer(response.registros, self._mapa, self.config.source_id, self.config.store_id)
         if any(not first.isoformat() <= row["sale_date"] <= last.isoformat() for row in rows):
-            raise ContratoInvalido("A origem retornou vendas fora do período; confira os filtros no OpenAPI.")
+            raise ContratoInvalido("A origem retornou vendas fora do período; confira os filtros no contrato.")
         return rows
 
 
@@ -133,8 +115,8 @@ def build_reader(
 ) -> GestaoClickReader:
     """Valida Secrets e monta leitor fechado, sem qualquer requisição de rede.
 
-    A especificação OpenAPI, mapas de campos/status e nomes de filtros precisam
-    ser conferidos pelo administrador. Nenhum desses objetos vem da navegação
+    O OpenAPI ou contrato declarativo, os mapas de campos/status e os nomes de
+    filtros precisam ser conferidos pelo administrador. Nenhum vem da navegação
     ou de uploads da aplicação. A primeira leitura continua exigindo Master e
     autorização explícita no coordenador de sincronização.
     """
@@ -142,8 +124,15 @@ def build_reader(
         raise ContratoInvalido("Configuração protegida do servidor inválida.")
     config = GestaoClickConfig.from_mapping(values)
     config.validar()
-    spec = _json(values, "GESTAOCLICK_OPENAPI_JSON")
-    contrato = ContratoGestaoClick.from_openapi(spec, config.base_url, ("vendas",))
+    contract_names = {"GESTAOCLICK_OPENAPI_JSON", "GESTAOCLICK_READ_CONTRACT_JSON"}
+    configured_contracts = contract_names & values.keys()
+    if len(configured_contracts) != 1:
+        raise ContratoInvalido("Configure exatamente um contrato: OpenAPI ou contrato de leitura JSON.")
+    contract_name = configured_contracts.pop()
+    spec = _json(values, contract_name)
+    builder = (ContratoGestaoClick.from_openapi if contract_name == "GESTAOCLICK_OPENAPI_JSON"
+               else ContratoGestaoClick.from_read_contract)
+    contrato = builder(spec, config.base_url, ("vendas",))
     field_map = _json(values, "GESTAOCLICK_FIELD_MAP_JSON")
     statuses = _json(values, "GESTAOCLICK_STATUS_MAP_JSON")
     if (not statuses or any(not isinstance(value, str) for value in statuses.values()) or
@@ -178,7 +167,7 @@ def build_reader(
             any(not isinstance(value, str) for value in period.values()) or
             len(set(period.values())) != 2 or set(period.values()) - endpoint_filters or
             set(period.values()) & _FORBIDDEN_FILTERS):
-        raise ContratoInvalido("Filtros temporais não confirmados no GET do OpenAPI.")
+        raise ContratoInvalido("Filtros temporais não confirmados no GET do contrato.")
     fixed = _json(values, "GESTAOCLICK_FIXED_FILTERS_JSON", optional=True)
     if (set(fixed) - endpoint_filters or set(fixed) & (_FORBIDDEN_FILTERS | set(period.values())) or
             any(not isinstance(value, str) or not value or len(value) > 512 or

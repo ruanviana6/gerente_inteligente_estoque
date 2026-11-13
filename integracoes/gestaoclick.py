@@ -33,7 +33,7 @@ class ContratoInvalido(GestaoClickError):
 
 
 # Recursos de consulta publicados nas fontes oficiais. Um recurso só é usado
-# quando seu GET também existe na especificação OpenAPI da conta autorizada.
+# quando seu GET também existe no contrato conferido da conta autorizada.
 RECURSOS_CONSULTA = frozenset({"produtos", "vendas", "lojas", "situacoes_vendas"})
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024
 MAX_TOTAL_RESPONSE_BYTES = 20 * 1024 * 1024
@@ -48,8 +48,17 @@ def _texto(value: Any, limite: int = 200) -> str:
     return value
 
 
+def _host_oficial(host: str) -> bool:
+    """Confere domínio oficial com labels DNS completos, sem sufixos parecidos."""
+    return (len(host) <= 253 and
+            all(re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label)
+                for label in host.split(".")) and
+            any(host == suffix or host.endswith("." + suffix)
+                for suffix in ("gestaoclick.com", "gestaoclick.com.br")))
+
+
 def _base(value: Any) -> str:
-    """Restringe o destino a HTTPS público e ao prefixo oficial /api ou /v1."""
+    """Restringe HTTPS oficial; somente api.gestaoclick.com pode usar a raiz."""
     value = _texto(value, 512)
     try:
         parsed = urllib.parse.urlsplit(value)
@@ -64,12 +73,12 @@ def _base(value: Any) -> str:
     else:
         raise ContratoInvalido("O destino deve ser um domínio oficial conferido.")
     # Não basta startswith: usuario@host, sufixos falsos e portas são recusados.
-    if (parsed.scheme != "https" or parsed.username or parsed.password or
-            port not in (None, 443) or parsed.query or parsed.fragment or
-            parsed.path.rstrip("/") not in {"/api", "/v1"} or
-            not re.fullmatch(r"[a-z0-9.-]+", host) or
-            not any(host == suffix or host.endswith("." + suffix)
-                    for suffix in ("gestaoclick.com", "gestaoclick.com.br"))):
+    if (parsed.scheme != "https" or parsed.username is not None or parsed.password is not None or
+            port not in (None, 443) or parsed.netloc.lower() not in {host, host + ":443"} or
+            "?" in value or "#" in value or any(char.isspace() for char in value) or
+            not (parsed.path.rstrip("/") in {"/api", "/v1"} or
+                 host == "api.gestaoclick.com" and parsed.path in {"", "/"}) or
+            not _host_oficial(host)):
         raise ContratoInvalido("Endereço GestãoClick fora dos destinos oficiais permitidos.")
     return f"https://{host}{parsed.path.rstrip('/')}"
 
@@ -106,8 +115,8 @@ class GestaoClickConfig:
             store_id=values.get("GESTAOCLICK_STORE_ID", ""),
         )
 
-    def validar(self) -> str:
-        """Valida pré-condições locais antes de transmitir qualquer segredo."""
+    def validar_conexao(self) -> str:
+        """Confere ativação, destino, credenciais e limites sem presumir loja ou fonte."""
         if self.enabled is not True:
             raise IntegracaoDesabilitada("Integração GestãoClick não habilitada.")
         base = _base(self.base_url)
@@ -115,8 +124,6 @@ class GestaoClickConfig:
             _texto(value, 4096)
             if not value.isascii() or any(char.isspace() for char in value):
                 raise ContratoInvalido("Credencial GestãoClick em formato inválido.")
-        _texto(self.source_id, 120)
-        _texto(self.store_id, 120)
         for value in (self.timeout_seconds, self.interval_seconds):
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
                 raise ContratoInvalido("Limites de rede inválidos.")
@@ -128,10 +135,17 @@ class GestaoClickConfig:
                 raise ContratoInvalido("Limites da consulta inválidos.")
         return base
 
+    def validar(self) -> str:
+        """Exige também o escopo da fonte antes de qualquer consulta analítica."""
+        base = self.validar_conexao()
+        _texto(self.source_id, 120)
+        _texto(self.store_id, 120)
+        return base
+
 
 @dataclass(frozen=True)
 class RecursoConsulta:
-    """Guarda o GET validado e sua allowlist de filtros OpenAPI, sem aceitar rotas externas."""
+    """Guarda o GET validado e sua allowlist de filtros, sem aceitar rotas externas."""
 
     nome: str
     path: str
@@ -140,7 +154,7 @@ class RecursoConsulta:
 
 @dataclass(frozen=True, repr=False)
 class ContratoGestaoClick:
-    """Vincula cada recurso permitido à especificação OpenAPI conferida da conta."""
+    """Vincula cada recurso permitido ao contrato de leitura conferido da conta."""
 
     base_url: str
     recursos: Mapping[str, RecursoConsulta]
@@ -152,10 +166,22 @@ class ContratoGestaoClick:
     ) -> ContratoGestaoClick:
         """Extrai somente GETs fechados; não importa métodos de escrita da especificação."""
         base = _base(base_url)
-        if not str(documento.get("openapi", "")).startswith("3."):
+        if (not isinstance(documento, Mapping) or not isinstance(documento.get("openapi"), str) or
+                not documento["openapi"].startswith("3.")):
             raise ContratoInvalido("É necessária a especificação OpenAPI 3 da conta.")
         servers = documento.get("servers", [])
-        if base not in {item.get("url", "").rstrip("/") for item in servers if isinstance(item, dict)}:
+        if (not isinstance(servers, list) or
+                any(not isinstance(item, dict) or not isinstance(item.get("url"), str) for item in servers)):
+            raise ContratoInvalido("Servidores inválidos no OpenAPI da conta.")
+        official_servers = set()
+        for server in servers:
+            try:
+                official_servers.add(_base(server["url"]))
+            except ContratoInvalido:
+                # Um OpenAPI pode listar outros ambientes; nenhum deles vira
+                # destino autorizado sem passar pela mesma validação da base.
+                continue
+        if base not in official_servers:
             raise ContratoInvalido("A base não corresponde ao servidor do OpenAPI conferido.")
         paths = documento.get("paths")
         if not isinstance(paths, dict) or not recursos or set(recursos) - RECURSOS_CONSULTA:
@@ -170,7 +196,11 @@ class ContratoGestaoClick:
             if "200" not in operation["responses"]:
                 raise ContratoInvalido("GET sem resposta 200 documentada.")
             filters = set()
-            for parameter in entry.get("parameters", []) + operation.get("parameters", []):
+            shared_parameters = entry.get("parameters", [])
+            operation_parameters = operation.get("parameters", [])
+            if not isinstance(shared_parameters, list) or not isinstance(operation_parameters, list):
+                raise ContratoInvalido("Parâmetros inválidos no OpenAPI da conta.")
+            for parameter in shared_parameters + operation_parameters:
                 if not isinstance(parameter, dict) or "$ref" in parameter:
                     raise ContratoInvalido("Resolva referências de parâmetros antes de aprovar o contrato.")
                 if parameter.get("in") == "query":
@@ -182,6 +212,74 @@ class ContratoGestaoClick:
                 raise ContratoInvalido("Paginação precisa estar documentada para esta consulta.")
             result[nome] = RecursoConsulta(nome, path, frozenset(filters))
         return cls(base, result)
+
+    @classmethod
+    def from_read_contract(
+        cls, documento: Mapping[str, Any], base_url: str,
+        recursos: tuple[str, ...] = ("produtos", "vendas", "lojas"),
+    ) -> ContratoGestaoClick:
+        """Valida contrato declarativo equivalente quando não há arquivo OpenAPI.
+
+        O formato fechado contém version=1, base_url, documentation_urls e
+        resources. Cada recurso declara somente method="GET" e filters; sua
+        rota é derivada do nome permitido. As referências são conferidas
+        localmente, sem baixar páginas nem presumir que comprovem a conta.
+        Mapas de campos/status e filtros temporais continuam obrigatórios no
+        leitor. Cabe ao administrador conferir o conteúdo nas fontes citadas.
+        """
+        base = _base(base_url)
+        if (not isinstance(documento, Mapping) or
+                set(documento) != {"version", "base_url", "documentation_urls", "resources"} or
+                type(documento.get("version")) is not int or documento["version"] != 1):
+            raise ContratoInvalido("Formato ou versão do contrato de leitura inválido.")
+        if _base(documento["base_url"]) != base:
+            raise ContratoInvalido("A base não corresponde ao contrato de leitura conferido.")
+        references = documento["documentation_urls"]
+        if not isinstance(references, list) or not 1 <= len(references) <= 20:
+            raise ContratoInvalido("O contrato exige referências oficiais HTTPS.")
+        seen_references = set()
+        for reference in references:
+            _referencia_oficial(reference)
+            if reference in seen_references:
+                raise ContratoInvalido("Referência oficial repetida no contrato de leitura.")
+            seen_references.add(reference)
+        entries = documento["resources"]
+        if (not isinstance(entries, dict) or not entries or set(entries) - RECURSOS_CONSULTA or
+                not recursos or set(recursos) - RECURSOS_CONSULTA or
+                len(set(recursos)) != len(recursos) or set(recursos) - set(entries)):
+            raise ContratoInvalido("Recurso fora da allowlist do contrato de leitura.")
+        result = {}
+        # Validar também recursos não selecionados impede esconder uma operação
+        # indevida em um contrato que aparentemente autoriza apenas vendas.
+        for nome, entry in entries.items():
+            if (not isinstance(entry, dict) or set(entry) != {"method", "filters"} or
+                    entry["method"] != "GET"):
+                raise ContratoInvalido("O contrato de leitura permite somente método GET e filtros.")
+            filters = entry["filters"]
+            if (not isinstance(filters, list) or not 2 <= len(filters) <= 64 or
+                    any(not isinstance(name, str) or not re.fullmatch(r"[a-z_][a-z0-9_]*", name)
+                        for name in filters) or len(set(filters)) != len(filters)):
+                raise ContratoInvalido("Filtro documentado inválido ou repetido.")
+            if not {"pagina", "limite"}.issubset(filters):
+                raise ContratoInvalido("Paginação precisa estar documentada para esta consulta.")
+            if nome in recursos:
+                result[nome] = RecursoConsulta(nome, "/" + nome, frozenset(filters))
+        return cls(base, result)
+
+
+def _referencia_oficial(value: Any) -> None:
+    """Exige referência HTTPS oficial sem userinfo, porta alternativa ou query."""
+    value = _texto(value, 2048)
+    try:
+        parsed = urllib.parse.urlsplit(value)
+        port = parsed.port
+    except ValueError:
+        raise ContratoInvalido("Referência oficial HTTPS inválida.") from None
+    host = parsed.hostname or ""
+    if (parsed.scheme != "https" or parsed.username is not None or parsed.password is not None or
+            port not in (None, 443) or parsed.netloc.lower() not in {host, host + ":443"} or
+            "?" in value or any(char.isspace() for char in value) or not _host_oficial(host)):
+        raise ContratoInvalido("O contrato exige referências oficiais HTTPS.")
 
 
 @dataclass(frozen=True, repr=False)
@@ -253,6 +351,46 @@ def _inteiro(value: Any) -> int:
 def _rejeitar_constante(value: str) -> None:
     """Recusa NaN e infinito que o parser JSON padrão aceitaria por compatibilidade."""
     raise ValueError("Número JSON inválido.")
+
+
+def _objeto_sem_duplicatas(pairs: list[tuple[str, Any]]) -> dict:
+    """Recusa chaves duplicadas em qualquer nível sem incluir nomes ou valores no erro."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("Chave JSON repetida.")
+        result[key] = value
+    return result
+
+
+def parse_json_seguro(raw: str | bytes) -> dict:
+    """Lê JSON limitado sem duplicatas, Unicode inválido, não finitos ou conteúdo em erros."""
+    try:
+        if not isinstance(raw, (str, bytes)):
+            raise ValueError("Tipo JSON inválido.")
+        size = len(raw.encode("utf-8")) if isinstance(raw, str) else len(raw)
+        if size > MAX_RESPONSE_BYTES:
+            raise ValueError("JSON excede limite.")
+        result = json.loads(raw, parse_constant=_rejeitar_constante, object_pairs_hook=_objeto_sem_duplicatas)
+        if not isinstance(result, dict):
+            raise ValueError("Objeto JSON obrigatório.")
+        # Escapes Unicode e expoentes são resolvidos pelo parser: validar o
+        # resultado também recusa surrogates isolados e números como 1e999.
+        pending = [result]
+        while pending:
+            value = pending.pop()
+            if isinstance(value, dict):
+                pending.extend(value.keys())
+                pending.extend(value.values())
+            elif isinstance(value, list):
+                pending.extend(value)
+            elif isinstance(value, str):
+                value.encode("utf-8")
+            elif isinstance(value, float) and not math.isfinite(value):
+                raise ValueError("Número JSON inválido.")
+    except (ValueError, UnicodeError, TypeError, RecursionError):
+        raise ContratoInvalido("JSON GestãoClick inválido ou ambíguo.") from None
+    return result
 
 
 class GestaoClickClient:
@@ -327,11 +465,8 @@ class GestaoClickClient:
             if (len(response.body) > MAX_RESPONSE_BYTES or
                     self._response_bytes > MAX_TOTAL_RESPONSE_BYTES):
                 raise ContratoInvalido("Resposta GestãoClick excedeu o limite de tamanho.")
-            try:
-                result = json.loads(response.body, parse_constant=_rejeitar_constante)
-            except (ValueError, UnicodeError, TypeError):
-                raise ContratoInvalido("Resposta JSON inválida do GestãoClick.") from None
-            if not isinstance(result, dict) or result.get("code") != 200 or result.get("status") != "success":
+            result = parse_json_seguro(response.body)
+            if result.get("code") != 200 or result.get("status") != "success":
                 raise ContratoInvalido("Envelope de consulta GestãoClick inválido.")
             return result
         raise GestaoClickError("Consulta não concluída.")

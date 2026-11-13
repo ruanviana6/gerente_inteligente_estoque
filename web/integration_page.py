@@ -25,6 +25,35 @@ def _secrets():
     return valores
 
 
+def _verificar_conexao(servico, contexto):
+    """Oferece diagnóstico explícito sem ler Secrets ou chamar o ERP ao navegar."""
+    with st.expander("Verificar conexão com o GestãoClick"):
+        st.caption("Uma consulta limitada de lojas testa a autenticação. Não importa dados, "
+                   "não confirma o histórico completo e não executa automação fiscal.")
+        st.caption("Para vincular os Secrets a esta organização, use o identificador abaixo "
+                   "em GESTAOCLICK_ORGANIZATION_ID.")
+        st.code(contexto.profile.organization_id, language=None)
+        with st.form("diagnostico_gestaoclick"):
+            autorizado = st.checkbox("Autorizo uma consulta real de lojas para verificar a conexão")
+            verificar = st.form_submit_button("Verificar conexão")
+        if verificar:
+            from integracoes.diagnostico import diagnosticar_conexao
+            from integracoes.gestaoclick import GestaoClickError
+
+            try:
+                with st.spinner("Verificando conexão protegida…"):
+                    resultado = diagnosticar_conexao(servico.auth, _secrets, autorizado=autorizado)
+            except GestaoClickError as erro:
+                st.warning(str(erro))
+            else:
+                st.success("O GestãoClick aceitou a autenticação para a consulta de lojas. "
+                           "Nenhum dado foi importado.")
+                if not resultado["records_received"]:
+                    st.warning("A consulta veio vazia. Confira a loja e as permissões da chave no ERP.")
+                st.caption("Antes de sincronizar, ainda é necessário conferir os campos, "
+                           "as situações, a loja e a abrangência do período.")
+
+
 def integracoes(servico, contexto):
     """Exige Master em cada ação e não oferece edição de credenciais pelo navegador."""
     atual = servico.auth.require("integrations.manage")
@@ -141,3 +170,4 @@ def integracoes(servico, contexto):
                 st.dataframe(historico, hide_index=True, width="stretch")
             else:
                 st.info("Nenhuma execução registrada.")
+    _verificar_conexao(servico, atual)

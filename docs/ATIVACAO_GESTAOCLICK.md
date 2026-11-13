@@ -1,8 +1,49 @@
 # Ativação protegida da cópia analítica
 
-O conector está desativado por padrão (`GESTAOCLICK_ENABLED=false`). A entrega
-não autoriza consultas empresariais, sincronização automática, custos ou escrita
-no GestãoClick. A configuração fica exclusivamente no servidor Streamlit.
+## Atualização de 13/11/2026: documentação online e diagnóstico
+
+A leitura real foi autorizada pelo proprietário. A base informada na aba
+**Referência** é `https://api.gestaoclick.com`, sem acrescentar `/api` ou `/mcp`.
+O conector aceita essa raiz exata e preserva o suporte às bases legadas `/api`
+e `/v1` quando documentadas. Não deduz a base REST a partir do endereço MCP.
+O OpenAPI pode ser substituído por contrato de leitura equivalente, descrito
+em `CONTRATO_GESTAOCLICK.md`. Os mapas de campos e situações continuam obrigatórios.
+
+O diagnóstico está em **Integrações → Verificar conexão com o GestãoClick**.
+Para usá-lo após a publicação desta versão:
+
+1. Entre como Master. Copie o identificador da organização exibido nesse painel.
+2. Preserve os Secrets existentes e as duas chaves da API. Acrescente
+   `GESTAOCLICK_BASE_URL = "https://api.gestaoclick.com"` e
+   `GESTAOCLICK_ORGANIZATION_ID = "UUID_EXIBIDO_NO_PAINEL"`.
+3. Para a consulta real autorizada, altere `GESTAOCLICK_ENABLED = true` e salve.
+   Isso não agenda consultas nem ativa cadastro fiscal. Para interromper novas
+   leituras, volte a `false`; nenhum dado é excluído.
+4. No painel, marque a autorização e clique em **Verificar conexão**.
+
+Esse botão faz um único GET `/lojas?pagina=1&limite=1`, sem repetição nem seguir
+páginas, usando as chaves apenas no servidor. Tolera até cem registros no retorno
+limitado, pois o recurso pode não paginar; não declara que são todas as lojas.
+Não exibe nem persiste nomes, documentos ou outros campos empresariais recebidos.
+Uma resposta vazia gera aviso de abrangência. O sucesso comprova apenas que
+essa consulta foi aceita pela API. Sem Master, vínculo da organização, permissão,
+consentimento ou ativação, não há chamada ao ERP. Uma mudança de acesso durante
+a chamada impede apresentar o resultado. Não há Secrets em cache global.
+
+Antes da sincronização real ainda precisamos conferir campos, filtros temporais,
+IDs de lojas, situações, devoluções, fonte interna e abrangência. Essas condições
+não são preenchidas com suposições pelo diagnóstico. A automação NF-e segue DEMO.
+Esta alteração não requer migração, acesso administrativo ao banco ou troca de
+chaves. Os procedimentos antigos de retomada do Supabase abaixo são históricos
+e não devem ser executados se o projeto já estiver ativo e atualizado.
+
+As orientações de autorização abaixo descrevem a liberação inicial: a leitura
+já autorizada não exige repetir a aprovação; confirmação de abrangência dos
+dados continua sendo necessária antes de consolidar cada carga.
+
+O conector está desativado por padrão (`GESTAOCLICK_ENABLED=false`). A autorização
+atual cobre consultas de leitura. Não autoriza sincronização automática, custos
+ou escrita no GestãoClick. A configuração fica exclusivamente no servidor Streamlit.
 
 ## Recuperar o projeto existente
 
@@ -36,8 +77,9 @@ não foi contratado plano pago nem criado mecanismo artificial de atividade.
 
 ## Conferir o contrato real
 
-No GestãoClick, **Meus aplicativos → API → Documentação**, obter o OpenAPI da
-conta autorizada. Conferir habilitação sem contratação não aprovada, endereço
+No GestãoClick, **Meus aplicativos → API → Documentação/Referência**, conferir
+a documentação da conta autorizada, pelo OpenAPI ou pela página online.
+Conferir habilitação sem contratação não aprovada, endereço
 HTTPS, GETs, campos, paginação, quotas e filtros disponíveis. Confirmar a conta,
 loja e usuário vinculados à chave, permissões mínimas de leitura e eventuais
 restrições de IP/horário. Um HTTP 200 não prova acesso a todo o catálogo.
@@ -58,7 +100,7 @@ explícitos e não trata ausência na resposta como exclusão ou cancelamento.
    `integration_register_source`; nunca enviar tokens nessa RPC.
 2. Em **Streamlit → App settings → Secrets**, inserir o modelo de `.env.example`
    adaptado a TOML: URL, dois tokens, UUID da fonte e loja autorizada. Inserir
-   também os JSONs de OpenAPI, campos, status e filtros descritos em
+   também o OpenAPI ou contrato equivalente e os JSONs de campos, status e filtros descritos em
    `CONTRATO_GESTAOCLICK.md`. Não versionar o arquivo real nem fornecer valores
    por formulário do navegador.
 3. Manter `GESTAOCLICK_ENABLED=false` até banco validado, correções aprovadas,

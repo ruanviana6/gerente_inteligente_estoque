@@ -23,7 +23,7 @@ jobs:
       - name: Verificar versão, login e negação no endereço real
         run: >-
           python scripts/verificar_publicacao.py
-          --expected-version cadastro-nfe-lojas-20261112.1
+          --expected-version gestaoclick-conexao-20261113.1
           --output evidencias/publicado
       - name: Guardar somente evidências anônimas
         if: always()

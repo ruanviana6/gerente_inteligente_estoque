@@ -21,6 +21,7 @@ from integracoes.gestaoclick import (
     RespostaGestaoClick,
     TransporteHTTPS,
     normalizar_linhas,
+    parse_json_seguro,
 )
 
 BASE = "https://conta-ficticia.gestaoclick.com/api"
@@ -39,6 +40,15 @@ def especificacao():
 def contrato():
     """Autoriza somente o GET fictício de vendas presente no OpenAPI de teste."""
     return ContratoGestaoClick.from_openapi(especificacao(), BASE, ("vendas",))
+
+
+def contrato_leitura():
+    """Descreve GET e filtros fictícios sem inferir qualquer mapeamento da conta real."""
+    return {"version": 1, "base_url": BASE,
+            "documentation_urls": ["https://central.gestaoclick.com.br/hc/pt-br/sections/132-api"],
+            "resources": {"vendas": {"method": "GET", "filters": [
+                "pagina", "limite", "loja_id", "data_inicio", "data_fim",
+            ]}}}
 
 
 def resposta(data=None, *, page=1, pages=1, total=None, next_url=None, status=200, **meta):
@@ -87,11 +97,68 @@ def test_configuracao_default_nao_faz_rede():
     assert "segredo-ficticio" not in repr(CONFIG)
 
 
+def test_validacao_conexao_nao_inventa_escopo_nem_habilita_consulta_analitica():
+    """Diagnóstico pode validar conexão; leitura analítica ainda exige fonte e loja."""
+    config = replace(CONFIG, source_id="", store_id="")
+    assert config.validar_conexao() == BASE
+    with pytest.raises(ContratoInvalido):
+        config.validar()
+    client, transport, _ = cliente(config=config)
+    with pytest.raises(ContratoInvalido):
+        client.consultar("vendas")
+    assert transport.calls == []
+    with pytest.raises(IntegracaoDesabilitada):
+        GestaoClickConfig().validar_conexao()
+
+
+@pytest.mark.parametrize("changes", [
+    {"access_token": ""}, {"access_token": "com espaço"}, {"secret_access_token": "\r\n"},
+    {"timeout_seconds": 0}, {"interval_seconds": float("nan")}, {"max_attempts": True},
+    {"max_pages": 0}, {"max_records": 100001}, {"max_requests": 5001},
+])
+def test_validacao_conexao_preserva_todas_as_barreiras_de_credenciais_e_limites(changes):
+    """Retirar a exigência de escopo não relaxa credenciais nem orçamento de rede."""
+    with pytest.raises(ContratoInvalido):
+        replace(CONFIG, source_id="", store_id="", **changes).validar_conexao()
+
+
+@pytest.mark.parametrize("base", [
+    "https://api.gestaoclick.com", "https://api.gestaoclick.com/",
+    "https://api.gestaoclick.com:443/", "https://conta-ficticia.gestaoclick.com/v1",
+    BASE,
+])
+def test_base_oficial_raiz_e_prefixos_legados_geram_get_no_destino_conferido(base):
+    """A raiz oficial é usada sem adicionar /api; aliases legados continuam explícitos."""
+    config = replace(CONFIG, base_url=base)
+    normalized_base = config.validar_conexao()
+    spec = especificacao()
+    spec["servers"] = [{"url": base}]
+    contract = ContratoGestaoClick.from_openapi(spec, base, ("vendas",))
+    transport = TransporteFicticio(resposta())
+    client = GestaoClickClient(config, contract, transport)
+    assert client.consultar("vendas").total == 1
+    assert transport.calls[0][0].startswith(normalized_base + "/vendas?")
+
+
 @pytest.mark.parametrize("url", [
     "http://conta-ficticia.gestaoclick.com/api", "https://127.0.0.1/api", "https://localhost/api",
     "https://gestaoclick.com.evil.invalid/api", "https://user@gestaoclick.com/api",
     "https://gestaoclick.com:8443/api", "https://gestaoclick.com:abc/api", "https://gestaoclick.com/api?token=x",
     "https://gestaoclick.com/api#x", "https://gestaoclick.com/api/v2", "https://evil.invalid/api",
+    "https://gestaoclick.com", "https://gestaoclick.com.br/", "https://api.gestaoclick.com.br/",
+    "https://conta-ficticia.gestaoclick.com/", "https://outra.api.gestaoclick.com/",
+    "https://api.gestaoclick.com.evil.invalid/", "http://api.gestaoclick.com/",
+    "https://user@api.gestaoclick.com/", "https://api.gestaoclick.com:8443/",
+    "https://api.gestaoclick.com/?x=1", "https://api.gestaoclick.com/#x",
+    "https://api.gestaoclick.com//", "https://api.gestaoclick.com///",
+    "https://@api.gestaoclick.com/", "https://:@api.gestaoclick.com/",
+    "https://api.gestaoclick.com:/", "https://api.gestaoclick.com:0443/",
+    "https://api.gestaoclick.com/?", "https://api.gestaoclick.com/#",
+    " https://api.gestaoclick.com/", "https://.gestaoclick.com/api",
+    "https://a..gestaoclick.com/api", "https://-a.gestaoclick.com/api",
+    "https://a-.gestaoclick.com/api", "https://api.gestaoclick.com/%2f",
+    "https://api.gestaoclick.com/%2e", "https://api.gestaoclick.com/%2e%2e/",
+    "https://api.gestaoclick.com/%2Fapi", "https://api%2egestaoclick.com/",
 ])
 def test_destinos_nao_autorizados_nao_recebem_credenciais(url):
     """Bloqueia HTTP, IP, userinfo, portas, rotas antigas e sufixos maliciosos."""
@@ -99,6 +166,77 @@ def test_destinos_nao_autorizados_nao_recebem_credenciais(url):
     with pytest.raises(ContratoInvalido):
         client.consultar("vendas")
     assert transport.calls == []
+
+
+def test_contrato_de_leitura_deriva_get_e_filtros_sem_rede():
+    """O formato alternativo produz a mesma autorização fechada do OpenAPI."""
+    contract = ContratoGestaoClick.from_read_contract(contrato_leitura(), BASE, ("vendas",))
+    assert contract == contrato()
+    transport = TransporteFicticio(resposta())
+    assert GestaoClickClient(CONFIG, contract, transport).consultar("vendas").total == 1
+    assert transport.calls[0][0].startswith(BASE + "/vendas?")
+
+
+@pytest.mark.parametrize("mutation", [
+    lambda spec: spec.update(version=True),
+    lambda spec: spec.update(version=2),
+    lambda spec: spec.update(openapi="3.0.3"),
+    lambda spec: spec.update(base_url="https://outra.gestaoclick.com/api"),
+    lambda spec: spec.update(base_url="https://api.gestaoclick.com"),
+    lambda spec: spec.pop("documentation_urls"),
+    lambda spec: spec.update(documentation_urls=[]),
+    lambda spec: spec.update(documentation_urls="https://gestaoclick.com"),
+    lambda spec: spec.update(resources={}),
+    lambda spec: spec["resources"].update(clientes={"method": "GET", "filters": ["pagina", "limite"]}),
+    lambda spec: spec["resources"].update(produtos={"method": "POST", "filters": ["pagina", "limite"]}),
+    lambda spec: spec["resources"]["vendas"].update(method="get"),
+    lambda spec: spec["resources"]["vendas"].update(method="POST"),
+    lambda spec: spec["resources"]["vendas"].update(path="/vendas"),
+    lambda spec: spec["resources"]["vendas"].update(filters="pagina,limite"),
+    lambda spec: spec["resources"]["vendas"].update(filters=["pagina", "limite", "pagina"]),
+    lambda spec: spec["resources"]["vendas"].update(filters=["pagina", "loja_id"]),
+    lambda spec: spec["resources"]["vendas"].update(filters=["pagina", "limite", "filtro&escopo"]),
+    lambda spec: spec["resources"]["vendas"].update(filters=["pagina", "limite", {}]),
+])
+def test_contrato_de_leitura_recusa_schema_ambiguo_e_operacoes_nao_autorizadas(mutation):
+    """Não aceita rota, escrita ou filtro oculto mesmo em recurso não selecionado."""
+    spec = contrato_leitura()
+    mutation(spec)
+    with pytest.raises(ContratoInvalido):
+        ContratoGestaoClick.from_read_contract(spec, BASE, ("vendas",))
+
+
+@pytest.mark.parametrize("reference", [
+    "http://central.gestaoclick.com.br/documentacao", "https://evil.invalid/documentacao",
+    "https://central.gestaoclick.com.br.evil.invalid/documentacao",
+    "https://user@gestaoclick.com/documentacao", "https://gestaoclick.com:8443/documentacao",
+    "https://127.0.0.1/documentacao", "https://gestaoclick.com/documentacao?token=privado",
+    "https://gestaoclick.com/documentacao\n", None,
+    "https://@gestaoclick.com/documentacao", "https://:@gestaoclick.com/documentacao",
+    "https://gestaoclick.com:/documentacao", "https://gestaoclick.com:0443/documentacao",
+    "https://gestaoclick.com/documentacao?", " https://gestaoclick.com/documentacao",
+    "https://a..gestaoclick.com/documentacao", "https://-a.gestaoclick.com/documentacao",
+])
+def test_contrato_de_leitura_exige_referencias_oficiais_https(reference):
+    """Fontes ausentes, endereços externos e credenciais em URLs não aprovam contrato."""
+    spec = contrato_leitura()
+    spec["documentation_urls"] = [reference]
+    with pytest.raises(ContratoInvalido):
+        ContratoGestaoClick.from_read_contract(spec, BASE, ("vendas",))
+
+
+def test_contrato_leitura_valida_recursos_requeridos_e_raiz_exata():
+    """Mesmo contrato de outra base ou sem o recurso pedido não habilita consultas."""
+    spec = contrato_leitura()
+    spec["base_url"] = "https://api.gestaoclick.com"
+    contract = ContratoGestaoClick.from_read_contract(spec, "https://api.gestaoclick.com/", ("vendas",))
+    assert contract.base_url == "https://api.gestaoclick.com"
+    for resources in (("clientes",), ("produtos",), (), ("vendas", "vendas")):
+        with pytest.raises(ContratoInvalido):
+            ContratoGestaoClick.from_read_contract(spec, "https://api.gestaoclick.com", resources)
+    spec["documentation_urls"] *= 2
+    with pytest.raises(ContratoInvalido):
+        ContratoGestaoClick.from_read_contract(spec, "https://api.gestaoclick.com", ("vendas",))
 
 
 def test_openapi_exige_get_servidor_e_parametros_comprovados():
@@ -113,6 +251,25 @@ def test_openapi_exige_get_servidor_e_parametros_comprovados():
         ContratoGestaoClick.from_openapi(especificacao(), "https://outra.gestaoclick.com/api", ("vendas",))
     spec = especificacao()
     spec["paths"]["/vendas"]["get"]["parameters"] = []
+    with pytest.raises(ContratoInvalido):
+        ContratoGestaoClick.from_openapi(spec, BASE, ("vendas",))
+
+
+@pytest.mark.parametrize("mutation", [
+    lambda spec: spec.update(openapi=3.1),
+    lambda spec: spec.update(servers=None),
+    lambda spec: spec.update(servers={"url": BASE}),
+    lambda spec: spec.update(servers=[None]),
+    lambda spec: spec.update(servers=[{"url": None}]),
+    lambda spec: spec["paths"]["/vendas"].update(parameters=None),
+    lambda spec: spec["paths"]["/vendas"].update(parameters={"name": "pagina"}),
+    lambda spec: spec["paths"]["/vendas"]["get"].update(parameters=None),
+    lambda spec: spec["paths"]["/vendas"]["get"].update(parameters={"name": "pagina"}),
+])
+def test_openapi_malformado_produz_erro_de_contrato_seguro(mutation):
+    """Tipos inválidos não escapam como exceções do parser nem expõem o contrato."""
+    spec = especificacao()
+    mutation(spec)
     with pytest.raises(ContratoInvalido):
         ContratoGestaoClick.from_openapi(spec, BASE, ("vendas",))
 
@@ -217,6 +374,55 @@ def test_http200_ou_redirect_nao_comprovam_integridade(response):
     client, _, _ = cliente(response)
     with pytest.raises(GestaoClickError):
         client.consultar("vendas")
+
+
+@pytest.mark.parametrize("original,duplicate", [
+    (b'"status": "success"', b'"status":"success","status":"success"'),
+    (b'"total_registros": 1', b'"total_registros":1,"total_registros":1'),
+    (b'"id": "001"', b'"id":"001","id":"001"'),
+    (b'"id": "001"', b'"privado-segredo":"valor-privado","privado-segredo":"valor-privado"'),
+])
+def test_resposta_com_chave_duplicada_em_qualquer_nivel_nao_vira_analise(original, duplicate):
+    """Rejeita ambiguidade no envelope, metadados e registros sem revelar conteúdo."""
+    response = resposta()
+    response = replace(response, body=response.body.replace(original, duplicate))
+    client, transport, _ = cliente(response)
+    with pytest.raises(ContratoInvalido, match="JSON") as exc:
+        client.consultar("vendas")
+    assert len(transport.calls) == 1
+    assert "privado" not in str(exc.value)
+    assert "segredo" not in str(exc.value)
+    assert "001" not in str(exc.value)
+
+
+@pytest.mark.parametrize("raw", [
+    b'{"duplicada":1,"dupli\\u0063ada":1}',
+    b'{"valor":NaN}', b'{"valor":Infinity}', b'{"valor":-Infinity}',
+    b'{"privado":"\\ud800"}', b'{"\\ud800":"privado"}',
+    b'{"privado":[{"valor":"\\udfff"}]}', b'{"privado":1e999}',
+    b'{"privado":[{"valor":-1e999}]}',
+    b'[]', b'"privado"', b'\xff', '{"privado":"\ud800"}',
+    b' ' * (MAX_RESPONSE_BYTES + 1), None,
+])
+def test_parser_reutilizavel_recusa_json_ambiguo_ou_excessivo_sem_vazamento(raw):
+    """O diagnóstico e o leitor podem compartilhar a mesma fronteira de JSON seguro."""
+    with pytest.raises(ContratoInvalido) as exc:
+        parse_json_seguro(raw)
+    assert str(exc.value) == "JSON GestãoClick inválido ou ambíguo."
+
+
+def test_parser_reutilizavel_aceita_objetos_json_texto_e_bytes():
+    """O parser mantém IDs como texto sem requerer um envelope de consulta completa."""
+    for raw in ('{"data":[{"id":"001"}]}', b'{"data":[{"id":"001"}]}'):
+        assert parse_json_seguro(raw) == {"data": [{"id": "001"}]}
+
+
+def test_parser_reutilizavel_trata_limite_de_recursao_sem_expor_resposta(monkeypatch):
+    """A profundidade suportada pelo interpretador não altera a mensagem segura."""
+    monkeypatch.setattr("integracoes.gestaoclick.json.loads", Mock(side_effect=RecursionError("privado")))
+    with pytest.raises(ContratoInvalido) as exc:
+        parse_json_seguro(b'{"data":[]}')
+    assert str(exc.value) == "JSON GestãoClick inválido ou ambíguo."
 
 
 def test_origem_alterada_durante_paginacao_e_limite_de_registros():
