@@ -83,6 +83,13 @@ def test_tom_nao_previsto_nao_cria_estilo_arbitrario():
         theme.surface("produto", tone="cor_injetada")
 
 
+@pytest.mark.parametrize("key", ["", "fora_do_componente", "flatter_page_header_<script>", None])
+def test_cabecalho_recusa_identificador_externo_ao_componente(key):
+    """A identidade de um cabeçalho deve ser estável e definida pelo código."""
+    with pytest.raises(ValueError, match="cabeçalho"):
+        theme.page_header("Título", key=key)
+
+
 def test_html_do_tema_e_estatico_e_nao_carrega_recursos_externos(monkeypatch):
     """O HTML contém só CSS estático; a marca usa um arquivo local e texto alternativo."""
     interface = MagicMock()

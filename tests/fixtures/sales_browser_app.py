@@ -88,7 +88,7 @@ def executar():
         raise RuntimeError("Entrada exclusiva de teste. Use app.py na aplicação.")
     import streamlit as st
 
-    from web.integration_page import integracoes
+    from web.pages import _administracao
     from web.sales_page import vendas
     from web.theme import apply_theme, brand_header
 
@@ -106,7 +106,10 @@ def executar():
         if page == "Inteligência de Vendas":
             vendas(service, auth.context)
         else:
-            integracoes(service, auth.context)
+            # Exercita a composição produtiva: o cabeçalho administrativo
+            # envolve o da integração. A página isolada não detecta colisões.
+            st.session_state["admin_area"] = "Integrações"
+            _administracao(service, auth.context)
         st.caption(f"Controle DEMO: confirmações={auth.commits}; cancelamentos={auth.cancels}")
 
 

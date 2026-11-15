@@ -751,7 +751,8 @@ def _administracao(servico: Any, contexto: Any) -> None:
     from web.fiscal_service import FiscalService
     from web.integration_page import integracoes
 
-    page_header("Administração", "Configurações e operações disponíveis para suas permissões.")
+    page_header("Administração", "Configurações e operações disponíveis para suas permissões.",
+                key="flatter_page_header_admin")
     master = _perfil(contexto, "role") == "Master"
     opcoes = {}
     if master:
