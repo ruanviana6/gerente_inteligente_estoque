@@ -1,3 +1,3 @@
 """Identificador público da versão, sem dados ou configurações da aplicação."""
 
-RELEASE = "gestaoclick-unidades-20261116.5"
+RELEASE = "gestaoclick-diagnostico-20261116.6"
