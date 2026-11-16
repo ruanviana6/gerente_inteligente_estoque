@@ -28,7 +28,7 @@ from test_gestaoclick_account_setup import auth as auth
 from test_gestaoclick_account_setup import configuracao as configuracao
 
 from integracoes.gestaoclick import ContratoInvalido, GestaoClickError, RespostaGestaoClick
-from integracoes.native_preview import consultar_previa_vendas
+from integracoes.native_preview import PaginacaoAmostraInvalida, consultar_previa_vendas
 from web.errors import AuthorizationError
 
 INICIO = date(2025, 1, 1)
@@ -572,3 +572,41 @@ def test_respostas_e_excecoes_invalidas_falham_com_mensagem_segura(auth, configu
     for sentinel in (SENSIVEL, ACCESS_TOKEN, SECRET_TOKEN, PRIVADO):
         assert sentinel not in str(error.value)
     auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("alteracao,codigo", [
+    ({"total_registros": "1"}, "PV_CONTAGEM"),
+    ({"limite_por_pagina": 0}, "PV_LIMITE"),
+    ({"pagina_atual": 2}, "PV_PAGINA"),
+    ({"total_paginas": 2}, "PV_TOTAL_PAGINAS"),
+    ({"proxima_pagina": 2}, "PV_CURSOR"),
+    ({"proxima_url": "https://externo.invalid/" + SENSIVEL}, "PV_CONTINUACAO"),
+])
+def test_diagnostico_restrito_identifica_o_motivo_sem_dados_de_vendas(
+        auth, configuracao, conta, alteracao, codigo):
+    """Apenas código e tipos dos campos conhecidos são mostrados ao Master."""
+    with pytest.raises(PaginacaoAmostraInvalida) as falha:
+        executar(auth, configuracao, conta, resposta(meta_changes=alteracao))
+    erro = falha.value
+    assert erro.diagnostico["codigo"] == codigo
+    assert erro.diagnostico["tipo_meta"] == "objeto"
+    assert set(erro.diagnostico["campos"]) == {
+        "total_registros", "total_da_pagina", "total_registros_pagina",
+        "total_paginas", "pagina_atual", "limite_por_pagina",
+        "proxima_pagina", "proxima_url",
+    }
+    assert set(erro.diagnostico["campos"].values()) <= {
+        "inteiro", "texto", "booleano", "decimal", "objeto", "lista", "nulo", "outro", "ausente",
+    }
+    for secreto in (SENSIVEL, PRIVADO, ACCESS_TOKEN, SECRET_TOKEN, "externo.invalid"):
+        assert secreto not in str(erro) + str(erro.diagnostico)
+    auth.rpc.assert_not_called()
+
+
+def test_metadado_ausente_exibe_codigo_sem_reproduzir_payload(auth, configuracao, conta):
+    """Metadado ausente recusa a prévia, sem confiar em status HTTP 200."""
+    with pytest.raises(PaginacaoAmostraInvalida) as falha:
+        executar(auth, configuracao, conta, resposta(meta=None))
+    assert falha.value.diagnostico["codigo"] == "PV_META"
+    assert falha.value.diagnostico["tipo_meta"] == "nulo"
+    assert all(tipo == "ausente" for tipo in falha.value.diagnostico["campos"].values())
