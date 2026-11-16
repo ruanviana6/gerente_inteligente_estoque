@@ -4,6 +4,15 @@
 
 # Contexto de continuidade para o Codex
 
+## Atualização autorizada em 16/11/2026
+
+O proprietário solicitou sincronização automática de vendas e janela de até
+732 dias. O executor é externo ao Streamlit e usa credencial restrita, aprovação
+Master, checkpoint e lotes de até 30 dias. O contrato e o escopo precisam ser
+conferidos antes da ativação real. Consulte [o procedimento](SINCRONIZACAO_AUTOMATICA.md).
+Esta decisão supera a restrição temporária de consulta apenas manual, preservando
+GET-only no ERP, RLS, dados históricos e ausência de custos novos.
+
 ## Estado da implementação web em 28/10/2026
 
 O PR #5, branch `implementacao/web-supabase`, continua o PR #4 e implementa a

@@ -110,7 +110,10 @@ set local role anon;
 select sync_auto_test.denied(format('select public.sync_job_claim(%L,repeat(''a'',64))',:'secret'),'42501','rebaixamento revoga job');
 reset role;
 update public.app_users set role='Master' where user_id='a1000000-0000-4000-8000-000000000001';
-insert into auth.sessions(id,user_id,not_after) values('a2000000-0000-4000-8000-000000000001','a1000000-0000-4000-8000-000000000001',now()+interval '1 day');
+-- Simula um login novo depois da revogação. now() ficaria no início desta
+-- transação e representaria uma sessão antiga, corretamente negada pelo Auth.
+insert into auth.sessions(id,user_id,created_at,not_after) values('a2000000-0000-4000-8000-000000000001',
+ 'a1000000-0000-4000-8000-000000000001',clock_timestamp(),now()+interval '1 day');
 set local role authenticated;
 select sync_auto_test.login(1);
 select j->>'secret' new_secret from public.sync_automation_configure(:'source','loja1',repeat('a',64),

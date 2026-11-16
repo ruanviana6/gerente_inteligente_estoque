@@ -1,5 +1,14 @@
 # Ativação protegida da cópia analítica
 
+## Atualização de 16/11/2026: agendamento autorizado
+
+O proprietário autorizou sincronização automática e histórico de até 732 dias.
+As referências abaixo à operação exclusivamente manual são históricas.
+O [procedimento atual](SINCRONIZACAO_AUTOMATICA.md) descreve o executor externo,
+a migração aditiva, a credencial restrita, a configuração no GitHub e a pausa.
+Contrato real, loja, campos e situações continuam exigindo conferência; não são
+inferidos dos tokens. A autorização não habilita escrita no ERP nem fiscal real.
+
 ## Atualização de 13/11/2026: documentação online e diagnóstico
 
 A leitura real foi autorizada pelo proprietário. A base informada na aba

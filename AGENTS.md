@@ -1,3 +1,19 @@
+## Sincronização automática autorizada em 16/11/2026
+
+O proprietário pediu atualização automática independente do navegador e histórico
+de até 732 dias. Esta decisão substitui a restrição anterior de sincronização
+exclusivamente manual. A autorização não dispensa validar o contrato, loja,
+campos e situações reais. O executor usa credencial delegada por automação,
+com aprovação Master, escopo, concessão e RPCs fechadas; nunca senha Master,
+JWT fabricado ou service_role para sincronizar. Consultas ERP continuam GET-only.
+Não executar consultas, treino ou cargas pesadas na navegação Streamlit.
+Preservar limites, RLS, histórico e cobertura desconhecida. Agendamento não
+comprova abrangência integral. A migração deve passar no banco descartável e
+ter backup verificável antes da produção. O cron GitHub precisa existir na
+branch padrão, mas faz checkout da branch publicada implementacao/web-supabase.
+Consultar docs/SINCRONIZACAO_AUTOMATICA.md; nunca declarar carga real concluída
+apenas porque o código, a configuração local ou os testes fictícios passaram.
+
 ## Leitura real autorizada em 13/11/2026
 
 O proprietário autorizou conectar a API de leitura e confirmou na Referência

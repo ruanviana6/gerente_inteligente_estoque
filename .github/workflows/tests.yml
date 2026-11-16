@@ -14,17 +14,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7.0.1
-      - name: Gerar migração automática com a CLI (preparação temporária)
-        run: |
-          npx --yes supabase@2.122.0 migration new --help
-          npx --yes supabase@2.122.0 migration new sincronizacao_automatica
-          python - <<'PYMIG'
-          from pathlib import Path
-          arquivos = list(Path('supabase/migrations').glob('*_sincronizacao_automatica.sql'))
-          assert len(arquivos) == 1, 'A CLI deve gerar exatamente uma migração nova.'
-          arquivos[0].write_text(Path('supabase/pending/sincronizacao_automatica.sql').read_text())
-          print('MIGRACAO_GERADA=' + arquivos[0].name)
-          PYMIG
       - uses: actions/setup-python@v7.1.0
         with:
           python-version: '3.12'
@@ -211,17 +200,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
-      - name: Gerar migração automática com a CLI (preparação temporária)
-        run: |
-          npx --yes supabase@2.122.0 migration new --help
-          npx --yes supabase@2.122.0 migration new sincronizacao_automatica
-          python - <<'PYMIG'
-          from pathlib import Path
-          arquivos = list(Path('supabase/migrations').glob('*_sincronizacao_automatica.sql'))
-          assert len(arquivos) == 1, 'A CLI deve gerar exatamente uma migração nova.'
-          arquivos[0].write_text(Path('supabase/pending/sincronizacao_automatica.sql').read_text())
-          print('MIGRACAO_GERADA=' + arquivos[0].name)
-          PYMIG
       - name: Preparar Auth fictício e aplicar schema
         run: |
           psql -v ON_ERROR_STOP=1 -f tests/sql/bootstrap.sql
@@ -269,6 +247,7 @@ jobs:
           python tests/sql/concorrencia.py
           python tests/sql/snapshot_concurrency.py
           python tests/sql/sync_concorrencia.py
+          python tests/sql/sync_auto_concurrency.py
           python tests/sql/fiscal_concurrency.py
       - name: Guardar evidências do banco
         if: always()
