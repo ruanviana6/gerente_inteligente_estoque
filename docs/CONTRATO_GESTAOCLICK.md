@@ -1,5 +1,14 @@
 # Contrato de leitura do GestãoClick
 
+## Atualização de 16/11/2026
+
+O OpenAPI público foi localizado em `https://api.gestaoclick.com/docs`.
+A [conferência do contrato público](CONTRATO_PUBLICO_GESTAOCLICK_20261116.md)
+registra diferenças de paginação e campos ausentes na resposta padrão. A
+configuração genérica abaixo não substitui essa adaptação: não é suficiente
+inventar mapas JSON para habilitar a carga real. A tela agora permite consultar
+lojas/situações e registrar a fonte efetiva com a sessão Master, sem escrita no ERP.
+
 O conector de `integracoes/gestaoclick.py` usa somente GET. Não existe argumento
 para escolher outro método, enviar corpo, fornecer uma URL pelo navegador ou
 executar uma rota arbitrária. O transporte urllib fixa GET e bloqueia redirects.

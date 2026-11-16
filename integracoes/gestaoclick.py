@@ -348,6 +348,44 @@ def _inteiro(value: Any) -> int:
     return value
 
 
+def _conferir_paginacao(meta: dict, quantidade: int, pagina: int, recurso: str) -> tuple[int, int, int | None]:
+    """Valida contagens e deriva páginas somente pelo envelope oficial de vendas.
+
+    O GET /vendas publicado em https://api.gestaoclick.com/docs informa
+    total_da_pagina e limite_por_pagina, mas não total_paginas. A divisão inteira
+    evita arredondamento por float. O tamanho efetivo precisa explicar cada
+    página recebida; um lote truncado não pode ser compensado por outro depois.
+    O formato anterior com total_paginas permanece aceito separadamente.
+    """
+    total = _inteiro(meta.get("total_registros"))
+    if _inteiro(meta.get("pagina_atual")) != pagina or quantidade > 100:
+        raise ContratoInvalido("Sequência de páginas inválida.")
+    for campo in ("total_registros_pagina", "total_da_pagina"):
+        if campo in meta and _inteiro(meta[campo]) != quantidade:
+            raise ContratoInvalido("Contagem da página diverge dos registros.")
+    limite = None
+    if "total_paginas" in meta:
+        paginas = _inteiro(meta["total_paginas"])
+    else:
+        if recurso != "vendas" or "total_da_pagina" not in meta or "proxima_url" not in meta:
+            raise ContratoInvalido("Metadados insuficientes para conferir a paginação.")
+        limite = _inteiro(meta.get("limite_por_pagina"))
+        if not 1 <= limite <= 100:
+            raise ContratoInvalido("Limite da página fora do contrato de vendas.")
+        paginas = (total + limite - 1) // limite
+        esperada = min(limite, max(0, total - (pagina - 1) * limite))
+        if pagina > max(1, paginas) or quantidade != esperada:
+            raise ContratoInvalido("Consulta parcial: tamanho da página não reconciliado.")
+        if "proxima_pagina" in meta:
+            cursor = meta["proxima_pagina"]
+            esperado = None if meta["proxima_url"] is None else str(pagina + 1)
+            if cursor != esperado:
+                raise ContratoInvalido("Cursor da próxima página inconsistente.")
+    if paginas == 0 and total != 0:
+        raise ContratoInvalido("Sequência de páginas inválida.")
+    return total, paginas, limite
+
+
 def _rejeitar_constante(value: str) -> None:
     """Recusa NaN e infinito que o parser JSON padrão aceitaria por compatibilidade."""
     raise ValueError("Número JSON inválido.")
@@ -494,7 +532,7 @@ class GestaoClickClient:
         filters.update({"pagina": "1", "limite": "100"})
         url = base + endpoint.path + "?" + urllib.parse.urlencode(filters)
         seen_urls, result = set(), []
-        expected_total = expected_pages = None
+        expected_total = expected_pages = expected_limit = None
         for page in range(1, self.config.max_pages + 1):
             if url in seen_urls:
                 raise ContratoInvalido("Ciclo detectado na paginação.")
@@ -505,17 +543,14 @@ class GestaoClickClient:
                 raise ContratoInvalido("Lista de registros inválida ou incompleta.")
             if not isinstance(meta, dict):
                 raise ContratoInvalido("Cobertura sem metadados não aprovada para sincronização.")
-            total, pages = _inteiro(meta.get("total_registros")), _inteiro(meta.get("total_paginas"))
-            if (pages == 0 and total != 0) or _inteiro(meta.get("pagina_atual")) != page or len(data) > 100:
-                raise ContratoInvalido("Sequência de páginas inválida.")
+            total, pages, page_limit = _conferir_paginacao(meta, len(data), page, recurso)
             if expected_total is None:
-                expected_total, expected_pages = total, pages
-            if total != expected_total or pages != expected_pages or pages > self.config.max_pages:
+                expected_total, expected_pages, expected_limit = total, pages, page_limit
+            if (total != expected_total or pages != expected_pages or page_limit != expected_limit
+                    or pages > self.config.max_pages):
                 raise ContratoInvalido("A origem mudou durante a consulta ou excedeu o limite.")
             if total > self.config.max_records or len(result) + len(data) > self.config.max_records:
                 raise ContratoInvalido("Consulta excede o limite de registros.")
-            if "total_registros_pagina" in meta and _inteiro(meta["total_registros_pagina"]) != len(data):
-                raise ContratoInvalido("Contagem da página diverge dos registros.")
             result.extend(data)
             next_url = meta.get("proxima_url")
             if next_url is None:
