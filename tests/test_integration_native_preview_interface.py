@@ -266,7 +266,7 @@ def test_diagnostico_da_amostra_rejeitada_expoe_apenas_tipos(previa_ficticia):
     e.meta_invalida = True
     consultar_amostra(e)
     assert not e.app.exception
-    assert e.app.warning and "PV_CONTAGEM" in str(e.app.warning[0].message)
+    assert e.app.warning and "PV_CONTAGEM" in str(e.app.warning[0].value)
     diagnosticos = [item.value for item in e.app.json]
     assert any("PV_CONTAGEM" in str(d) for d in diagnosticos)
     conteudo = texto_interface(e.app) + str(diagnosticos) + tabelas(e.app)
