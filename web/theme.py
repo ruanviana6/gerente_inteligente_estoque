@@ -60,10 +60,10 @@ STYLES = """
     margin-top: 0.15rem;
     margin-bottom: 0.4rem;
 }
-.st-key-flatter_page_header {
+[class*="st-key-flatter_page_header"] {
     margin-bottom: 0.2rem;
 }
-.st-key-flatter_page_header h1 {
+[class*="st-key-flatter_page_header"] h1 {
     letter-spacing: -0.025em;
     text-wrap: balance;
     overflow-wrap: anywhere;
@@ -117,7 +117,7 @@ STYLES = """
     box-sizing: border-box;
 }
 @media (max-width: 640px) {
-    .st-key-flatter_page_header h1 { font-size: 1.65rem; }
+    [class*="st-key-flatter_page_header"] h1 { font-size: 1.65rem; }
     [class*="st-key-flatter_surface_"],
     [class*="st-key-flatter_metric_"] { padding: 0.85rem; }
 }
@@ -147,9 +147,16 @@ def brand_header(compact: bool = False) -> None:
         st.caption("GERENTE DE ESTOQUE" if compact else "INTELIGÊNCIA DE ESTOQUE")
 
 
-def page_header(title: str, subtitle: str = "") -> None:
-    """Apresenta um cabeçalho contextual, sem interpolar conteúdo em HTML."""
-    with st.container(key="flatter_page_header"):
+def page_header(title: str, subtitle: str = "", *, key: str = "flatter_page_header") -> None:
+    """Apresenta um cabeçalho com identidade própria ao compor páginas aninhadas.
+
+    O cabeçalho externo da Administração usa uma chave distinta da subárea.
+    A chave é definida pelo código, nunca pelo título ou por dados do usuário.
+    """
+    if (not isinstance(key, str) or
+            not re.fullmatch(r"flatter_page_header(?:_[a-zA-Z0-9_-]{1,40})?", key)):
+        raise ValueError("Identificador de cabeçalho inválido.")
+    with st.container(key=key):
         st.title(title, anchor=False)
         if subtitle:
             st.caption(subtitle)
