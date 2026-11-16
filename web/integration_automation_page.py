@@ -63,8 +63,10 @@ def automation_controls(servico, loader):
                 if missing:
                     st.warning("A conexão não está pronta para importar vendas. Faltam estas configurações:")
                     st.write("\n".join(f"- `{name}`" for name in missing))
-                    st.caption("Comece por ‘Conferir lojas e situações da conta’. O registro da fonte e a "
-                               "validação do formato das vendas precisam estar completos antes de ativar o agendamento.")
+                    st.caption("Comece por ‘Conferir lojas e situações da conta’ e ‘Conferir amostra de vendas’. "
+                               "A amostra nativa não exige mapas JSON. A importação completa ainda depende "
+                               "da adaptação e validação de itens, devoluções e versões; "
+                               "não preencha campos desconhecidos apenas para ativar o agendamento.")
                 else:
                     _, source, store = validated_scope(values, context.profile.organization_id)
                     contract_fingerprint(values)

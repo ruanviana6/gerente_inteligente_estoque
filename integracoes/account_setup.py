@@ -113,6 +113,7 @@ class ContaGestaoClick:
     _expira_em: float
     _lojas: tuple[tuple[str, str], ...]
     _situacoes: tuple[tuple[str, str], ...]
+    _config_stamp: bytes
     _assinatura: bytes = b""
 
     @property
@@ -126,10 +127,21 @@ class ContaGestaoClick:
         return [{"id": identificador, "nome": nome} for identificador, nome in self._situacoes]
 
 
+def _vinculo_configuracao(config: GestaoClickConfig) -> bytes:
+    """Vincula a consulta à conta sem guardar tokens no catálogo da sessão.
+
+    A HMAC usa a chave efêmera do processo. Fonte, loja e mapas não entram no
+    vínculo, pois podem ser configurados depois da conferência da mesma conta.
+    """
+    body = json.dumps((config.validar_conexao(), config.access_token, config.secret_access_token),
+                      ensure_ascii=True, separators=(",", ":")).encode()
+    return hmac.digest(_CHAVE_ASSINATURA, b"gestaoclick-account-binding\0" + body, "sha256")
+
+
 def _assinatura(conta: ContaGestaoClick) -> bytes:
     """Assina metadados mínimos com chave efêmera que nunca sai do processo servidor."""
     body = json.dumps((conta.organization_id, conta._access_stamp, conta._criada_em,
-                       conta._expira_em, conta._lojas, conta._situacoes),
+                       conta._expira_em, conta._lojas, conta._situacoes, conta._config_stamp.hex()),
                       ensure_ascii=True, separators=(",", ":"), allow_nan=False).encode()
     return hmac.digest(_CHAVE_ASSINATURA, body, "sha256")
 
@@ -145,6 +157,7 @@ def _validar_conta(auth: RPCAuth, conta: ContaGestaoClick) -> None:
                       for row in conta._lojas + conta._situacoes) and
                   type(conta._access_stamp) is tuple and len(conta._access_stamp) == 5 and
                   type(conta._access_stamp[3]) is tuple and
+                  type(conta._config_stamp) is bytes and len(conta._config_stamp) == 32 and
                   type(conta._assinatura) is bytes and
                   hmac.compare_digest(conta._assinatura, _assinatura(conta)) and
                   all(type(value) in (int, float) and math.isfinite(value)
@@ -323,7 +336,7 @@ def consultar_conta(
         revalidar()
         criada_em = time.monotonic()
         conta = ContaGestaoClick(stamp[1], stamp, criada_em, criada_em + CONTA_TTL_SECONDS,
-                                lojas, situacoes)
+                                lojas, situacoes, _vinculo_configuracao(config))
         return replace(conta, _assinatura=_assinatura(conta))
 
 

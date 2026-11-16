@@ -14,6 +14,7 @@ from integracoes.account_setup import (
 )
 from integracoes.gestaoclick import GestaoClickError
 from web.errors import AuthenticationError, AuthorizationError
+from web.integration_native_preview_page import native_preview_controls
 
 _ACCOUNT_KEY = "_gestaoclick_account_setup"
 _SOURCE_KEY = "_gestaoclick_registered_source"
@@ -83,6 +84,9 @@ def account_setup_controls(servico, carregar_configuracao):
             st.warning("Nenhuma situação de venda foi retornada; o mapeamento ainda não pode ser validado.")
         st.caption("Os nomes e códigos são específicos da conta. Eles não são classificados "
                    "automaticamente como venda concluída, devolução ou cancelamento.")
+
+        if loja_id is not None:
+            native_preview_controls(servico, carregar_configuracao, conta, loja_id)
 
         if st.button("Registrar fonte analítica desta loja", disabled=loja_id is None,
                      key="gestaoclick_setup_register"):
