@@ -79,7 +79,7 @@ da primeira página e não segue links recebidos. A resposta precisa ter envelop
 contagens válidos. O resultado exibe no máximo cinco documentos e cem itens; não
 importa registros nem altera indicadores ou aprova o agendamento.
 
-Somente IDs, número do documento, data, situação e quantidades são projetados.
+Somente IDs, número do documento, data, situação, quantidades e unidades são projetados.
 Clientes, valores financeiros, observações, credenciais e demais atributos não
 são apresentados nem guardados. A prévia não fica em cache ou no estado da sessão
 e desaparece em uma nova interação. Autorização, prazo do catálogo e configuração
@@ -93,6 +93,14 @@ retorno. A amostra nunca declara cobertura integral. SKU, ID estável da linha,
 quantidade devolvida e instante de alteração continuam desconhecidos quando não
 documentados; não são preenchidos com zero, índice do item ou horário da coleta.
 Mesmo uma prévia válida não pode ser enviada ao sincronizador genérico atual.
+
+A unidade vem de `produtos[].produto.sigla_unidade`, campo documentado na API.
+Uma quantidade `2` com unidade `CX` aparece como tal; não é convertida para duas
+unidades avulsas. Unidade ausente permanece desconhecida. O código comercial do
+documento é texto, podendo conter pontuação como `2025/001`; ele não usa a regra
+restritiva do identificador técnico. Ambos os campos têm limites de tamanho e
+recusam caracteres de controle. Essas correções foram reproduzidas com dados
+fictícios baseados no contrato público, sem afirmar ocorrência na conta real.
 
 ## Lacunas que continuam bloqueando a carga padrão
 

@@ -28,7 +28,7 @@ DEMO agora precisa ser selecionado explicitamente. Ele utiliza uma fonte fictíc
 
 O [OpenAPI público localizado em 16/11/2026](docs/CONTRATO_PUBLICO_GESTAOCLICK_20261116.md) revelou diferenças em relação ao contrato genérico dos testes. A paginação foi adaptada, e o Master pode consultar lojas/situações e registrar a fonte sem conhecer IDs previamente. A importação padrão de vendas ainda depende da adaptação de itens, SKUs, devoluções e versões. Não basta preencher os Secrets com nomes de campos: as informações ausentes não são inventadas, e a sincronização real não é apresentada como concluída.
 
-Após escolher a loja conferida, **Conferir amostra de vendas** consulta uma pequena prévia nativa, sem exigir mapas JSON. O Master escolhe até 31 dias e vendas de produtos ou PDV. A prévia mostra documentos, produtos e quantidades para comparação com o ERP, sem clientes ou valores financeiros. Ela desaparece na próxima interação e não é importada, não altera indicadores nem ativa a automação. O limite dessa amostra não muda a janela histórica de 732 dias.
+Após escolher a loja conferida, **Conferir amostra de vendas** consulta uma pequena prévia nativa, sem exigir mapas JSON. O Master escolhe até 31 dias e vendas de produtos ou PDV. A prévia mostra documentos, produtos, quantidades e unidades para comparação com o ERP, sem clientes ou valores financeiros. Não converte caixas em unidades automaticamente. Ela desaparece na próxima interação e não é importada, não altera indicadores nem ativa a automação. O limite dessa amostra não muda a janela histórica de 732 dias.
 
 ## Interface consolidada e cadastro fiscal DEMO
 
