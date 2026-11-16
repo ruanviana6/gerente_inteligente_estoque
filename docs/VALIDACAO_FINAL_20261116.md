@@ -80,3 +80,33 @@ nesta sessão. Deve manter aplicativo, branch e Secrets. Depois, a versão será
 conferida novamente no endereço real. A conclusão funcional exige também a
 reconciliação autenticada da amostra e o encerramento das lacunas de importação.
 Não se declara o projeto finalizado enquanto essas etapas permanecerem pendentes.
+
+
+## Revalidação da publicação após reinício em 16/11/2026
+
+O teste de publicação que falhou no primeiro horário foi **reexecutado**
+depois do reinício da aplicação no Streamlit Community Cloud, sem mudanças
+nos Secrets, dados ou contas do projeto.
+
+- Workflow: [Verificação da versão publicada, execução 43949821807,
+  tentativa 2](https://github.com/ruanviana6/gerente_inteligente_estoque/actions/runs/43949821807).
+- Resultado: **aprovado**. A versão servida na URL real foi
+  `gestaoclick-unidades-20261116.5`, igual à versão esperada no código.
+- O formulário de login apareceu no desktop e no celular (390 px);
+  uma credencial intencionalmente inválida foi recusada.
+- Nenhuma tabela ou métrica foi exibida a visitante sem autenticação;
+  o teste não encontrou exceção pública visível.
+- A tentativa 1, anterior ao reinício, permanece registrada como
+  **reprovada** porque observou `gestaoclick-configuracao-20261116.2`.
+  Não houve alteração de critério ou aceitação de HTTP 200 isolado.
+
+**Alcance da evidência:** somente publicação e barreira anônima.
+Não foram testados login Master, páginas autenticadas, importação real,
+abrangência do histórico, situação das vendas na conta, sincronização
+efetiva, e-mail de relatórios ou cadastro fiscal produtivo.
+A aprovação do navegador não ativa nenhum desses fluxos.
+
+**Pendências de uso real:** concluir o contrato e a conciliação de
+catálogo/SKU, identidade de linhas, devoluções, versões e loja; validar
+uma amostra autorizada no ERP; só então considerar ativação agendada,
+com as credenciais e aprovação do Master. Fiscal permanece DEMO.
