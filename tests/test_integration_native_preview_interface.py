@@ -272,3 +272,16 @@ def test_diagnostico_da_amostra_rejeitada_expoe_apenas_tipos(previa_ficticia):
     conteudo = texto_interface(e.app) + str(diagnosticos) + tabelas(e.app)
     assert PRIVADO not in conteudo and PRODUTO not in tabelas(e.app)
     assert len(e.gets) == 3 and not e.auth.calls
+
+
+def test_contagem_invalida_exibe_motivo_sem_expor_valores(previa_ficticia):
+    """A interface informa a categoria, nunca o valor recebido."""
+    e = previa_ficticia
+    selecionar_loja(e)
+    e.meta_invalida = True
+    consultar_amostra(e)
+    conteudo = texto_interface(e.app) + str([item.value for item in e.app.json])
+    assert "Motivo da contagem" in conteudo
+    assert "formato inválido" in conteudo
+    assert "FORMATO_INVALIDO" in conteudo
+    assert PRIVADO not in conteudo and not e.auth.calls
