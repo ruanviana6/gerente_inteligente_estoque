@@ -610,3 +610,55 @@ def test_metadado_ausente_exibe_codigo_sem_reproduzir_payload(auth, configuracao
     assert falha.value.diagnostico["codigo"] == "PV_META"
     assert falha.value.diagnostico["tipo_meta"] == "nulo"
     assert all(tipo == "ausente" for tipo in falha.value.diagnostico["campos"].values())
+
+
+@pytest.mark.parametrize("tipo", ["produto", "vendas_balcao"])
+def test_cursor_inteiro_canonico_aceito_na_primeira_pagina(auth, configuracao, conta, tipo):
+    """Página 2 inteira e texto '2' têm a mesma semântica, sem continuar o GET."""
+    rows = [documento(f"venda-{i}") for i in range(5)]
+    previa, transporte = executar(auth, configuracao, conta,
+                                  resposta(rows, total=17, meta_changes={"proxima_pagina": 2}),
+                                  tipo=tipo)
+    assert previa.total_informado == 17 and previa.documentos_recebidos == 5
+    assert len(previa.documentos) == 5 and previa.amostra_parcial
+    assert not previa.imported and not previa.coverage_confirmed
+    assert len(transporte.calls) == 1
+    auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("cursor", [True, False, 2.0, 1, 3, -1, 0, "02", "2.0", {}, []])
+def test_cursor_nao_canonico_continua_bloqueado(auth, configuracao, conta, cursor):
+    """Não aceitar booleano, fração, zero, texto ambíguo ou página incorreta."""
+    rows = [documento(f"venda-{i}") for i in range(5)]
+    with pytest.raises(PaginacaoAmostraInvalida) as falha:
+        executar(auth, configuracao, conta,
+                 resposta(rows, total=17, meta_changes={"proxima_pagina": cursor}))
+    assert falha.value.diagnostico["codigo"] == "PV_CURSOR"
+    auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("mudanca,motivo", [
+    ({"total_registros": "2"}, "FORMATO_INVALIDO"),
+    ({"total_da_pagina": 0}, "CONTADOR_DIVERGENTE"),
+    ({"total_registros": 2}, "TOTAL_DIVERGENTE"),
+])
+def test_diagnostico_subcategoria_contagem_nao_expoe_valores(
+        auth, configuracao, conta, mudanca, motivo):
+    """Distingue incompatibilidades sem armazenar o conteúdo da venda."""
+    with pytest.raises(PaginacaoAmostraInvalida) as falha:
+        executar(auth, configuracao, conta, resposta(meta_changes=mudanca))
+    assert falha.value.diagnostico["codigo"] == "PV_CONTAGEM"
+    assert falha.value.diagnostico["motivo_contagem"] == motivo
+    for sensivel in (PRIVADO, SENSIVEL, ACCESS_TOKEN, SECRET_TOKEN):
+        assert sensivel not in str(falha.value.diagnostico)
+    auth.rpc.assert_not_called()
+
+
+def test_sem_contador_documentado_nao_aceita_amostra(auth, configuracao, conta):
+    """Campo ausente continua impedindo a comprovação da primeira página."""
+    response = resposta()
+    corpo = json.loads(response.body)
+    del corpo["meta"]["total_da_pagina"]
+    with pytest.raises(PaginacaoAmostraInvalida) as falha:
+        executar(auth, configuracao, conta, RespostaGestaoClick(200, json.dumps(corpo).encode()))
+    assert falha.value.diagnostico["motivo_contagem"] == "CONTADOR_AUSENTE"
