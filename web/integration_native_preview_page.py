@@ -57,6 +57,16 @@ def native_preview_controls(servico, carregar_configuracao, conta, loja_id: str)
         st.warning(str(erro))
         if isinstance(erro, PaginacaoAmostraInvalida):
             st.caption("Diagnóstico técnico: somente nomes e tipos de metadados, sem valores da conta.")
+            descricoes = {
+                "CONTADOR_AUSENTE": "A API não informou o contador da página.",
+                "FORMATO_INVALIDO": "Um contador veio em formato inválido.",
+                "CONTADOR_DIVERGENTE": "O contador da página diverge dos registros retornados.",
+                "TOTAL_DIVERGENTE": "O total e o limite não correspondem à página retornada.",
+                "INDETERMINADO": "Não foi possível localizar a divergência com segurança.",
+            }
+            motivo = erro.diagnostico.get("motivo_contagem")
+            if motivo:
+                st.caption("Motivo da contagem: " + descricoes[motivo])
             st.json(erro.diagnostico, expanded=False)
         return
 
