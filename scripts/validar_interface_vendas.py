@@ -117,6 +117,8 @@ def verificar(browser, base: str, destino: Path, strict: bool):
             result["telas"][f"integracoes-inicial-{width}"] = verificar_layout(
                 page, f"integracoes-inicial-{width}", destino, strict, False)
             expect(page.get_by_text("Controle DEMO: confirmações=0; cancelamentos=0", exact=True)).to_be_visible()
+            page.get_by_text("Usar somente dados fictícios identificados como DEMO", exact=True).click()
+            expect(page.get_by_role("checkbox", name="Usar somente dados fictícios identificados como DEMO", exact=True)).to_be_checked()
             page.get_by_role("button", name="Preparar prévia", exact=True).click()
             expect(page.get_by_role("heading", name="Conferir prévia", exact=True)).to_be_visible(timeout=30000)
             expect(page.get_by_role("button", name="Cancelar esta prévia", exact=True)).to_be_visible(timeout=30000)

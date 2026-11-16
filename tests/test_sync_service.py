@@ -217,3 +217,32 @@ def test_manifesto_e_paginas_estaveis_em_ordem_diferente():
     auth.calls.clear()
     prepare(auth, list(reversed(rows)))
     assert auth.calls == first
+
+
+def test_prepare_aceita_732_dias_inclusivos():
+    """A fronteira autorizada aceita a janela ampliada sem confirmar o lote."""
+    auth = FakeAuth()
+    SyncCoordinator(auth).prepare(source_id=SOURCE, store_id='loja1', request_key=REQUEST,
+        start='2020-01-01', end='2022-01-01', read_all=lambda: [line()])
+    begin = next(payload for name, payload in auth.calls if name == 'sync_begin')
+    assert begin['p_period_start'] == '2020-01-01'
+    assert begin['p_period_end'] == '2022-01-01'
+    assert all(name != 'sync_commit' for name, _ in auth.calls)
+
+
+@pytest.mark.parametrize('start,end', [
+    ('2020-01-01', '2022-01-02'),
+    ('2020-01-31', '2020-01-01'),
+    ('2999-01-01', '2999-01-01'),
+    ('20200101', '2020-01-31'),
+])
+def test_prepare_periodo_invalido_nao_faz_rpc_nem_leitura(start, end):
+    """Uma chamada fora da UI também respeita prazo e não consome cota externa."""
+    auth = FakeAuth()
+    def read_all():
+        """Falha se a origem for consultada antes da validação temporal."""
+        raise AssertionError('Leitura não autorizada para período inválido.')
+    with pytest.raises(ValueError):
+        SyncCoordinator(auth).prepare(source_id=SOURCE, store_id='loja1', request_key=REQUEST,
+            start=start, end=end, read_all=read_all)
+    assert auth.calls == []

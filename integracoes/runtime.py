@@ -8,9 +8,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from integracoes.gestaoclick import (
     ContratoGestaoClick,
@@ -24,6 +23,7 @@ from integracoes.gestaoclick import (
     normalizar_linhas,
     parse_json_seguro,
 )
+from sincronizacao.periodos import validar_periodo
 
 _REQUIRED_FIELDS = frozenset({
     "document_id", "line_id", "product_id", "sku", "sale_date", "status", "quantity",
@@ -61,21 +61,6 @@ def _fields(value: Any) -> dict[str, tuple[str, ...]]:
     return {key: _path(path) for key, path in value.items()}
 
 
-def _day(value: Any) -> date:
-    """Normaliza data civil ISO sem aceitar datetime ou interpretação ambígua."""
-    if type(value) is date:
-        return value
-    if not isinstance(value, str):
-        raise ContratoInvalido("Informe o período com datas civis válidas.")
-    try:
-        result = date.fromisoformat(value)
-    except ValueError:
-        raise ContratoInvalido("Informe o período em AAAA-MM-DD.") from None
-    if result.isoformat() != value:
-        raise ContratoInvalido("Informe o período em AAAA-MM-DD.")
-    return result
-
-
 @dataclass(frozen=True, repr=False)
 class GestaoClickReader:
     """Lê um período autorizado, validando cobertura antes de entregar linhas ao sync."""
@@ -94,10 +79,10 @@ class GestaoClickReader:
         silenciosamente pela origem. A contagem ainda requer reconciliação com
         a conta/loja autorizada; uma lista vazia não demonstra sua abrangência.
         """
-        first, last = _day(start), _day(end)
-        today = datetime.now(ZoneInfo("America/Fortaleza")).date()
-        if first > last or last > today or (last - first).days > 3660:
-            raise ContratoInvalido("Período inválido, futuro ou maior que dez anos.")
+        try:
+            first, last = validar_periodo(start, end)
+        except ValueError as erro:
+            raise ContratoInvalido(str(erro)) from None
         filters = {**self._fixed_filters,
                    self._period_filters["start"]: first.isoformat(),
                    self._period_filters["end"]: last.isoformat()}

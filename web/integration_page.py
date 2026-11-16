@@ -9,8 +9,10 @@ import streamlit as st
 
 from analytics.demo import gerar_vendas_ficticias
 from dados import hoje_local
+from sincronizacao.periodos import validar_periodo
 from sincronizacao.service import SyncCoordinator
-from web.errors import AuthorizationError
+from web.errors import AppError, AuthenticationError, AuthorizationError, RateLimited, ServiceUnavailable
+from web.integration_automation_page import automation_controls
 from web.sales_service import access_stamp
 from web.theme import page_header
 
@@ -60,8 +62,9 @@ def integracoes(servico, contexto):
     if atual.profile.role != "Master":
         raise AuthorizationError("Somente o Master gerencia sincronizações.")
     page_header("Integrações", "GestãoClick → cópia analítica. Exclusivamente leitura no ERP.")
-    st.info("A sincronização é manual. Preparar uma prévia não altera as vendas analíticas consolidadas. "
-            "Nenhum fluxo realiza baixa ou outra escrita no GestãoClick.")
+    st.info("Consulte o agendamento abaixo ou prepare uma prévia manual. Nenhum fluxo realiza "
+            "baixa ou outra escrita no GestãoClick.")
+    automation_controls(servico, _secrets)
     assinatura = access_stamp(atual, servico.auth.generation)
     previa = st.session_state.get("_sync_preview")
     if previa and previa["signature"] != assinatura:
@@ -70,17 +73,23 @@ def integracoes(servico, contexto):
     with st.form("preparar_sincronizacao"):
         datas = st.date_input("Período da consulta", (hoje_local().date() - timedelta(days=59), hoje_local().date()),
                              max_value=hoje_local().date())
-        ficticia = st.checkbox("Usar somente dados fictícios identificados como DEMO", value=True)
+        ficticia = st.checkbox("Usar somente dados fictícios identificados como DEMO", value=False)
+        st.caption("Desmarcado: consulta real da loja configurada. Marcado: apenas simulação, sem acessar a API. "
+                   "Período máximo: 732 dias, incluindo início e fim.")
         autorizado = st.checkbox("Confirmo autorização da empresa, contrato e permissões de leitura (consulta real)")
         preparar = st.form_submit_button("Preparar prévia", type="primary")
     coordenador = SyncCoordinator(servico.auth)
     if preparar:
-        if len(datas) != 2 or not 0 <= (datas[1] - datas[0]).days <= 365:
-            st.warning("Escolha um período de até 366 dias.")
+        try:
+            if len(datas) != 2:
+                raise ValueError("Escolha as datas inicial e final da consulta.")
+            validar_periodo(*datas)
+        except ValueError as erro:
+            st.warning(str(erro))
             return
         chave = str(uuid4())
         # A chave de repetição não muda em uma tentativa interrompida do mesmo escopo.
-        escopo = (tuple(str(d) for d in datas), ficticia)
+        escopo = (tuple(str(d) for d in datas), ficticia, "demo-v2" if ficticia else "api-v1")
         tentativa = st.session_state.get("_sync_attempt")
         if tentativa and tentativa["scope"] == escopo:
             chave = tentativa["key"]
@@ -88,7 +97,7 @@ def integracoes(servico, contexto):
         try:
             if ficticia:
                 fonte = servico.auth.rpc("integration_register_source", {
-                    "p_key": "demo-vendas", "p_name": "DEMO: vendas fictícias", "p_stores": ["DEMO"]},
+                    "p_key": "demo-vendas-v2", "p_name": "DEMO: vendas fictícias, cenário 2", "p_stores": ["DEMO"]},
                     "integrations.manage")
                 fonte_id = fonte["id"]
                 loja = "DEMO"
@@ -99,9 +108,16 @@ def integracoes(servico, contexto):
                 if not autorizado:
                     st.warning("A consulta real exige autorização explícita e contrato conferido.")
                     return
+                from integracoes.configuration import missing_configuration, validated_scope
                 from integracoes.runtime import build_reader
 
-                reader = build_reader(_secrets())
+                values = _secrets()
+                missing = missing_configuration(values)
+                if missing:
+                    st.warning("A consulta real ainda precisa destas configurações protegidas: " + ", ".join(missing))
+                    return
+                validated_scope(values, atual.profile.organization_id)
+                reader = build_reader(values)
                 fonte_id, loja = reader.config.source_id, reader.config.store_id
                 def leitor():
                     """Consulta o contrato protegido, sem receber rotas do navegador."""
@@ -115,6 +131,20 @@ def integracoes(servico, contexto):
                 st.session_state["_sync_preview"] = {"signature": assinatura,
                     "id": resultado["id"], "claim_token": resultado["claim_token"]}
                 previa = st.session_state["_sync_preview"]
+        except (AuthenticationError, AuthorizationError):
+            raise
+        except RateLimited:
+            st.warning("O serviço limitou as consultas. Aguarde antes de tentar novamente; "
+                       "os dados consolidados foram preservados.")
+            return
+        except ServiceUnavailable:
+            st.warning("A comunicação com o Supabase foi interrompida. Tente novamente com o mesmo período "
+                       "para retomar o lote; nenhuma carga parcial foi consolidada.")
+            return
+        except AppError:
+            st.warning("O banco recusou a preparação da prévia. Confira o histórico de sincronização: "
+                       "pode haver um lote em andamento ou dados incompatíveis. Nenhuma carga parcial foi consolidada.")
+            return
         except (ValueError, RuntimeError) as erro:
             st.warning(str(erro))
             return

@@ -147,6 +147,7 @@ def test_sincronizacao_demo_por_administracao_confirma_uma_vez_apos_previa():
     """O roteamento preserva o coordenador real e o rerun depois da confirmação."""
     app, servico = abrir_administracao()
     assert not app.exception
+    checkbox(app, "Usar somente dados fictícios identificados como DEMO").check()
     botao(app, "Preparar prévia").click().run()
     assert not app.exception
     assert servico.auth.pages
@@ -237,6 +238,7 @@ def test_revogacao_reseleciona_area_sem_exibir_ou_confirmar_previa(alteracao):
     """A prévia existente não permanece na tela quando a integração perde acesso."""
     app, servico = abrir_administracao()
     assert not app.exception
+    checkbox(app, "Usar somente dados fictícios identificados como DEMO").check()
     botao(app, "Preparar prévia").click().run()
     assert not app.exception
     assert app.dataframe

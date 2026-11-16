@@ -124,6 +124,7 @@ def checkbox(app, label):
 
 def preparar_demo(app):
     """Solicita a prévia por clique; não confirma a sincronização."""
+    checkbox(app, "Usar somente dados fictícios identificados como DEMO").check()
     botao(app, "Preparar prévia").click().run()
     assert not app.exception
     return app
@@ -212,10 +213,14 @@ def test_nao_master_nao_recebe_interface_mesmo_com_permissao_concedida(role):
 
 def test_integracao_real_desabilitada_nao_faz_rede_nem_exibe_segredos(monkeypatch):
     """Desmarcar DEMO não contorna enabled=false nem apresenta configuração protegida."""
+    from test_gestaoclick_runtime import secrets
+
     import web.integration_page
 
     sentinela = "SEGREDO-FICTICIO-NAO-EXIBIR"
     monkeypatch.setattr(web.integration_page, "_secrets", lambda: {
+        **secrets(), "GESTAOCLICK_ORGANIZATION_ID": ORGANIZACAO_DIAGNOSTICO,
+        "GESTAOCLICK_SOURCE_ID": SOURCE,
         "GESTAOCLICK_ENABLED": False, "GESTAOCLICK_ACCESS_TOKEN": sentinela,
         "GESTAOCLICK_SECRET_ACCESS_TOKEN": sentinela,
     })
@@ -224,6 +229,7 @@ def test_integracao_real_desabilitada_nao_faz_rede_nem_exibe_segredos(monkeypatc
         raise AssertionError("Rede indevida no modo desabilitado.")
     monkeypatch.setattr("urllib.request.build_opener", bloquear)
     app, auth = abrir()
+    auth.context = replace(auth.context, profile=replace(auth.context.profile, organization_id=ORGANIZACAO_DIAGNOSTICO))
     checkbox(app, "Usar somente dados fictícios identificados como DEMO").uncheck()
     checkbox(app, "Confirmo autorização da empresa, contrato e permissões de leitura (consulta real)").check()
     botao(app, "Preparar prévia").click().run()
@@ -252,15 +258,28 @@ def test_real_exige_autorizacao_antes_de_ler_configuracao(monkeypatch):
     assert auth.calls == []
 
 
-@pytest.mark.parametrize("period", [(date(2020, 1, 1), date(2022, 1, 1)), (date(2020, 1, 1),)])
+@pytest.mark.parametrize("period", [(date(2020, 1, 1), date(2022, 1, 2)), (date(2020, 1, 1),)])
 def test_periodo_invalido_impede_qualquer_rpc(period):
     """Janela incompleta ou excessiva não registra fonte, staging nem confirmação."""
     app, auth = abrir()
-    app.date_input[0].set_value(period)
+    next(item for item in app.date_input if item.label == "Período da consulta").set_value(period)
     botao(app, "Preparar prévia").click().run()
     assert not app.exception
-    assert any("período" in item.value for item in app.warning)
+    assert any("período" in item.value or "datas inicial e final" in item.value for item in app.warning)
     assert auth.calls == []
+
+
+def test_previa_demo_aceita_732_dias_inclusivos_sem_confirmar_carga():
+    """A interface aceita o novo limite inteiro, com linhas ainda restritas ao staging."""
+    app, auth = abrir()
+    period = (date(2020, 1, 1), date(2022, 1, 1))
+    next(item for item in app.date_input if item.label == "Período da consulta").set_value(period)
+    preparar_demo(app)
+    assert not app.exception
+    assert not app.warning
+    assert sum(len(page) for page in auth.pages.values()) == 732 * 5
+    assert not auth.consolidated
+    assert botao(app, "Confirmar sincronização interna").disabled
 
 
 def test_revogacao_durante_previa_nao_exibe_amostra():
