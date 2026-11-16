@@ -12,6 +12,7 @@ from dados import hoje_local
 from sincronizacao.periodos import validar_periodo
 from sincronizacao.service import SyncCoordinator
 from web.errors import AppError, AuthenticationError, AuthorizationError, RateLimited, ServiceUnavailable
+from web.integration_account_page import account_setup_controls
 from web.integration_automation_page import automation_controls
 from web.sales_service import access_stamp
 from web.theme import page_header
@@ -65,6 +66,7 @@ def integracoes(servico, contexto):
     st.info("Consulte o agendamento abaixo ou prepare uma prévia manual. Nenhum fluxo realiza "
             "baixa ou outra escrita no GestãoClick.")
     automation_controls(servico, _secrets)
+    account_setup_controls(servico, _secrets)
     assinatura = access_stamp(atual, servico.auth.generation)
     previa = st.session_state.get("_sync_preview")
     if previa and previa["signature"] != assinatura:
@@ -114,7 +116,10 @@ def integracoes(servico, contexto):
                 values = _secrets()
                 missing = missing_configuration(values)
                 if missing:
-                    st.warning("A consulta real ainda precisa destas configurações protegidas: " + ", ".join(missing))
+                    st.warning("A consulta real ainda não foi configurada. Use ‘Conferir lojas e situações da conta’ "
+                               "para identificar a loja. Os mapeamentos técnicos precisam refletir o contrato da API; "
+                               "não preencha campos com valores inventados.")
+                    st.caption("Configurações pendentes: " + ", ".join(missing))
                     return
                 validated_scope(values, atual.profile.organization_id)
                 reader = build_reader(values)

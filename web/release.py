@@ -1,3 +1,3 @@
 """Identificador público da versão, sem dados ou configurações da aplicação."""
 
-RELEASE = "sincronizacao-automatica-20261116.1"
+RELEASE = "gestaoclick-configuracao-20261116.2"

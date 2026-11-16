@@ -1,5 +1,16 @@
 > Regra vigente em 12/11/2026: uma API e lojas FLT Comércio → Flagship - Flatter. Somente cadastro da NF-e, emissão exclusivamente manual no ERP. A aba Automação / Notas Fiscais e o login persistente são obrigatórios. Menções antigas a duas APIs/emissão automática estão superadas. Consulte [CADASTRO_NFE_POR_LOJA.md](CADASTRO_NFE_POR_LOJA.md).
 
+## Contrato público conferido em 16/11/2026
+
+O OpenAPI foi encontrado em `https://api.gestaoclick.com/docs`. A resposta padrão
+de vendas difere dos cenários fictícios do conector: faltam campos de identidade
+da linha, SKU, devolução e versão. Não tratar o aviso de configuração como algo
+resolvido apenas ao preencher Secrets. Consulte
+[o registro das diferenças e pendências](CONTRATO_PUBLICO_GESTAOCLICK_20261116.md).
+A consulta autenticada de lojas/situações e o registro interno de fonte são
+etapas explícitas do Master, separadas da importação e da ativação automática.
+Nenhuma leitura ou escrita ocorre no ERP ao simplesmente navegar.
+
 > Atualização vigente de 11/11/2026: a consolidação fiscal DEMO e os seis menus estão em [FISCAL_DEMO.md](FISCAL_DEMO.md). O cliente analítico permanece GET-only. Somente o executor isolado poderá futuramente criar/emitir NF-e direta no Varejo após OpenAPI, homologação e nova autorização. Sem XML/PDF, segundo banco operacional ou alterações reais no ERP nesta entrega. As instruções anteriores abaixo são históricas quando divergirem dessa decisão.
 
 # Contexto de continuidade para o Codex
