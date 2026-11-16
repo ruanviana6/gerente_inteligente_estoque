@@ -257,3 +257,18 @@ def test_periodo_incompleto_ou_longo_nao_acessa_secrets(previa_ficticia, dias):
     assert (e.loads, e.gets) == anteriores
     assert PRODUTO not in tabelas(e.app)
     assert not e.auth.calls
+
+
+def test_diagnostico_da_amostra_rejeitada_expoe_apenas_tipos(previa_ficticia):
+    """Uma inconsistência real de paginação deve ser identificável sem valores."""
+    e = previa_ficticia
+    selecionar_loja(e)
+    e.meta_invalida = True
+    consultar_amostra(e)
+    assert not e.app.exception
+    assert e.app.warning and "PV_CONTAGEM" in str(e.app.warning[0].message)
+    diagnosticos = [item.value for item in e.app.json]
+    assert any("PV_CONTAGEM" in str(d) for d in diagnosticos)
+    conteudo = texto_interface(e.app) + str(diagnosticos) + tabelas(e.app)
+    assert PRIVADO not in conteudo and PRODUTO not in tabelas(e.app)
+    assert len(e.gets) == 3 and not e.auth.calls
