@@ -90,6 +90,6 @@ def account_setup_controls(servico, carregar_configuracao):
         fonte = st.session_state.get(_SOURCE_KEY)
         if fonte and fonte["store_id"] == loja_id:
             st.code("GESTAOCLICK_SOURCE_ID = " + json.dumps(fonte["source_id"]) + "\n"
-                    "GESTAOCLICK_STORE_ID = " + json.dumps(loja_id), language="toml")
+                    "GESTAOCLICK_STORE_ID = " + json.dumps(loja_id), language="toml", wrap_lines=True)
             st.info("Estes são os identificadores para os Secrets. O registro da fonte ainda não "
                     "valida campos de vendas, devoluções nem ativa a sincronização automática.")

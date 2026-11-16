@@ -1,6 +1,7 @@
 """Testa a descoberta autorizada da conta com transporte e RPC exclusivamente fictícios."""
 
 import json
+import math
 from dataclasses import FrozenInstanceError, asdict, replace
 from unittest.mock import Mock
 
@@ -383,6 +384,35 @@ def test_snapshot_vigente_ate_instante_anterior_a_expiracao(auth, configuracao, 
     conta, _ = consultar(auth, configuracao)
     monkeypatch.setattr("integracoes.account_setup.time.monotonic", lambda: 1299.99)
     assert validar_conta(auth, conta) is conta
+
+
+@pytest.mark.parametrize("criada_em", [
+    math.nextafter(256.0, math.inf),
+    math.nextafter(512.0, -math.inf),
+    math.nextafter(724.0, math.inf),
+    math.nextafter(1024.0, -math.inf),
+])
+def test_prazo_valido_com_arredondamento_na_subtracao_dos_instantes(auth, configuracao, monkeypatch, criada_em):
+    """Fronteiras binárias não invalidam um catálogo emitido com prazo legítimo de cinco minutos."""
+    monkeypatch.setattr("integracoes.account_setup.time.monotonic", lambda: criada_em)
+    conta, _ = consultar(auth, configuracao)
+    assert conta._expira_em - conta._criada_em != 300
+    assert validar_conta(auth, conta) is conta
+    assert registrar_fonte(auth, conta, "001") == FONTE
+
+    anterior = math.nextafter(conta._expira_em, -math.inf)
+    monkeypatch.setattr("integracoes.account_setup.time.monotonic", lambda: anterior)
+    assert validar_conta(auth, conta) is conta
+
+    adulterada = replace(conta, _expira_em=math.nextafter(conta._expira_em, math.inf))
+    with pytest.raises(AuthorizationError):
+        registrar_fonte(auth, adulterada, "001")
+
+    for expirada_em in (conta._expira_em, math.nextafter(conta._expira_em, math.inf)):
+        monkeypatch.setattr("integracoes.account_setup.time.monotonic", lambda: expirada_em)
+        with pytest.raises(ContratoInvalido, match="expirou"):
+            registrar_fonte(auth, conta, "001")
+    auth.rpc.assert_called_once()
 
 
 @pytest.mark.parametrize("campo", ["_lojas", "_situacoes", "organization_id", "_expira_em", "_access_stamp", "dict"])

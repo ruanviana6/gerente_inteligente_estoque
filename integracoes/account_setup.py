@@ -88,7 +88,8 @@ def _validar_conta(auth: RPCAuth, conta: ContaGestaoClick) -> None:
                   hmac.compare_digest(conta._assinatura, _assinatura(conta)) and
                   all(type(value) in (int, float) and math.isfinite(value)
                       for value in (conta._criada_em, conta._expira_em)) and
-                  conta._expira_em - conta._criada_em == CONTA_TTL_SECONDS and
+                  # Repete a soma da emissão: subtrair floats pode arredondar o prazo de novo.
+                  conta._expira_em == conta._criada_em + CONTA_TTL_SECONDS and
                   conta._criada_em <= time.monotonic() and
                   conta._access_stamp == atual and conta.organization_id == atual[1])
     except (AttributeError, TypeError, ValueError, OverflowError):
