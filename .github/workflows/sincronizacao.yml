@@ -1,0 +1,43 @@
+name: Sincronização automática somente leitura
+on:
+  schedule:
+    # A cada hora há apenas uma verificação de trabalho devido no banco.
+    # A aprovação Master define o intervalo real; o ERP só é lido com claim.
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validar configuração ou executar uma janela aprovada
+        type: choice
+        default: check
+        options: [check, run]
+permissions:
+  contents: read
+concurrency:
+  group: sincronizacao-gestaoclick
+  cancel-in-progress: false
+jobs:
+  sincronizar:
+    if: github.repository == 'ruanviana6/gerente_inteligente_estoque' && (github.event_name == 'workflow_dispatch' || vars.SYNC_SCHEDULER_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment: sincronizacao
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          # O cron deve existir na main, mas executa somente a versão web publicada.
+          ref: implementacao/web-supabase
+          persist-credentials: false
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.12'
+      # O worker só depende da biblioteca padrão. Não instala o Streamlit nem ML.
+      - name: Conferir configuração sem consultar serviços
+        env:
+          SYNC_JOB_CONFIG_JSON: ${{ secrets.SYNC_JOB_CONFIG_JSON }}
+        run: python -m scripts.run_sync --check
+      - name: Sincronizar uma janela autorizada
+        if: vars.SYNC_SCHEDULER_ENABLED == 'true' && (github.event_name == 'schedule' || inputs.mode == 'run')
+        env:
+          SYNC_JOB_CONFIG_JSON: ${{ secrets.SYNC_JOB_CONFIG_JSON }}
+        run: python -m scripts.run_sync --run

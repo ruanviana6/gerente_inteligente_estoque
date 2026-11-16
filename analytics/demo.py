@@ -2,15 +2,19 @@
 
 from datetime import date, timedelta
 
+from sincronizacao.periodos import validar_periodo
 
-def gerar_vendas_ficticias(source_id: str, store_id: str, inicio: date, fim: date) -> list[dict]:
+
+def gerar_vendas_ficticias(source_id: str, store_id: str, inicio: date | str, fim: date | str) -> list[dict]:
     """Gera pedidos DEMO determinísticos, sem cadastro de clientes nem dinheiro.
 
     A função não persiste nem é chamada automaticamente. Cabe à ação Master
     registrar uma fonte identificada como fictícia e conferir a abrangência.
+    Cada linha depende da data civil, nunca dos limites da consulta. O produto
+    A segue um ciclo anual fictício de 1 a 12 unidades, com reinício em janeiro,
+    para demonstrar variação mensal sem alterar versões em janelas sobrepostas.
     """
-    if not isinstance(inicio, date) or not isinstance(fim, date) or not 1 <= (fim - inicio).days + 1 <= 366:
-        raise ValueError("A demonstração aceita um período ordenado de até 366 dias.")
+    inicio, fim = validar_periodo(inicio, fim)
     if not source_id or not store_id:
         raise ValueError("Informe a fonte e a loja fictícias.")
     produtos = {
@@ -30,7 +34,10 @@ def gerar_vendas_ficticias(source_id: str, store_id: str, inicio: date, fim: dat
                     "document_id": f"DEMO-{dia.isoformat()}-{numero}", "line_id": str(indice),
                     "product_id": produto, "sku": produto, "product_name": nome,
                     "category": categoria, "supplier": fornecedor, "sale_date": dia.isoformat(),
-                    "status": "completed", "quantity": 1 + (deslocamento // 30 if produto == "DEMO-A" else 0),
-                    "returned_quantity": 0, "source_updated_at": f"{dia.isoformat()}T18:00:00+00:00",
+                    "status": "completed", "quantity": dia.month if produto == "DEMO-A" else 1,
+                    "returned_quantity": 0,
+                    # Meia-noite em Fortaleza já passou para todo dia aceito
+                    # pelo validador, inclusive quando a consulta inclui hoje.
+                    "source_updated_at": f"{dia.isoformat()}T03:00:00+00:00",
                 })
     return linhas

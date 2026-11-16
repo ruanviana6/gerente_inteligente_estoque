@@ -221,3 +221,36 @@ class SupabaseAPI:
             raise ConfigurationError("Configure o segredo dedicado do agendador em ambiente protegido.")
         # A credencial do job fica no corpo HTTPS, nunca na URL, nos logs ou no bearer.
         return self._request("POST", "/rest/v1/rpc/" + name, payload)
+
+    def sync_job_rpc(self, name: str, payload: dict) -> Any:
+        """Restringe a sincronização agendada a duas RPCs e um segredo dedicado.
+
+        Não reutiliza JWT do Master, chave administrativa ou segredo de sessão.
+        O banco vincula o segredo à organização e revalida a autorização em
+        cada etapa; o cliente não permite escolher outro endpoint pelo job.
+        """
+        if name not in {"sync_job_claim", "sync_job_step"} or not isinstance(payload, dict):
+            raise AuthorizationError("Operação não permitida para o agendador de sincronização.")
+        expected = ({"p_secret", "p_contract_hash"} if name == "sync_job_claim" else
+                    {"p_secret", "p_claim", "p_action", "p_payload"})
+        if set(payload) != expected:
+            raise AppError("Parâmetros inválidos para sincronização agendada.")
+        secret = payload["p_secret"]
+        if not isinstance(secret, str) or not re.fullmatch(r"[a-f0-9]{64}", secret):
+            raise ConfigurationError("Configure o segredo dedicado da sincronização em ambiente protegido.")
+        if name == "sync_job_claim":
+            if not isinstance(payload["p_contract_hash"], str) or not re.fullmatch(r"[a-f0-9]{64}", payload["p_contract_hash"]):
+                raise AppError("Contrato de sincronização inválido.")
+        elif (not isinstance(payload["p_claim"], str)
+              or not re.fullmatch(r"[a-f0-9-]{36}", payload["p_claim"])
+              or not isinstance(payload["p_action"], str)
+              or payload["p_action"] not in {"authorize", "begin", "stage", "preview", "commit", "finish", "fail"}
+              or not isinstance(payload["p_payload"], dict)):
+            raise AppError("Etapa de sincronização inválida.")
+        try:
+            size = len(json.dumps(payload, allow_nan=False).encode("utf-8"))
+        except (ValueError, TypeError, OverflowError):
+            raise AppError("Dados inválidos para sincronização agendada.") from None
+        if size > 2 * 1024 * 1024:
+            raise AppError("O lote de sincronização excedeu o limite permitido.")
+        return self._request("POST", "/rest/v1/rpc/" + name, payload)

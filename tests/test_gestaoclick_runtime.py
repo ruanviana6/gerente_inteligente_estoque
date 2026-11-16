@@ -161,6 +161,24 @@ def test_periodos_invalidos_nao_fazem_get(first, last):
     assert transport.calls == []
 
 
+@pytest.mark.parametrize("days,permitted", [(732, True), (733, False)])
+def test_reader_obedece_limite_inclusivo_compartilhado(days, permitted):
+    """O conector não admite contornar o limite usado pelo coordenador e pela tela."""
+    from datetime import timedelta
+
+    first = date(2020, 1, 1)
+    last = first + timedelta(days=days - 1)
+    transport = TransporteFicticio([])
+    reader = build_reader(secrets(), transport)
+    if permitted:
+        assert reader.read(first, last) == []
+        assert len(transport.calls) == 1
+    else:
+        with pytest.raises(ContratoInvalido, match="732 dias"):
+            reader.read(first, last)
+        assert transport.calls == []
+
+
 @pytest.mark.parametrize("contract", ["openapi", "read_contract"])
 def test_filtro_ignorado_pela_origem_nao_e_aceito_como_cobertura(contract):
     """Uma venda fora da janela torna a prévia inválida em vez de ser descartada silenciosamente."""

@@ -13,6 +13,7 @@ from hashlib import sha256
 from typing import Any, Protocol
 from uuid import UUID
 
+from sincronizacao.periodos import validar_periodo
 from web.errors import AuthorizationError
 
 MAX_ROWS = 20000
@@ -131,8 +132,9 @@ class SyncCoordinator:
         with self.auth.operation():
             before = self._stamp()
             source_id, request_key = _uuid(source_id), _uuid(request_key)
-            start, end = _day(start), _day(end)
-            if start > end or not isinstance(store_id, str) or not 1 <= len(store_id.strip()) <= 120:
+            first, last = validar_periodo(start, end)
+            start, end = first.isoformat(), last.isoformat()
+            if not isinstance(store_id, str) or not 1 <= len(store_id.strip()) <= 120:
                 raise ValueError('Escopo ou período inválido.')
             self._call('sync_authorize_source', {'p_source_id': source_id, 'p_store_id': store_id})
             rows, quantity = reconcile(read_all(), source_id, store_id, start, end)
