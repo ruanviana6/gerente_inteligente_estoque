@@ -20,6 +20,7 @@ from zoneinfo import ZoneInfo
 
 from integracoes.account_setup import (
     ContaGestaoClick,
+    PaginacaoSituacoesInvalida,
     _conferir_pagina_situacoes,
     _configuracao,
     _validar_conta,
@@ -36,12 +37,27 @@ from integracoes.gestaoclick import (
 from sincronizacao.service import RPCAuth
 from web.errors import AuthorizationError
 
-VERSAO_CONTRATO = "gestaoclick-vendas-previa-20261116.2"
+VERSAO_CONTRATO = "gestaoclick-vendas-previa-20261116.3"
 MAX_DOCUMENTOS_EXIBIDOS = 5
 MAX_DOCUMENTOS_RECEBIDOS = 100
 MAX_ITENS_RECEBIDOS = 100
 MAX_DIAS_PREVIA = 31
 _TIPOS = frozenset({"produto", "vendas_balcao"})
+
+
+class PaginacaoAmostraInvalida(ContratoInvalido):
+    """Mostra apenas código e tipos conhecidos, sem dados da resposta de vendas."""
+
+    def __init__(self, origem: PaginacaoSituacoesInvalida):
+        """Converte o diagnóstico protegido da conferência sem copiar valores."""
+        codigo = origem.diagnostico["codigo"].replace("SC_", "PV_", 1)
+        super().__init__(f"A paginação da amostra de vendas não pôde ser comprovada ({codigo}). "
+                         "Nenhuma venda foi importada.")
+        self.diagnostico = {
+            "codigo": codigo,
+            "tipo_meta": origem.diagnostico["tipo_meta"],
+            "campos": dict(origem.diagnostico["campos"]),
+        }
 
 
 @dataclass(frozen=True, repr=False)
@@ -207,8 +223,8 @@ def _projetar(payload: dict, inicio: date, fim: date, conta: ContaGestaoClick) -
         # Situações e vendas têm os mesmos contadores documentados. Reutilizar
         # a validação numérica não reutiliza rotas nem segue URLs da resposta.
         total, _, _ = _conferir_pagina_situacoes(payload.get("meta"), len(rows), 1)
-    except ContratoInvalido:
-        raise ContratoInvalido("A paginação da amostra de vendas não pôde ser comprovada.") from None
+    except PaginacaoSituacoesInvalida as erro:
+        raise PaginacaoAmostraInvalida(erro) from None
     documentos = []
     vistos = set()
     total_itens = 0
