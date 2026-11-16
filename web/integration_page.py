@@ -65,8 +65,8 @@ def integracoes(servico, contexto):
     page_header("Integrações", "GestãoClick → cópia analítica. Exclusivamente leitura no ERP.")
     st.info("Consulte o agendamento abaixo ou prepare uma prévia manual. Nenhum fluxo realiza "
             "baixa ou outra escrita no GestãoClick.")
-    automation_controls(servico, _secrets)
     account_setup_controls(servico, _secrets)
+    automation_controls(servico, _secrets)
     assinatura = access_stamp(atual, servico.auth.generation)
     previa = st.session_state.get("_sync_preview")
     if previa and previa["signature"] != assinatura:
