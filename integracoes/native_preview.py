@@ -37,7 +37,7 @@ from integracoes.gestaoclick import (
 from sincronizacao.service import RPCAuth
 from web.errors import AuthorizationError
 
-VERSAO_CONTRATO = "gestaoclick-vendas-previa-20261116.3"
+VERSAO_CONTRATO = "gestaoclick-vendas-previa-20261116.4"
 MAX_DOCUMENTOS_EXIBIDOS = 5
 MAX_DOCUMENTOS_RECEBIDOS = 100
 MAX_ITENS_RECEBIDOS = 100
@@ -45,10 +45,43 @@ MAX_DIAS_PREVIA = 31
 _TIPOS = frozenset({"produto", "vendas_balcao"})
 
 
+def _normalizar_cursor_numerico(meta: Any) -> Any:
+    """Aceita somente o próximo número inteiro, mantendo a verificação original.
+
+    A prévia não segue links de continuação nem pede outra página.
+    """
+    if isinstance(meta, dict) and type(meta.get("proxima_pagina")) is int:
+        cursor = meta["proxima_pagina"]
+        if 2 <= cursor <= 1000000:
+            return {**meta, "proxima_pagina": str(cursor)}
+    return meta
+
+
+def _motivo_contagem(meta: Any, recebidos: int) -> str:
+    """Identifica a categoria da divergência sem revelar nenhum contador."""
+    if not isinstance(meta, dict):
+        return "FORMATO_INVALIDO"
+    obrigatorios = ("total_registros", "pagina_atual", "limite_por_pagina")
+    contadores = [campo for campo in ("total_da_pagina", "total_registros_pagina") if campo in meta]
+    if not contadores:
+        return "CONTADOR_AUSENTE"
+    if any(type(meta.get(campo)) is not int or meta[campo] < 0
+           for campo in (*obrigatorios, *contadores)):
+        return "FORMATO_INVALIDO"
+    if any(meta[campo] != recebidos for campo in contadores):
+        return "CONTADOR_DIVERGENTE"
+    total, pagina, limite = (meta[campo] for campo in obrigatorios)
+    if 1 <= limite <= 100 and pagina >= 1:
+        esperado = min(limite, max(0, total - (pagina - 1) * limite))
+        if recebidos != esperado:
+            return "TOTAL_DIVERGENTE"
+    return "INDETERMINADO"
+
+
 class PaginacaoAmostraInvalida(ContratoInvalido):
     """Mostra apenas código e tipos conhecidos, sem dados da resposta de vendas."""
 
-    def __init__(self, origem: PaginacaoSituacoesInvalida):
+    def __init__(self, origem: PaginacaoSituacoesInvalida, meta: Any, recebidos: int):
         """Converte o diagnóstico protegido da conferência sem copiar valores."""
         codigo = origem.diagnostico["codigo"].replace("SC_", "PV_", 1)
         super().__init__(f"A paginação da amostra de vendas não pôde ser comprovada ({codigo}). "
@@ -58,6 +91,8 @@ class PaginacaoAmostraInvalida(ContratoInvalido):
             "tipo_meta": origem.diagnostico["tipo_meta"],
             "campos": dict(origem.diagnostico["campos"]),
         }
+        if codigo == "PV_CONTAGEM":
+            self.diagnostico["motivo_contagem"] = _motivo_contagem(meta, recebidos)
 
 
 @dataclass(frozen=True, repr=False)
@@ -222,9 +257,10 @@ def _projetar(payload: dict, inicio: date, fim: date, conta: ContaGestaoClick) -
     try:
         # Situações e vendas têm os mesmos contadores documentados. Reutilizar
         # a validação numérica não reutiliza rotas nem segue URLs da resposta.
-        total, _, _ = _conferir_pagina_situacoes(payload.get("meta"), len(rows), 1)
+        meta = payload.get("meta")
+        total, _, _ = _conferir_pagina_situacoes(_normalizar_cursor_numerico(meta), len(rows), 1)
     except PaginacaoSituacoesInvalida as erro:
-        raise PaginacaoAmostraInvalida(erro) from None
+        raise PaginacaoAmostraInvalida(erro, payload.get("meta"), len(rows)) from None
     documentos = []
     vistos = set()
     total_itens = 0
