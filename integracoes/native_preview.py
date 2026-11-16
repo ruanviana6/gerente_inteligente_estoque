@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hmac
 import re
+import unicodedata
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -35,7 +36,7 @@ from integracoes.gestaoclick import (
 from sincronizacao.service import RPCAuth
 from web.errors import AuthorizationError
 
-VERSAO_CONTRATO = "gestaoclick-vendas-previa-20261116.1"
+VERSAO_CONTRATO = "gestaoclick-vendas-previa-20261116.2"
 MAX_DOCUMENTOS_EXIBIDOS = 5
 MAX_DOCUMENTOS_RECEBIDOS = 100
 MAX_ITENS_RECEBIDOS = 100
@@ -50,6 +51,7 @@ class ItemPreviaVenda:
     produto_id: str
     variacao_id: str | None
     quantidade: Decimal
+    sigla_unidade: str | None = None
     source_line_id: None = field(default=None, init=False)
     sku: None = field(default=None, init=False)
     returned_quantity: None = field(default=None, init=False)
@@ -101,6 +103,18 @@ def _identificador(value: Any) -> str:
     return value
 
 
+def _codigo_comercial(value: Any) -> str:
+    """Aceita o número comercial textual sem aplicar a regra de ID técnico.
+
+    O contrato documenta texto, permitindo formatos como 2025/001. Mantemos
+    tamanho limitado e recusamos controles ou marcação, sem truncar o código.
+    """
+    if (not isinstance(value, str) or not value.strip() or len(value) > 100 or
+            any(unicodedata.category(char).startswith("C") or char in "<>\u2028\u2029" for char in value)):
+        raise ContratoInvalido("A amostra contém um número comercial inválido.")
+    return value.strip()
+
+
 def _id_produto(value: Any, *, variacao: bool = False) -> str | None:
     """Normaliza IDs numéricos sem confundir variação zero com ausência.
 
@@ -130,12 +144,27 @@ def _quantidade(value: Any) -> Decimal:
     return numero
 
 
+def _sigla_unidade(value: Any) -> str | None:
+    """Preserva a unidade declarada sem converter quantidade ou presumir UN.
+
+    Ausência, nulo e texto vazio continuam desconhecidos. Maiúsculas e minúsculas
+    são preservadas; controles e textos longos são
+    recusados antes da apresentação para impedir rótulos ambíguos.
+    """
+    if value is None:
+        return None
+    if (not isinstance(value, str) or len(value) > 20 or
+            any(unicodedata.category(char).startswith("C") or char in "\u2028\u2029" for char in value)):
+        raise ContratoInvalido("A amostra contém uma unidade de medida inválida.")
+    return value.strip() or None
+
+
 def _documento(row: Any, inicio: date, fim: date, situacoes: set[str]) -> DocumentoPreviaVenda:
     """Projeta uma venda conferindo período, situação e todos os seus itens."""
     if not isinstance(row, dict):
         raise ContratoInvalido("A amostra contém um documento de venda inválido.")
     identificador = _identificador(row.get("id"))
-    codigo = _identificador(row.get("codigo"))
+    codigo = _codigo_comercial(row.get("codigo"))
     situacao = _identificador(row.get("situacao_id"))
     if situacao not in situacoes:
         raise ContratoInvalido("A venda usa uma situação não conferida. Consulte as situações novamente.")
@@ -160,6 +189,7 @@ def _documento(row: Any, inicio: date, fim: date, situacoes: set[str]) -> Docume
             produto_id=_id_produto(produto.get("produto_id")),
             variacao_id=_id_produto(produto.get("variacao_id"), variacao=True),
             quantidade=_quantidade(produto.get("quantidade")),
+            sigla_unidade=_sigla_unidade(produto.get("sigla_unidade")),
         ))
     return DocumentoPreviaVenda(identificador, codigo, dia, situacao, tuple(itens))
 

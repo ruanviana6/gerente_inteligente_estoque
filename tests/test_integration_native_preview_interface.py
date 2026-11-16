@@ -24,7 +24,8 @@ PRODUTO = "900000000123"
 @pytest.fixture
 def previa_ficticia(monkeypatch):
     """Preserva o leitor e a autorização reais; substitui somente configuração e HTTP."""
-    estado = SimpleNamespace(loads=0, gets=[], status=200, revogar=False, meta_invalida=False)
+    estado = SimpleNamespace(loads=0, gets=[], status=200, revogar=False, meta_invalida=False,
+                             unidade="__ausente__", quantidade="2.5", codigo="1001")
     hoje = hoje_local().date()
 
     def config():
@@ -51,16 +52,18 @@ def previa_ficticia(monkeypatch):
                 estado.auth.generation += 1
             if estado.status != 200:
                 return RespostaGestaoClick(estado.status, json.dumps({"erro": PRIVADO}).encode())
-            payload = {"data": [{"id": "VENDA-FICTICIA-001", "codigo": "1001", "data": hoje.isoformat(),
+            payload = {"data": [{"id": "VENDA-FICTICIA-001", "codigo": estado.codigo, "data": hoje.isoformat(),
                                 "situacao_id": "91", "nome_situacao": "Situação fictícia",
                                 "cliente_id": PRIVADO, "nome_cliente": PRIVADO,
                                 "valor_total": PRIVADO, "observacoes": PRIVADO,
                                 "produtos": [{"produto": {"produto_id": PRODUTO, "variacao_id": "700001",
-                                                          "quantidade": "2.5", "nome_produto": PRIVADO,
+                                                          "quantidade": estado.quantidade, "nome_produto": PRIVADO,
                                                           "valor_custo": PRIVADO, "valor_total": PRIVADO}}]}],
                        "meta": {"total_registros": 1, "total_da_pagina": 1,
                                 "pagina_atual": 1, "limite_por_pagina": 5,
                                 "proxima_url": None, "proxima_pagina": None}}
+            if estado.unidade != "__ausente__":
+                payload["data"][0]["produtos"][0]["produto"]["sigla_unidade"] = estado.unidade
             if estado.meta_invalida:
                 payload["meta"]["total_da_pagina"] = PRIVADO
         else:
@@ -134,6 +137,45 @@ def test_amostra_exibe_projecao_sem_mapas_pii_financeiro_ou_persistencia(previa_
     estado_sessao = e.app.session_state.to_dict()
     assert PRODUTO not in str(estado_sessao)
     assert not any(isinstance(value, PreviaVendasNativas) for value in estado_sessao.values())
+
+
+def test_amostra_mostra_duas_caixas_e_numero_comercial_sem_conversao(previa_ficticia):
+    """A conferência mostra o número da venda e a medida recebida, sem assumir unidades."""
+    e = previa_ficticia
+    e.unidade, e.quantidade, e.codigo = "CX", "2", "2025/001"
+    selecionar_loja(e)
+    consultar_amostra(e)
+    tabela = next(item.value for item in e.app.dataframe if "Documento (ID)" in item.value.columns)
+    assert tabela["Unidade"].tolist() == ["CX"]
+    assert tabela["Quantidade"].tolist() == ["2"]
+    assert tabela["Número"].tolist() == ["2025/001"]
+    assert len(e.gets) == 3 and not e.auth.calls
+    assert PRIVADO not in texto_interface(e.app) + tabelas(e.app)
+
+
+@pytest.mark.parametrize("unidade", ["__ausente__", None])
+def test_amostra_exibe_unidade_desconhecida_sem_adotar_padrao(previa_ficticia, unidade):
+    """Quando a API não informa medida, a tabela não chama a quantidade de UN ou CX."""
+    e = previa_ficticia
+    e.unidade = unidade
+    selecionar_loja(e)
+    consultar_amostra(e)
+    tabela = next(item.value for item in e.app.dataframe if "Documento (ID)" in item.value.columns)
+    assert tabela["Unidade"].tolist() == ["Não informada"]
+    assert tabela["Quantidade"].tolist() == ["2.5"]
+    assert len(e.gets) == 3 and not e.auth.calls
+
+
+def test_unidade_invalida_nao_aparece_na_tabela_ou_aviso(previa_ficticia):
+    """Um campo de medida incompatível recusa a amostra inteira sem refletir seu valor."""
+    e = previa_ficticia
+    e.unidade = PRIVADO
+    selecionar_loja(e)
+    consultar_amostra(e)
+    assert e.app.warning
+    assert PRODUTO not in tabelas(e.app)
+    assert PRIVADO not in texto_interface(e.app) + tabelas(e.app)
+    assert len(e.gets) == 3 and not e.auth.calls
 
 
 def test_amostra_nao_reaparece_nem_consulta_novamente_no_rerun(previa_ficticia):

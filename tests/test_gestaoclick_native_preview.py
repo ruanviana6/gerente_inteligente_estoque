@@ -111,6 +111,7 @@ def test_projecao_preserva_decimais_e_ausencias_sem_financas_ou_dados_pessoais(a
     assert (doc.id, doc.codigo, doc.data, doc.situacao_id) == ("venda-001", "PED-001", date(2025, 1, 15), "1")
     assert item.produto_id == "101" and item.variacao_id == "0"
     assert item.quantidade == Decimal("2.500000")
+    assert item.sigla_unidade is None
     assert item.source_line_id is None and item.sku is None and item.returned_quantity is None
     assert doc.source_updated_at is None
     encoded = str(asdict(preview))
@@ -120,6 +121,109 @@ def test_projecao_preserva_decimais_e_ausencias_sem_financas_ou_dados_pessoais(a
     assert "venda-001" not in repr(preview)
     with pytest.raises(FrozenInstanceError):
         preview.loja_solicitada = "outra"
+    auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("unidade, esperada", [("CX", "CX"), ("kg", "kg"), ("M²", "M²"),
+                                               ("  CX  ", "CX"), ("U" * 20, "U" * 20)])
+def test_unidade_documentada_preserva_quantidade_sem_conversao(auth, configuracao, conta, unidade, esperada):
+    """Duas caixas continuam duas caixas; a conferência não inventa fator de conversão."""
+    doc = documento()
+    produto = doc["produtos"][0]["produto"]
+    produto.update(quantidade="2", sigla_unidade=unidade)
+    preview, transport = executar(auth, configuracao, conta, resposta([doc]))
+    item = preview.documentos[0].itens[0]
+    assert item.quantidade == Decimal("2") and item.sigla_unidade == esperada
+    assert item.returned_quantity is None and item.sku is None
+    assert len(transport.calls) == 1
+    assert all(sentinel not in str(asdict(preview)) for sentinel in (PRIVADO, SENSIVEL, ACCESS_TOKEN, SECRET_TOKEN))
+    auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("unidade", ["__ausente__", None, "", "   ", "\u00a0"])
+def test_unidade_desconhecida_nao_vira_unidade_padrao(auth, configuracao, conta, unidade):
+    """Ausência ou texto vazio não autoriza chamar a quantidade de unidades ou caixas."""
+    doc = documento()
+    if unidade != "__ausente__":
+        doc["produtos"][0]["produto"]["sigla_unidade"] = unidade
+    preview, _ = executar(auth, configuracao, conta, resposta([doc]))
+    item = preview.documentos[0].itens[0]
+    assert item.sigla_unidade is None and item.quantidade == Decimal("2.500000")
+    auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("unidade", [1, True, [], {}, "U" * 21, "CX\n", "\t", "CX\x00",
+                                    "CX\u202e", "CX\u200b", "CX\u2028", "CX\u2029", SENSIVEL])
+def test_unidade_invalida_recusa_amostra_sem_expor_valor(auth, configuracao, conta, unidade):
+    """Tipos, tamanho excessivo e controles invisíveis não alcançam a tabela nem o erro."""
+    doc = documento()
+    doc["produtos"][0]["produto"]["sigla_unidade"] = unidade
+    transport = TransporteFicticio(resposta([doc]))
+    with pytest.raises(ContratoInvalido) as erro:
+        consultar_previa_vendas(auth, lambda: configuracao, conta, "001", INICIO, FIM,
+                               autorizado=True, transporte=transport)
+    assert "unidade" in str(erro.value).lower()
+    assert all(sentinel not in str(erro.value) for sentinel in (PRIVADO, SENSIVEL, ACCESS_TOKEN, SECRET_TOKEN))
+    if isinstance(unidade, str) and unidade.strip():
+        assert unidade not in str(erro.value)
+    assert len(transport.calls) == 1
+    auth.rpc.assert_not_called()
+
+
+def test_itens_do_mesmo_produto_com_unidades_distintas_nao_sao_agregados(auth, configuracao, conta):
+    """Linhas de caixas e unidades preservam separadamente suas medidas na prévia."""
+    doc = documento()
+    primeiro = doc["produtos"][0]["produto"]
+    primeiro.update(quantidade="2", sigla_unidade="CX")
+    segundo = deepcopy(doc["produtos"][0])
+    segundo["produto"]["sigla_unidade"] = "UN"
+    doc["produtos"].append(segundo)
+    preview, _ = executar(auth, configuracao, conta, resposta([doc]))
+    assert [(item.quantidade, item.sigla_unidade) for item in preview.documentos[0].itens] == [
+        (Decimal("2"), "CX"), (Decimal("2"), "UN"),
+    ]
+    auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("codigo, esperado", [("2025/001", "2025/001"),
+                                              ("  PV 2025/001.2  ", "PV 2025/001.2"),
+                                              ("C" * 100, "C" * 100)])
+def test_codigo_comercial_aceita_pontuacao_sem_mudar_id(auth, configuracao, conta, codigo, esperado):
+    """O número comercial é texto de conferência; não vira rota nem identidade da venda."""
+    preview, transport = executar(auth, configuracao, conta, resposta([documento(codigo=codigo)]))
+    doc = preview.documentos[0]
+    assert doc.id == "venda-001" and doc.codigo == esperado
+    assert len(transport.calls) == 1
+    assert "2025/001" not in transport.calls[0][0]
+    auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("codigo", ["__ausente__", None, "", "   ", 1, True, [], {},
+                                   "2025/001\n", "\t2025/001", "2025\x00/001", "2025\u202e/001",
+                                   "2025\u2028/001", "2025\u2029/001",
+                                   "<b>2025/001</b>", "CODIGO-PRIVADO-" + "X" * 101])
+def test_codigo_comercial_invalido_nao_vaza_no_erro(auth, configuracao, conta, codigo):
+    """Número obrigatório, limitado e sem controles não aceita conteúdo arbitrário do ERP."""
+    doc = documento()
+    if codigo == "__ausente__":
+        doc.pop("codigo")
+    else:
+        doc["codigo"] = codigo
+    transport = TransporteFicticio(resposta([doc]))
+    with pytest.raises(ContratoInvalido) as erro:
+        consultar_previa_vendas(auth, lambda: configuracao, conta, "001", INICIO, FIM,
+                               autorizado=True, transporte=transport)
+    assert "2025/001" not in str(erro.value) and "CODIGO-PRIVADO" not in str(erro.value)
+    assert all(sentinel not in str(erro.value) for sentinel in (PRIVADO, SENSIVEL, ACCESS_TOKEN, SECRET_TOKEN))
+    assert len(transport.calls) == 1
+    auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("campo", ["id", "situacao_id"])
+def test_pontuacao_comercial_nao_relaxa_identificadores_tecnicos(auth, configuracao, conta, campo):
+    """Permitir barra no número da venda não autoriza barra nos IDs usados como identidade."""
+    with pytest.raises(ContratoInvalido):
+        executar(auth, configuracao, conta, resposta([documento(**{campo: "2025/001"})]))
     auth.rpc.assert_not_called()
 
 

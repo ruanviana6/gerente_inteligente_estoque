@@ -70,6 +70,8 @@ def native_preview_controls(servico, carregar_configuracao, conta, loja_id: str)
     st.caption("SKU, identificador da linha, devoluções e instante de alteração não foram comprovados. "
                "Dados desconhecidos não são preenchidos com zero. A amostra não é usada nos cálculos "
                "de estoque, não é salva e não ativa a sincronização automática.")
+    st.caption("Quantidade e unidade são apresentadas como informadas pela origem. "
+               "Unidade ausente aparece como ‘Não informada’; não há conversão automática entre caixas e unidades.")
     if not previa.documentos:
         st.info("Nenhum documento foi retornado nesta consulta. Isso não comprova ausência de vendas "
                 "fora do período, do tipo ou das permissões da chave.")
@@ -84,8 +86,10 @@ def native_preview_controls(servico, carregar_configuracao, conta, loja_id: str)
         for item in documento.itens:
             linhas.append({**cabecalho, "Produto (ID)": item.produto_id,
                            "Variação (ID)": item.variacao_id or "Não informada",
-                           "Quantidade": format(item.quantidade, "f")})
+                           "Quantidade": format(item.quantidade, "f"),
+                           "Unidade": item.sigla_unidade or "Não informada"})
         if not documento.itens:
             linhas.append({**cabecalho, "Produto (ID)": "Sem itens retornados",
-                           "Variação (ID)": "Não informada", "Quantidade": "Não informada"})
+                           "Variação (ID)": "Não informada", "Quantidade": "Não informada",
+                           "Unidade": "Não informada"})
     st.dataframe(linhas, hide_index=True, width="stretch")
