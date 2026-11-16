@@ -9,7 +9,7 @@ import streamlit as st
 from dados import hoje_local
 from integracoes.account_setup import validar_conta
 from integracoes.gestaoclick import GestaoClickError
-from integracoes.native_preview import consultar_previa_vendas
+from integracoes.native_preview import PaginacaoAmostraInvalida, consultar_previa_vendas
 from web.errors import AuthenticationError, AuthorizationError
 
 _TIPOS = {"produto": "Produtos", "vendas_balcao": "PDV / vendas de balcão"}
@@ -55,6 +55,9 @@ def native_preview_controls(servico, carregar_configuracao, conta, loja_id: str)
         raise
     except GestaoClickError as erro:
         st.warning(str(erro))
+        if isinstance(erro, PaginacaoAmostraInvalida):
+            st.caption("Diagnóstico técnico: somente nomes e tipos de metadados, sem valores da conta.")
+            st.json(erro.diagnostico, expanded=False)
         return
 
     st.success("Amostra consultada. Nenhuma venda foi importada e nenhum indicador foi alterado.")
