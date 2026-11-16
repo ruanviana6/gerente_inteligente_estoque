@@ -65,6 +65,35 @@ desta loja** usa a RPC existente e grava somente a fonte no Supabase. Apresenta 
 IDs efetivos de fonte e loja; não muda Secrets, não importa vendas, não aprova um
 contrato e não ativa o agendador. Não é necessário criar outra conta no ERP.
 
+## Prévia nativa de vendas
+
+Depois de conferir a conta e selecionar a loja, o Master pode usar **Conferir
+amostra de vendas**. A ação usa um contrato versionado no código para `GET /vendas`;
+não exige mapas JSON, fonte interna nem contrato adicional nos Secrets. As chaves
+protegidas e o vínculo da organização continuam obrigatórios.
+
+A consulta recebe um período de até 31 dias e um universo explícito: produtos ou
+balcão/PDV. Esse limite é da amostra de conferência, não substitui a capacidade de
+732 dias da carga histórica. O fluxo faz somente um GET, solicita cinco documentos
+da primeira página e não segue links recebidos. A resposta precisa ter envelope e
+contagens válidos. O resultado exibe no máximo cinco documentos e cem itens; não
+importa registros nem altera indicadores ou aprova o agendamento.
+
+Somente IDs, número do documento, data, situação e quantidades são projetados.
+Clientes, valores financeiros, observações, credenciais e demais atributos não
+são apresentados nem guardados. A prévia não fica em cache ou no estado da sessão
+e desaparece em uma nova interação. Autorização, prazo do catálogo e configuração
+são conferidos antes e depois do GET, inclusive quando a consulta falha.
+O catálogo também fica vinculado à conexão por um HMAC com chave efêmera do
+processo. Trocar a base ou as credenciais exige conferir a conta novamente antes
+de ler vendas. O objeto assinado guarda somente o digest, nunca as credenciais.
+
+A loja é o **escopo solicitado no filtro**, não uma identidade comprovada pelo
+retorno. A amostra nunca declara cobertura integral. SKU, ID estável da linha,
+quantidade devolvida e instante de alteração continuam desconhecidos quando não
+documentados; não são preenchidos com zero, índice do item ou horário da coleta.
+Mesmo uma prévia válida não pode ser enviada ao sincronizador genérico atual.
+
 ## Lacunas que continuam bloqueando a carga padrão
 
 O schema e o exemplo de `/vendas` não documentam os seguintes campos exigidos
@@ -103,9 +132,12 @@ com base no maior número documentado.
 
 1. Conferir lojas e situações pela nova ação autenticada e escolher a loja correta.
 2. Registrar a fonte e guardar seus identificadores na configuração protegida.
-3. Concluir a adaptação de itens, catálogo, devoluções e versões com amostra real
-   autorizada; não apenas preencher mapas JSON para silenciar a validação.
-4. Reconciliar uma prévia pequena, incluindo cancelamentos, devoluções e PDV.
+3. Conferir uma amostra nativa pequena pelo novo formulário, comparando documentos,
+   produtos, quantidades, situações e loja efetiva com o ERP.
+4. Concluir a adaptação de itens, catálogo, devoluções e versões. A persistência
+   atual recusa alterações sem um instante de atualização comprovado; essa lacuna
+   também exige implementação, não apenas preencher mapas JSON. Reconciliar
+   cancelamentos, devoluções posteriores e PDV antes da carga completa.
 5. Somente então aprovar a automação e configurar o executor conforme
    [Sincronização automática](SINCRONIZACAO_AUTOMATICA.md).
 

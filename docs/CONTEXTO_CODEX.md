@@ -9,6 +9,9 @@ resolvido apenas ao preencher Secrets. Consulte
 [o registro das diferenças e pendências](CONTRATO_PUBLICO_GESTAOCLICK_20261116.md).
 A consulta autenticada de lojas/situações e o registro interno de fonte são
 etapas explícitas do Master, separadas da importação e da ativação automática.
+O Master também pode consultar uma amostra nativa de vendas, sem mapas JSON,
+após escolher a loja conferida. Essa amostra limitada não alimenta indicadores
+nem substitui a adaptação de persistência, catálogo e devoluções.
 Nenhuma leitura ou escrita ocorre no ERP ao simplesmente navegar.
 
 > Atualização vigente de 11/11/2026: a consolidação fiscal DEMO e os seis menus estão em [FISCAL_DEMO.md](FISCAL_DEMO.md). O cliente analítico permanece GET-only. Somente o executor isolado poderá futuramente criar/emitir NF-e direta no Varejo após OpenAPI, homologação e nova autorização. Sem XML/PDF, segundo banco operacional ou alterações reais no ERP nesta entrega. As instruções anteriores abaixo são históricas quando divergirem dessa decisão.
