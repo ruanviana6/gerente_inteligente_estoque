@@ -107,6 +107,18 @@ def test_configuracao_incompleta_mostra_campos_sem_segredos(automacao_ficticia):
     assert not state.app.success
 
 
+def test_ativacao_incompleta_orienta_conferir_conta_sem_gravar(automacao_ficticia):
+    """A autorização marcada não substitui fonte/loja/contrato, nem acusa o UUID errado."""
+    state = automacao_ficticia
+    state.values.pop("GESTAOCLICK_SOURCE_ID")
+    checkbox(state.app, APPROVAL).check()
+    botao(state.app, "Ativar atualização automática").click().run()
+    assert not state.app.exception
+    assert any("Primeiro confira as lojas e situações" in item.value for item in state.app.warning)
+    assert not state.auth.calls and not state.app.success
+    assert "Configure os UUIDs válidos" not in rendered(state.app)
+
+
 def test_configuracao_completa_valida_fonte_sem_get(automacao_ficticia):
     """Conferência local não é anunciada como autenticação real ou carga concluída."""
     state = automacao_ficticia

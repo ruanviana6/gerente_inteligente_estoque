@@ -6,7 +6,12 @@ import json
 
 import streamlit as st
 
-from integracoes.account_setup import consultar_conta, registrar_fonte, validar_conta
+from integracoes.account_setup import (
+    PaginacaoSituacoesInvalida,
+    consultar_conta,
+    registrar_fonte,
+    validar_conta,
+)
 from integracoes.gestaoclick import GestaoClickError
 from web.errors import AuthenticationError, AuthorizationError
 
@@ -40,6 +45,9 @@ def account_setup_controls(servico, carregar_configuracao):
                 raise
             except GestaoClickError as erro:
                 st.warning(str(erro))
+                if isinstance(erro, PaginacaoSituacoesInvalida):
+                    st.caption("Diagnóstico técnico: somente nomes e tipos dos metadados, sem valores da conta.")
+                    st.json(erro.diagnostico, expanded=False)
                 return
             st.session_state[_ACCOUNT_KEY] = conta
             st.success("Lojas e situações consultadas. Nenhuma venda foi importada.")

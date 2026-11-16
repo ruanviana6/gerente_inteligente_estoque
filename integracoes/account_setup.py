@@ -35,6 +35,67 @@ CONTA_TTL_SECONDS = 300
 _LIMITE = 100
 _MAX_PAGINAS = 3
 _CHAVE_ASSINATURA = secrets.token_bytes(32)
+_CAMPOS_PAGINACAO = ("total_registros", "total_da_pagina", "total_registros_pagina",
+                     "total_paginas", "pagina_atual", "limite_por_pagina", "proxima_pagina", "proxima_url")
+
+
+class PaginacaoSituacoesInvalida(ContratoInvalido):
+    """Expõe apenas o motivo fixo e tipos de metadados, nunca seu conteúdo.
+
+    O diagnóstico permite identificar diferenças de contrato sem pedir resposta
+    bruta da API, que poderia conter dados comerciais ou credenciais.
+    """
+
+    def __init__(self, motivo: str, meta: Any):
+        """Limita códigos e nomes de campo ao vocabulário interno conhecido."""
+        motivos = {"SC_META", "SC_CONTAGEM", "SC_LIMITE", "SC_PAGINA", "SC_TOTAL_PAGINAS",
+                   "SC_CURSOR", "SC_CONTINUACAO", "SC_MUDANCA"}
+        codigo = motivo if motivo in motivos else "SC_META"
+        super().__init__(f"A paginação das situações não pôde ser comprovada ({codigo}). "
+                         "Nenhum catálogo parcial foi utilizado.")
+        tipos = {int: "inteiro", str: "texto", bool: "booleano", float: "decimal",
+                 dict: "objeto", list: "lista", type(None): "nulo"}
+        self.diagnostico = {"codigo": codigo, "tipo_meta": tipos.get(type(meta), "outro"),
+                            "campos": {campo: (tipos.get(type(meta[campo]), "outro")
+                                               if isinstance(meta, dict) and campo in meta else "ausente")
+                                       for campo in _CAMPOS_PAGINACAO}}
+
+
+def _conferir_pagina_situacoes(meta: Any, recebidos: int, pagina: int) -> tuple[int, int, int]:
+    """Reconcilia os dois formatos documentados sem inferir fim por página curta.
+
+    A API pode aplicar um limite menor que o solicitado. O limite efetivo define
+    o tamanho de cada página e precisa permanecer estável durante a consulta.
+    As contagens continuam inteiras; aliases conflitantes são recusados.
+    """
+    if not isinstance(meta, dict) or "proxima_url" not in meta:
+        raise PaginacaoSituacoesInvalida("SC_META", meta)
+    campos = ["total_registros", "pagina_atual", "limite_por_pagina"]
+    contadores = [nome for nome in ("total_da_pagina", "total_registros_pagina") if nome in meta]
+    if not contadores or any(type(meta.get(nome)) is not int or meta[nome] < 0
+                            for nome in campos + contadores):
+        raise PaginacaoSituacoesInvalida("SC_CONTAGEM", meta)
+    total, limite = meta["total_registros"], meta["limite_por_pagina"]
+    if not 1 <= limite <= _LIMITE:
+        raise PaginacaoSituacoesInvalida("SC_LIMITE", meta)
+    paginas = (total + limite - 1) // limite
+    if meta["pagina_atual"] != pagina or pagina > max(1, paginas):
+        raise PaginacaoSituacoesInvalida("SC_PAGINA", meta)
+    if "total_paginas" in meta:
+        declaradas = meta["total_paginas"]
+        esperadas = {paginas} if total else {0, 1}
+        if type(declaradas) is not int or declaradas not in esperadas:
+            raise PaginacaoSituacoesInvalida("SC_TOTAL_PAGINAS", meta)
+    if (any(meta[nome] != recebidos for nome in contadores) or
+            recebidos != min(limite, max(0, total - (pagina - 1) * limite))):
+        raise PaginacaoSituacoesInvalida("SC_CONTAGEM", meta)
+    cursor = str(pagina + 1) if pagina < paginas else None
+    if "proxima_pagina" in meta and meta["proxima_pagina"] != cursor:
+        raise PaginacaoSituacoesInvalida("SC_CURSOR", meta)
+    if (pagina >= paginas and meta["proxima_url"] is not None or
+            pagina < paginas and not isinstance(meta["proxima_url"], str)):
+        raise PaginacaoSituacoesInvalida("SC_CONTINUACAO", meta)
+    return total, limite, paginas
 
 
 @dataclass(frozen=True, repr=False)
@@ -155,18 +216,21 @@ def _catalogo(rows: Any) -> tuple[tuple[str, str], ...]:
     return tuple(result)
 
 
-def _validar_proxima_url(value: Any, base: str, pagina: int) -> None:
-    """Confere a continuação publicada, mas nunca a utiliza como destino de requisição."""
+def _validar_proxima_url(value: Any, base: str, pagina: int, limites: tuple[int, ...]) -> int:
+    """Extrai só o limite comprovado; o próximo endereço continua construído localmente."""
     if not isinstance(value, str) or not value or len(value) > 1024 or any(c.isspace() for c in value):
         raise ContratoInvalido("A continuação do catálogo de situações é inválida.")
     try:
         parsed = urllib.parse.urlsplit(value)
         expected = urllib.parse.urlsplit(base + "/situacoes_vendas")
         pairs = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True, strict_parsing=True)
+        params = dict(pairs)
         if (parsed.scheme != expected.scheme or parsed.netloc != expected.netloc or
                 parsed.path != expected.path or parsed.fragment or
-                len(pairs) != 2 or dict(pairs) != {"pagina": str(pagina), "limite": str(_LIMITE)}):
+                len(pairs) != 2 or set(params) != {"pagina", "limite"} or
+                params["pagina"] != str(pagina) or params["limite"] not in {str(n) for n in limites}):
             raise ValueError
+        return int(params["limite"])
     except ValueError:
         raise ContratoInvalido("A continuação do catálogo de situações está fora da consulta autorizada.") from None
 
@@ -181,7 +245,7 @@ def consultar_conta(
     """Consulta lojas e todas as situações em até quatro GETs, sem importar vendas.
 
     Lojas não têm paginação no contrato público. Situações exigem metadados
-    consistentes em até três páginas de cem registros; qualquer lacuna aborta
+    consistentes em até três páginas de até cem registros; qualquer lacuna aborta
     toda a consulta. As URLs são construídas localmente e não há retentativas.
     """
     with auth.operation():
@@ -235,35 +299,27 @@ def consultar_conta(
             raise ContratoInvalido("A resposta de lojas diverge do catálogo sem paginação documentado.")
         lojas = _catalogo(lojas_payload.get("data"))
         situacoes: tuple[tuple[str, str], ...] = ()
-        total = None
+        total = limite_efetivo = None
+        limite_solicitado = _LIMITE
         for pagina in range(1, _MAX_PAGINAS + 1):
-            payload = consultar(f"/situacoes_vendas?pagina={pagina}&limite={_LIMITE}")
+            payload = consultar(f"/situacoes_vendas?pagina={pagina}&limite={limite_solicitado}")
             rows = _catalogo(payload.get("data"))
             meta = payload.get("meta")
-            if (not isinstance(meta, dict) or
-                    any(type(meta.get(key)) is not int or meta[key] < 0 for key in
-                        ("total_registros", "total_da_pagina", "pagina_atual", "limite_por_pagina")) or
-                    meta["pagina_atual"] != pagina or meta["limite_por_pagina"] != _LIMITE or
-                    meta["total_da_pagina"] != len(rows) or "proxima_url" not in meta):
-                raise ContratoInvalido("A paginação das situações não pôde ser comprovada.")
+            total_pagina, limite, paginas = _conferir_pagina_situacoes(meta, len(rows), pagina)
             if total is None:
-                total = meta["total_registros"]
-            if total > _LIMITE * _MAX_PAGINAS:
+                total, limite_efetivo = total_pagina, limite
+            if paginas > _MAX_PAGINAS:
                 raise ContratoInvalido("As situações excedem o limite de três páginas; a consulta foi descartada.")
-            esperados = min(_LIMITE, max(total - len(situacoes), 0))
-            if (meta["total_registros"] != total or len(rows) != esperados or
+            if (total_pagina != total or limite != limite_efetivo or
                     {row[0] for row in situacoes} & {row[0] for row in rows}):
-                raise ContratoInvalido("O catálogo de situações está incompleto, repetido ou mudou durante a consulta.")
+                raise PaginacaoSituacoesInvalida("SC_MUDANCA", meta)
             situacoes += rows
             if len(situacoes) == total:
-                if meta["proxima_url"] is not None or meta.get("proxima_pagina") is not None:
-                    raise ContratoInvalido("A continuação das situações contradiz o total informado.")
                 break
             if pagina == _MAX_PAGINAS:
                 raise ContratoInvalido("Não foi possível comprovar todas as situações no limite autorizado.")
-            if "proxima_pagina" in meta and meta["proxima_pagina"] != str(pagina + 1):
-                raise ContratoInvalido("A próxima página de situações é inválida.")
-            _validar_proxima_url(meta["proxima_url"], base, pagina + 1)
+            limite_solicitado = _validar_proxima_url(meta["proxima_url"], base, pagina + 1,
+                                                    (limite_solicitado, limite))
         revalidar()
         criada_em = time.monotonic()
         conta = ContaGestaoClick(stamp[1], stamp, criada_em, criada_em + CONTA_TTL_SECONDS,

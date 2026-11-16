@@ -63,7 +63,8 @@ def automation_controls(servico, loader):
                 if missing:
                     st.warning("A conexão não está pronta para importar vendas. Faltam estas configurações:")
                     st.write("\n".join(f"- `{name}`" for name in missing))
-                    st.caption("As chaves de acesso, sozinhas, não definem a loja nem o formato das vendas.")
+                    st.caption("Comece por ‘Conferir lojas e situações da conta’. O registro da fonte e a "
+                               "validação do formato das vendas precisam estar completos antes de ativar o agendamento.")
                 else:
                     _, source, store = validated_scope(values, context.profile.organization_id)
                     contract_fingerprint(values)
@@ -107,6 +108,10 @@ def automation_controls(servico, loader):
                     raise ValueError("Escolha as datas inicial e final do histórico.")
                 first, last = validar_periodo(*dates)
                 values, context, stamp = _protected_settings(auth, loader)
+                if missing_configuration(values):
+                    raise ValueError("A atualização automática ainda não pode ser ativada. Primeiro confira "
+                                     "as lojas e situações, registre a fonte e conclua a configuração de vendas. "
+                                     "As chaves existentes podem ser usadas na conferência da conta.")
                 _, source, store = validated_scope(values, context.profile.organization_id)
                 fingerprint = contract_fingerprint(values)
                 result = _rpc(auth, stamp, "sync_automation_configure", {

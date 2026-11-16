@@ -297,7 +297,7 @@ def test_json_invalido_ou_ambiguo_abortado(auth, configuracao, raw):
 @pytest.mark.parametrize("changes", [
     {"total_registros": True}, {"total_registros": "2"}, {"total_registros": -1},
     {"total_da_pagina": 1}, {"pagina_atual": 2}, {"pagina_atual": True},
-    {"limite_por_pagina": 20}, {"limite_por_pagina": 101},
+    {"limite_por_pagina": 0}, {"limite_por_pagina": 101},
     {"proxima_url": "https://externo.invalid/"}, {"proxima_pagina": "2"},
 ])
 def test_metadados_inconsistentes_nao_comprovam_situacoes(auth, configuracao, changes):

@@ -27,6 +27,32 @@ tratar as diferenças abaixo.
 O cliente mantém o formato antigo de paginação e aceita o formato público de
 vendas com validação estrita. Nenhuma página parcial é consolidada.
 
+### Correção da conferência de situações
+
+O primeiro assistente de conta exigia `total_da_pagina` e limite efetivo de
+100 registros. Isso recusava o formato legado `total_registros_pagina` e uma
+resposta coerente com limite menor, por exemplo 20. Ambos os formatos são
+documentados: além do OpenAPI, o
+[artigo oficial sobre campos e retorno](https://central.gestaoclick.com.br/hc/pt-br/articles/1863-api-nomes-de-campo-filtros-e-formato-do-retorno)
+apresenta o envelope legado.
+
+Agora a conferência aceita os dois nomes e exige igualdade quando ambos aparecem.
+Calcula o número de páginas pelo limite efetivo, confere `total_paginas` quando
+presente e exige que total e limite permaneçam estáveis. O próximo endereço é
+construído localmente; o link recebido só pode indicar o limite solicitado ou
+o limite efetivo já comprovado. Permanecem os mesmos host, recurso e filtros,
+contagens inteiras, IDs únicos, páginas completas e teto de quatro GETs.
+
+Se o formato ainda divergir, a tela apresenta um código e somente a presença e
+o tipo dos campos de paginação conhecidos. Nunca mostra seus valores, nomes de
+lojas/situações, tokens ou resposta bruta nesse diagnóstico. O erro enviado pelo
+usuário não identifica sozinho qual campo da resposta real divergiu; os testes
+reproduzem as incompatibilidades documentadas, sem alegar consulta autenticada.
+
+A conferência da conta aparece antes do agendamento. Uma tentativa de ativação
+com configuração incompleta orienta concluir fonte, loja e contrato antes de
+salvar, sem atribuir indevidamente o problema ao UUID da organização.
+
 Na aplicação, **Administração → Integrações → Conferir lojas e situações da conta**
 usa as chaves já protegidas no servidor somente após autorização explícita.
 São no máximo quatro GETs: lojas e até três páginas de situações. Não lê vendas,
