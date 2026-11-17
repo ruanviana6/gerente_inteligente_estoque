@@ -162,3 +162,18 @@ Os fluxos autenticados foram testados com usuários fictícios e Supabase descar
 A versão web integrada está pronta para a auditoria independente da Issue #3. Dados empresariais só podem ser usados com autorização e validação apropriadas. A ativação real do GestãoClick depende das condições documentadas. Emissão automática de NF-e é permanentemente proibida. Compras automáticas, sincronização reversa e previsão sazonal avançada continuam bloqueadas. O fluxo fiscal DEMO é a preparação atual, não uma homologação da API.
 
 Quero que o projeto economize tempo na rotina e continue simples de entender e manter, sem transformar uma necessidade pessoal em uma infraestrutura desnecessária.
+
+
+### Estado de ativação real (16/11/2026)
+
+O Gerente Flatter opera como aplicação privada. A consulta de amostras do
+GestãoClick foi validada para **vendas de produtos**; **PDV/vendas de balcão
+fica desativado** por decisão da empresa. O cliente analítico somente usa GET.
+
+Amostras conferidas não são importadas. Antes de ativar a carga automática ou
+apresentar indicadores reais de vendas, falta homologar a vinculação de
+produtos/variações ao SKU, devoluções, identidade de itens, atualização de
+documentos, filtro da loja e cobertura dos lotes. O saldo/catálogo de estoque
+ainda dependem da importação atual e não são atualizados por essa prévia.
+O cadastro fiscal real está desabilitado e a emissão de notas permanece manual
+no GestãoClick. Não confunda testes e módulos DEMO com operação homologada.
