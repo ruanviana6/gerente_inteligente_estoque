@@ -8,10 +8,15 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 from test_gestaoclick_account_setup import (
-    ACCESS_TOKEN, BASE, PRIVADO, SECRET_TOKEN, TransporteFicticio, consultar,
+    ACCESS_TOKEN,
+    PRIVADO,
+    SECRET_TOKEN,
+    TransporteFicticio,
+    consultar,
 )
 from test_gestaoclick_account_setup import auth as auth
 from test_gestaoclick_account_setup import configuracao as configuracao
+
 from integracoes.catalog_preview import consultar_previa_catalogo
 from integracoes.gestaoclick import ContratoInvalido, GestaoClickError, RespostaGestaoClick
 from web.errors import AuthorizationError
