@@ -174,8 +174,12 @@ def _estoque(value: Any) -> Decimal | None:
     return result
 
 
-def _projetar(body: dict) -> tuple[tuple[ProdutoCatalogo, ...], int, int | None]:
-    """Confere a página inteira antes de mostrar os cinco primeiros produtos."""
+def _projetar(
+    body: dict, *, pagina: int = 1, max_exibidos: int = MAX_PRODUTOS_EXIBIDOS,
+) -> tuple[tuple[ProdutoCatalogo, ...], int, int | None]:
+    """Valida a página inteira; permite ao leitor completo manter todas as linhas."""
+    if type(pagina) is not int or pagina < 1 or type(max_exibidos) is not int or not 1 <= max_exibidos <= 100:
+        raise ContratoInvalido("Limites inválidos na prévia do catálogo.")
     rows = body.get("data")
     if (type(body.get("code")) is not int or body["code"] != 200
             or body.get("status") != "success"
@@ -187,7 +191,7 @@ def _projetar(body: dict) -> tuple[tuple[ProdutoCatalogo, ...], int, int | None]
         if not isinstance(meta, dict):
             raise ContratoInvalido("Metadados inválidos na prévia do catálogo.")
         if "pagina_atual" in meta and (type(meta["pagina_atual"]) is not int
-                                      or meta["pagina_atual"] != 1):
+                                      or meta["pagina_atual"] != pagina):
             raise ContratoInvalido("A prévia do catálogo não corresponde à primeira página.")
         if "total_registros" in meta:
             n = meta["total_registros"]
@@ -232,7 +236,7 @@ def _projetar(body: dict) -> tuple[tuple[ProdutoCatalogo, ...], int, int | None]
                 variacao_api_id=_codigo(variation.get("variacao_api_id"),
                                           campo="variacao.variacao_api_id", opcional=True),
             ))
-        if len(products) < MAX_PRODUTOS_EXIBIDOS:
+        if len(products) < max_exibidos:
             products.append(ProdutoCatalogo(
                 id=id_prod, codigo_interno=_codigo(row.get("codigo_interno"),
                                                   campo="produto.codigo_interno", opcional=True),
