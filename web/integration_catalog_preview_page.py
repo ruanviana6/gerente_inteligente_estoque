@@ -51,6 +51,12 @@ def catalog_preview_controls(servico, carregar_configuracao, conta, loja_id: str
     if not previa.produtos:
         st.info("Nenhum produto retornado. Isso não comprova catálogo vazio nem estoque zerado.")
         return
+    sem_id = sum(variacao.id is None for produto in previa.produtos for variacao in produto.variacoes)
+    if sem_id:
+        st.warning(f"{sem_id} linha(s) de variação vieram sem ID de estoque. "
+                   "O saldo dessas linhas foi ocultado e não será importado. "
+                   "O retorno não corresponde integralmente ao contrato documentado do GestãoClick; "
+                   "confira a loja e a resposta da API antes de sincronizar estoque.")
 
     def valor(quantidade):
         return format(quantidade, "f") if quantidade is not None else "Não informado"
@@ -72,7 +78,7 @@ def catalog_preview_controls(servico, carregar_configuracao, conta, loja_id: str
                 "Produto (ID)": produto.id,
                 "Código interno": produto.codigo_interno,
                 "Estoque do produto (loja)": valor(produto.estoque),
-                "Linha de estoque (ID)": variacao.id,
+                "Linha de estoque (ID)": variacao.id or "Não informado",
                 "Código da variação": variacao.codigo,
                 "Estoque da variação": valor(variacao.estoque),
                 "Combinação API": variacao.variacao_api_id or "Não informada",
