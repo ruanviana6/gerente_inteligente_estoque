@@ -5,7 +5,11 @@ from __future__ import annotations
 import streamlit as st
 
 from integracoes.account_setup import validar_conta
-from integracoes.catalog_preview import IdentificadorCatalogoInvalido, consultar_previa_catalogo
+from integracoes.catalog_preview import (
+    CodigoCatalogoInvalido,
+    IdentificadorCatalogoInvalido,
+    consultar_previa_catalogo,
+)
 from integracoes.gestaoclick import GestaoClickError
 from web.errors import AuthenticationError, AuthorizationError
 
@@ -32,8 +36,8 @@ def catalog_preview_controls(servico, carregar_configuracao, conta, loja_id: str
         raise
     except GestaoClickError as erro:
         st.warning(str(erro))
-        if isinstance(erro, IdentificadorCatalogoInvalido):
-            st.caption("Diagnóstico do identificador: somente campo, tipo e motivo; "
+        if isinstance(erro, (IdentificadorCatalogoInvalido, CodigoCatalogoInvalido)):
+            st.caption("Diagnóstico do campo: somente nome, tipo e motivo; "
                        "nenhum valor da conta é exibido.")
             st.json(erro.diagnostico, expanded=False)
         return
@@ -58,6 +62,18 @@ def catalog_preview_controls(servico, carregar_configuracao, conta, loja_id: str
                    "O retorno não corresponde integralmente ao contrato documentado do GestãoClick; "
                    "confira a loja e a resposta da API antes de sincronizar estoque.")
 
+    sem_codigo_produto = sum(produto.codigo_interno is None for produto in previa.produtos)
+    sem_codigo_variacao = sum(variacao.codigo is None
+                             for produto in previa.produtos for variacao in produto.variacoes)
+    if sem_codigo_produto or sem_codigo_variacao:
+        st.warning(
+            f"Na amostra exibida, {sem_codigo_produto} produto(s) estão sem código interno "
+            f"e {sem_codigo_variacao} linha(s) de variação estão sem código. "
+            "A prévia mostra 'Não informado', sem inventar códigos. "
+            "Confirme os códigos no GestãoClick antes de associar itens de vendas "
+            "ou sincronizar estoque; nenhuma carga será feita aqui."
+        )
+
     def valor(quantidade):
         return format(quantidade, "f") if quantidade is not None else "Não informado"
 
@@ -66,7 +82,7 @@ def catalog_preview_controls(servico, carregar_configuracao, conta, loja_id: str
         if not produto.variacoes:
             linhas.append({
                 "Produto (ID)": produto.id,
-                "Código interno": produto.codigo_interno,
+                "Código interno": produto.codigo_interno or "Não informado",
                 "Estoque do produto (loja)": valor(produto.estoque),
                 "Linha de estoque (ID)": "Não informada",
                 "Código da variação": "Não informado",
@@ -76,10 +92,10 @@ def catalog_preview_controls(servico, carregar_configuracao, conta, loja_id: str
         for variacao in produto.variacoes:
             linhas.append({
                 "Produto (ID)": produto.id,
-                "Código interno": produto.codigo_interno,
+                "Código interno": produto.codigo_interno or "Não informado",
                 "Estoque do produto (loja)": valor(produto.estoque),
                 "Linha de estoque (ID)": variacao.id or "Não informado",
-                "Código da variação": variacao.codigo,
+                "Código da variação": variacao.codigo or "Não informado",
                 "Estoque da variação": valor(variacao.estoque),
                 "Combinação API": variacao.variacao_api_id or "Não informada",
             })

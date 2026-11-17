@@ -127,7 +127,7 @@ def test_estoque_nao_informado_permanece_desconhecido(auth, configuracao, conta)
 
 
 @pytest.mark.parametrize("campo,valor", [
-    ("id", True), ("id", -1), ("codigo_interno", ""), ("codigo_interno", "<script>"),
+    ("id", True), ("id", -1), ("codigo_interno", "<script>"),
     ("estoque", "nan"), ("estoque", float("inf")), ("estoque", "999999999999"),
     ("variacoes", "errado"), ("variacoes", [{"id": 0, "codigo": "X", "estoque": "1"}]),
     ("variacoes", [{"id": 900, "codigo": "<x>", "estoque": "1"}]),
@@ -273,4 +273,68 @@ def test_multiplas_variacoes_sem_id_nao_sao_unificadas(auth, configuracao, conta
     previa, _ = executar(auth, configuracao, conta, resposta([row]))
     assert len(previa.produtos[0].variacoes) == 2
     assert all(v.id is None and v.estoque is None for v in previa.produtos[0].variacoes)
+    auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("codigo_interno,tem_variacao_codigo,codigo_variacao", [
+    (None, False, None),
+    ("", True, ""),
+    ("   ", True, None),
+    ("SKU-OK", False, None),
+])
+def test_codigos_ausentes_ou_vazios_nao_interrompem_previa(
+    auth, configuracao, conta, codigo_interno, tem_variacao_codigo, codigo_variacao,
+):
+    """Só códigos de exibição ficam desconhecidos: IDs e saldos não são inventados."""
+    variacao = {"id": 900, "estoque": "2.5", "variacao_api_id": ""}
+    if tem_variacao_codigo:
+        variacao["codigo"] = codigo_variacao
+    row = produto(codigo_interno=codigo_interno, variacoes=[variacao])
+    if codigo_interno is None:
+        row.pop("codigo_interno")
+    previa, transport = executar(auth, configuracao, conta, resposta([row]))
+    item = previa.produtos[0]
+    assert item.id == "100"
+    assert item.codigo_interno == (codigo_interno.strip() if codigo_interno and codigo_interno.strip() else None)
+    assert item.variacoes[0].id == "900"
+    assert item.variacoes[0].codigo is None
+    assert str(item.variacoes[0].estoque) == "2.5"
+    assert not previa.imported and not previa.coverage_confirmed
+    assert len(transport.calls) == 1
+    auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("campo,valor,motivo,tipo", [
+    ("produto.codigo_interno", True, "TIPO_INCOMPATIVEL", "booleano"),
+    ("produto.codigo_interno", {"segredo": PRIVADO}, "TIPO_INCOMPATIVEL", "objeto"),
+    ("produto.codigo_interno", "<script>", "CARACTERE_INSEGURO", "texto"),
+    ("variacao.codigo", "C" * 101, "COMPRIMENTO", "texto"),
+    ("variacao.codigo", ["NUNCA"], "TIPO_INCOMPATIVEL", "lista"),
+    ("variacao.variacao_api_id", "<x>", "CARACTERE_INSEGURO", "texto"),
+])
+def test_diagnostico_codigo_invalido_nao_expoe_dados(
+    auth, configuracao, conta, campo, valor, motivo, tipo,
+):
+    from integracoes.catalog_preview import CodigoCatalogoInvalido
+
+    row = produto()
+    if campo.startswith("produto."):
+        row["codigo_interno"] = valor
+    else:
+        row["variacoes"][0][campo.split(".")[-1]] = valor
+    with pytest.raises(CodigoCatalogoInvalido) as exc:
+        executar(auth, configuracao, conta, resposta([row]))
+    assert exc.value.diagnostico == {"campo": campo, "tipo": tipo, "motivo": motivo}
+    texto = str(exc.value) + json.dumps(exc.value.diagnostico)
+    for secreto in (PRIVADO, MARCADOR, ACCESS_TOKEN, SECRET_TOKEN, "<script>", "NUNCA"):
+        assert secreto not in texto
+    auth.rpc.assert_not_called()
+
+
+def test_codigo_numerico_preserva_formato_e_nao_altera_erp(auth, configuracao, conta):
+    row = produto(codigo_interno=123, variacoes=[{"id": 901, "codigo": 88, "estoque": 0}])
+    previa, transport = executar(auth, configuracao, conta, resposta([row]))
+    assert previa.produtos[0].codigo_interno == "123"
+    assert previa.produtos[0].variacoes[0].codigo == "88"
+    assert len(transport.calls) == 1
     auth.rpc.assert_not_called()
