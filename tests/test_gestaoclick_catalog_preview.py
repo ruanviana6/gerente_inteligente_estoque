@@ -124,7 +124,7 @@ def test_estoque_nao_informado_permanece_desconhecido(auth, configuracao, conta)
 
 @pytest.mark.parametrize("campo,valor", [
     ("id", True), ("id", -1), ("codigo_interno", ""), ("codigo_interno", "<script>"),
-    ("estoque", "nan"), ("estoque", 0.5), ("estoque", "999999999999"),
+    ("estoque", "nan"), ("estoque", float("inf")), ("estoque", "999999999999"),
     ("variacoes", "errado"), ("variacoes", [{"id": 0, "codigo": "X", "estoque": "1"}]),
     ("variacoes", [{"id": 900, "codigo": "<x>", "estoque": "1"}]),
     ("variacoes", [{"id": 900, "codigo": "A", "estoque": "1.0"},
@@ -172,3 +172,15 @@ def test_revogacao_durante_http_descarta_resultado(auth, configuracao, conta):
     with pytest.raises(AuthorizationError):
         executar(auth, configuracao, conta, depois=revogar)
     auth.rpc.assert_not_called()
+
+
+def test_decimais_numericos_finitos_sao_apenas_exibidos(auth, configuracao, conta):
+    """Não altera unidades ou arredonda saldo 2.5 vindo como número JSON."""
+    row = produto(estoque=2.5, variacoes=[
+        {"id": 900, "codigo": "FL-100-A", "estoque": -0.5, "variacao_api_id": ""},
+    ])
+    previa, transport = executar(auth, configuracao, conta, resposta([row]))
+    assert str(previa.produtos[0].estoque) == "2.5"
+    assert str(previa.produtos[0].variacoes[0].estoque) == "-0.5"
+    assert previa.imported is False and previa.coverage_confirmed is False
+    assert len(transport.calls) == 1
