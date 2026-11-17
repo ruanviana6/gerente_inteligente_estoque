@@ -6,8 +6,11 @@ from urllib.parse import urlsplit
 from test_integration_interface import botao, checkbox, texto_interface
 from test_integration_native_preview_interface import (
     previa_ficticia as previa_ficticia,
+)
+from test_integration_native_preview_interface import (
     selecionar_loja,
 )
+
 from integracoes.gestaoclick import RespostaGestaoClick
 
 SENSIVEL = "SEGREDO-FICTICIO-NUNCA-RENDERIZAR"
