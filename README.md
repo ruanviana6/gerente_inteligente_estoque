@@ -177,3 +177,11 @@ documentos, filtro da loja e cobertura dos lotes. O saldo/catálogo de estoque
 ainda dependem da importação atual e não são atualizados por essa prévia.
 O cadastro fiscal real está desabilitado e a emissão de notas permanece manual
 no GestãoClick. Não confunda testes e módulos DEMO com operação homologada.
+
+
+**Prévia adicional para homologação:** em Administração → Integrações,
+o Master pode consultar uma amostra de cinco produtos de uma loja, com códigos
+internos, estoques e variações retornados pelo GestãoClick (somente GET).
+Essa prévia **não** atualiza o saldo do Gerente nem valida automaticamente o
+vínculo com as linhas de venda. A cópia operacional de catálogo e estoque
+continua dependente de adaptação e reconciliação antes da ativação real.
