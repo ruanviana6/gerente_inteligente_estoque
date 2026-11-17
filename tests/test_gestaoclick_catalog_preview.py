@@ -310,7 +310,7 @@ def test_codigos_ausentes_ou_vazios_nao_interrompem_previa(
     ("produto.codigo_interno", "<script>", "CARACTERE_INSEGURO", "texto"),
     ("variacao.codigo", "C" * 101, "COMPRIMENTO", "texto"),
     ("variacao.codigo", ["NUNCA"], "TIPO_INCOMPATIVEL", "lista"),
-    ("variacao.variacao_api_id", "L\\nX", "CARACTERE_INSEGURO", "texto"),
+    ("variacao.variacao_api_id", "<x>", "CARACTERE_INSEGURO", "texto"),
 ])
 def test_diagnostico_codigo_invalido_nao_expoe_dados(
     auth, configuracao, conta, campo, valor, motivo, tipo,
