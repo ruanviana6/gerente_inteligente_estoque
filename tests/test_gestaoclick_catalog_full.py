@@ -92,7 +92,6 @@ def test_paginacao_integral_valida_ate_limite(auth, configuracao, conta, total):
 
 
 @pytest.mark.parametrize("metas", [
-    {"total_registros": 246},
     {"pagina_atual": 9},
     {"proxima_url": "https://exemplo.invalid/produtos?loja_id=001&pagina=2&limite=100"},
     {"proxima_url": BASE + "/produtos?loja_id=002&pagina=2&limite=100"},
@@ -111,6 +110,13 @@ def test_metadados_inconsistentes_bloqueiam_todo_lote(auth, configuracao, conta,
             autorizado=True, transporte=transporte,
         )
     assert len(transporte.calls) == 1
+    auth.rpc.assert_not_called()
+
+
+def test_total_mudou_durante_paginacao_bloqueia(auth, configuracao, conta):
+    with pytest.raises(PaginacaoCatalogoInvalida, match="ALTERACAO"):
+        ler(auth, configuracao, conta, pagina_catalogo(1, 245),
+            pagina_catalogo(2, 245, metas={"total_registros": 246}))
     auth.rpc.assert_not_called()
 
 
