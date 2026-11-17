@@ -200,7 +200,6 @@ def test_decimais_numericos_finitos_sao_apenas_exibidos(auth, configuracao, cont
     ("produto.id", "", False, "TEXTO_VAZIO", "texto"),
     ("produto.id", "1" * 31, False, "COMPRIMENTO", "texto"),
     ("produto.id", 0, False, "NAO_POSITIVO", "inteiro"),
-    ("variacao.id", None, True, "CAMPO_AUSENTE", "ausente"),
     ("variacao.id", None, False, "CAMPO_NULO", "nulo"),
     ("variacao.id", "VARIACAO-SECRET", False, "NAO_NUMERICO", "texto"),
     ("variacao.id", -1, False, "NAO_NUMERICO", "inteiro"),
@@ -243,3 +242,35 @@ def test_id_numerico_textual_ou_inteiro_continua_valido(auth, configuracao, cont
     assert previa.produtos[0].variacoes[0].id == "900"
     assert not previa.imported and not previa.coverage_confirmed
     assert len(transport.calls) == 1
+
+
+
+def test_variacao_sem_id_mantem_previa_sem_atribuir_saldo(auth, configuracao, conta):
+    """Campo ausente não pode virar ID inventado nem saldo associado."""
+    row = produto(variacoes=[
+        {"codigo": "FL-SEM-ID", "estoque": "18.0", "variacao_api_id": "13:45"},
+        {"id": 902, "codigo": "FL-COM-ID", "estoque": "2.5", "variacao_api_id": ""},
+    ])
+    previa, transport = executar(auth, configuracao, conta, resposta([row]))
+    desconhecida, identificada = previa.produtos[0].variacoes
+    assert desconhecida.id is None
+    assert desconhecida.estoque is None
+    assert desconhecida.codigo == "FL-SEM-ID"
+    assert desconhecida.variacao_api_id == "13:45"
+    assert identificada.id == "902"
+    assert str(identificada.estoque) == "2.5"
+    assert previa.imported is False and previa.coverage_confirmed is False
+    assert len(transport.calls) == 1
+    auth.rpc.assert_not_called()
+
+
+def test_multiplas_variacoes_sem_id_nao_sao_unificadas(auth, configuracao, conta):
+    """Sem identidade não deduplicar por código nem assumir mesmo saldo."""
+    row = produto(variacoes=[
+        {"codigo": "FL-A", "estoque": "1"},
+        {"codigo": "FL-B", "estoque": "3"},
+    ])
+    previa, _ = executar(auth, configuracao, conta, resposta([row]))
+    assert len(previa.produtos[0].variacoes) == 2
+    assert all(v.id is None and v.estoque is None for v in previa.produtos[0].variacoes)
+    auth.rpc.assert_not_called()
