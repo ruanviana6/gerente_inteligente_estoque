@@ -97,6 +97,66 @@ def test_paginacao_integral_valida_ate_limite(auth, configuracao, conta, total):
     auth.rpc.assert_not_called()
 
 
+@pytest.mark.parametrize("cursor", [2, "2"])
+def test_cursor_numero_ou_texto_aceito_sem_perda_de_paginas(
+    auth, configuracao, conta, cursor,
+):
+    """Aceita somente o próximo índice exato, nunca uma página presumida."""
+    catalogo, transporte = ler(
+        auth, configuracao, conta,
+        pagina_catalogo(1, 245, metas={"proxima_pagina": cursor}),
+        pagina_catalogo(2, 245, metas={"proxima_pagina": 3}),
+        pagina_catalogo(3, 245),
+    )
+    assert catalogo.total_informado == 245
+    assert len(catalogo.produtos) == 245
+    assert len(transporte.calls) == 3
+    auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("cursor,reason", [
+    (True, "CURSOR_TIPO"),
+    (2.0, "CURSOR_TIPO"),
+    (None, "CURSOR_TIPO"),
+    ({}, "CURSOR_TIPO"),
+    ("02", "CURSOR_PAGINA"),
+    (0, "CURSOR_PAGINA"),
+    (3, "CURSOR_PAGINA"),
+])
+def test_cursor_invalido_bloqueia_com_diagnostico_seguro(
+    auth, configuracao, conta, cursor, reason,
+):
+    with pytest.raises(PaginacaoCatalogoInvalida) as exc:
+        ler(auth, configuracao, conta,
+            pagina_catalogo(1, 245, metas={"proxima_pagina": cursor}))
+    assert exc.value.diagnostico == {"motivo": reason}
+    auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("meta,reason", [
+    ({"proxima_url": None}, "CURSOR_URL_AUSENTE"),
+    ({"proxima_url": ""}, "CURSOR_URL_AUSENTE"),
+])
+def test_url_sem_continuacao_quando_faltam_paginas_bloqueia(
+    auth, configuracao, conta, meta, reason,
+):
+    with pytest.raises(PaginacaoCatalogoInvalida) as exc:
+        ler(auth, configuracao, conta, pagina_catalogo(1, 245, metas=meta))
+    assert exc.value.diagnostico == {"motivo": reason}
+    auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("cursor", [3, "3", False, ""])
+def test_cursor_extra_na_ultima_pagina_bloqueia(
+    auth, configuracao, conta, cursor,
+):
+    with pytest.raises(PaginacaoCatalogoInvalida) as exc:
+        ler(auth, configuracao, conta,
+            pagina_catalogo(1, 1, metas={"proxima_pagina": cursor}))
+    assert exc.value.diagnostico == {"motivo": "CURSOR_PAGINA"}
+    auth.rpc.assert_not_called()
+
+
 @pytest.mark.parametrize("metas", [
     {"pagina_atual": 9},
     {"proxima_url": "https://exemplo.invalid/produtos?loja_id=001&pagina=2&limite=100"},
