@@ -19,7 +19,11 @@ from integracoes.account_setup import ContaGestaoClick, _configuracao, _validar_
 from integracoes.catalog_preview import ProdutoCatalogo, _projetar
 from integracoes.diagnostico import _stamp
 from integracoes.gestaoclick import (
-    ContratoInvalido, GestaoClickError, TransporteConsulta, TransporteHTTPS, parse_json_seguro,
+    ContratoInvalido,
+    GestaoClickError,
+    TransporteConsulta,
+    TransporteHTTPS,
+    parse_json_seguro,
 )
 from sincronizacao.service import RPCAuth
 from web.errors import AuthorizationError
