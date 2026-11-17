@@ -5,16 +5,22 @@ from unittest.mock import Mock
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-
-from integracoes.catalog_full import (
-    PaginacaoCatalogoInvalida, consultar_catalogo_completo,
-)
-from integracoes.gestaoclick import ContratoInvalido, RespostaGestaoClick
 from test_gestaoclick_account_setup import (
-    ACCESS_TOKEN, BASE, PRIVADO, SECRET_TOKEN, TransporteFicticio, consultar,
+    ACCESS_TOKEN,
+    BASE,
+    PRIVADO,
+    SECRET_TOKEN,
+    TransporteFicticio,
+    consultar,
 )
 from test_gestaoclick_account_setup import auth as auth
 from test_gestaoclick_account_setup import configuracao as configuracao
+
+from integracoes.catalog_full import (
+    PaginacaoCatalogoInvalida,
+    consultar_catalogo_completo,
+)
+from integracoes.gestaoclick import ContratoInvalido, RespostaGestaoClick
 from web.errors import AuthorizationError
 
 
