@@ -188,3 +188,58 @@ def test_decimais_numericos_finitos_sao_apenas_exibidos(auth, configuracao, cont
     assert str(previa.produtos[0].variacoes[0].estoque) == "-0.5"
     assert previa.imported is False and previa.coverage_confirmed is False
     assert len(transport.calls) == 1
+
+
+@pytest.mark.parametrize("campo,valor,remover,motivo,tipo", [
+    ("produto.id", None, True, "CAMPO_AUSENTE", "ausente"),
+    ("produto.id", None, False, "CAMPO_NULO", "nulo"),
+    ("produto.id", True, False, "TIPO_INCOMPATIVEL", "booleano"),
+    ("produto.id", 1.0, False, "TIPO_INCOMPATIVEL", "decimal"),
+    ("produto.id", {"segredo": "NUNCA"}, False, "TIPO_INCOMPATIVEL", "objeto"),
+    ("produto.id", "IDENTIFICADOR-INTERNO", False, "NAO_NUMERICO", "texto"),
+    ("produto.id", "", False, "TEXTO_VAZIO", "texto"),
+    ("produto.id", "1" * 31, False, "COMPRIMENTO", "texto"),
+    ("produto.id", 0, False, "NAO_POSITIVO", "inteiro"),
+    ("variacao.id", None, True, "CAMPO_AUSENTE", "ausente"),
+    ("variacao.id", None, False, "CAMPO_NULO", "nulo"),
+    ("variacao.id", "VARIACAO-SECRET", False, "NAO_NUMERICO", "texto"),
+    ("variacao.id", -1, False, "NAO_NUMERICO", "inteiro"),
+])
+def test_diagnostico_de_id_restrito_nao_expoe_resposta(
+    auth, configuracao, conta, campo, valor, remover, motivo, tipo,
+):
+    """Só localiza produto ou variação e tipo; a resposta bruta é descartada."""
+    from integracoes.catalog_preview import IdentificadorCatalogoInvalido
+
+    doc = produto(id=731, variacoes=[{
+        "id": 900, "codigo": "FL-A", "estoque": "2.0",
+        "variacao_api_id": "", "cliente": PRIVADO, "valor_venda": MARCADOR,
+    }])
+    alvo = doc if campo == "produto.id" else doc["variacoes"][0]
+    if remover:
+        alvo.pop("id")
+    else:
+        alvo["id"] = valor
+    with pytest.raises(IdentificadorCatalogoInvalido) as exc:
+        executar(auth, configuracao, conta, resposta([doc]))
+    diagnostico = exc.value.diagnostico
+    assert diagnostico == {"campo": campo, "tipo": tipo, "motivo": motivo}
+    texto = str(exc.value) + json.dumps(diagnostico)
+    for secreto in (PRIVADO, MARCADOR, ACCESS_TOKEN, SECRET_TOKEN, "IDENTIFICADOR-INTERNO",
+                    "VARIACAO-SECRET", "NUNCA"):
+        assert secreto not in texto
+    assert "731" not in texto and "900" not in texto
+    auth.rpc.assert_not_called()
+
+
+def test_id_numerico_textual_ou_inteiro_continua_valido(auth, configuracao, conta):
+    """O novo diagnóstico não flexibiliza o contrato validado."""
+    previa, transport = executar(auth, configuracao, conta, resposta([
+        produto(id="000731", variacoes=[
+            {"id": 900, "codigo": "FL-A", "estoque": 2.5, "variacao_api_id": ""},
+        ]),
+    ]))
+    assert previa.produtos[0].id == "000731"
+    assert previa.produtos[0].variacoes[0].id == "900"
+    assert not previa.imported and not previa.coverage_confirmed
+    assert len(transport.calls) == 1
