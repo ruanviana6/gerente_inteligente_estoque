@@ -118,3 +118,21 @@ HTTP, tokens ou dados comerciais.
 Testes automatizados usam dados fictícios. A ativação real só pode ser declarada
 depois de configurar o executor, validar o contrato e observar uma execução
 real concluída no banco. A automação fiscal permanece independente e em DEMO.
+
+
+## Escopo operacional: somente vendas de produtos (decisão de 16/11/2026)
+
+A empresa não utiliza o módulo PDV/vendas de balcão na operação atual.
+Por decisão do proprietário, **PDV fica desativado** na prévia, no leitor de
+sincronização e no agendador. O sistema continua enviando o filtro explícito
+`tipo=produto` nas amostras. Uma tentativa de configurar `tipo=vendas_balcao`
+para importar dados é recusada antes de consultar o ERP. Não apagar dados,
+registros históricos ou estruturas legadas de PDV; reativação futura exigiria
+nova decisão e homologação.
+
+**Essa escolha não conclui a integração real.** Mesmo com a prévia de vendas de
+produtos funcionando, o sincronizador ainda precisa de uma correspondência
+comprovada entre produto/variação e SKU, tratamento de devoluções, identidade
+das linhas, datas de atualização e cobertura real da loja. Não criar valores
+fictícios para esses campos, nem ativar a carga histórica ou a automação enquanto
+a reconciliação estiver pendente. Dados reais do ERP permanecem somente leitura.
