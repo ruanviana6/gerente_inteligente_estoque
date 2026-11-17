@@ -39,7 +39,7 @@ class VariacaoCatalogo:
     """ID de linha do estoque na loja, não assumido como ID de item vendido."""
 
     id: str | None
-    codigo: str
+    codigo: str | None
     estoque: Decimal | None
     variacao_api_id: str | None
 
@@ -49,7 +49,7 @@ class ProdutoCatalogo:
     """Amostra do catálogo com campos operacionais mínimos, sem preços ou clientes."""
 
     id: str
-    codigo_interno: str
+    codigo_interno: str | None
     estoque: Decimal | None
     variacoes: tuple[VariacaoCatalogo, ...]
 
@@ -72,6 +72,14 @@ class IdentificadorCatalogoInvalido(ContratoInvalido):
     def __init__(self, campo: str, tipo: str, motivo: str):
         # Os argumentos são códigos fixos da aplicação, nunca valores da API.
         super().__init__("O catálogo retornou um identificador inválido. Nenhum saldo foi importado.")
+        self.diagnostico = {"campo": campo, "tipo": tipo, "motivo": motivo}
+
+
+class CodigoCatalogoInvalido(ContratoInvalido):
+    """Diagnóstico de código sem valores empresariais, tokens ou resposta bruta."""
+
+    def __init__(self, campo: str, tipo: str, motivo: str):
+        super().__init__("O catálogo retornou um código inválido. Nenhum saldo foi importado.")
         self.diagnostico = {"campo": campo, "tipo": tipo, "motivo": motivo}
 
 
@@ -120,18 +128,28 @@ def _id(value: Any, *, campo: str, presente: bool) -> str:
     return raw
 
 
-def _codigo(value: Any, *, opcional: bool = False) -> str | None:
-    """Preserva códigos operacionais sem reproduzir controles ou conteúdo HTML."""
-    if opcional and value is None:
-        return None
+def _codigo(value: Any, *, campo: str, opcional: bool = False) -> str | None:
+    """Lê código de exibição sem inventar SKU nem transformar conteúdo inseguro em texto."""
+    tipo = _tipo_id(value, True)
+    # Código é auxiliar na prévia. Sua ausência não compromete o ID da linha,
+    # mas impede reconciliar código/SKU com vendas ou importar qualquer saldo.
+    if value is None:
+        if opcional:
+            return None
+        raise CodigoCatalogoInvalido(campo, tipo, "CAMPO_NULO")
     if type(value) is int:
         value = str(value)
-    if (not isinstance(value, str) or (not value.strip() and not opcional) or
-            len(value) > 100 or any(
-                unicodedata.category(ch).startswith("C") or ch in "<>" for ch in value
-            )):
-        raise ContratoInvalido("O catálogo retornou um código inválido.")
-    return value.strip() or None
+    if not isinstance(value, str):
+        raise CodigoCatalogoInvalido(campo, tipo, "TIPO_INCOMPATIVEL")
+    if not value.strip():
+        if opcional:
+            return None
+        raise CodigoCatalogoInvalido(campo, tipo, "TEXTO_VAZIO")
+    if len(value) > 100:
+        raise CodigoCatalogoInvalido(campo, tipo, "COMPRIMENTO")
+    if any(unicodedata.category(ch).startswith("C") or ch in "<>" for ch in value):
+        raise CodigoCatalogoInvalido(campo, tipo, "CARACTERE_INSEGURO")
+    return value.strip()
 
 
 def _estoque(value: Any) -> Decimal | None:
@@ -206,16 +224,18 @@ def _projetar(body: dict) -> tuple[tuple[ProdutoCatalogo, ...], int, int | None]
                 if vid in ids:
                     raise ContratoInvalido("A prévia contém variação repetida no produto.")
                 ids.add(vid)
-            codigo = _codigo(variation.get("codigo"))
+            codigo = _codigo(variation.get("codigo"), campo="variacao.codigo", opcional=True)
             estoque = _estoque(variation.get("estoque"))
             parsed.append(VariacaoCatalogo(
                 id=vid, codigo=codigo,
                 estoque=estoque if vid is not None else None,
-                variacao_api_id=_codigo(variation.get("variacao_api_id"), opcional=True),
+                variacao_api_id=_codigo(variation.get("variacao_api_id"),
+                                          campo="variacao.variacao_api_id", opcional=True),
             ))
         if len(products) < MAX_PRODUTOS_EXIBIDOS:
             products.append(ProdutoCatalogo(
-                id=id_prod, codigo_interno=_codigo(row.get("codigo_interno")),
+                id=id_prod, codigo_interno=_codigo(row.get("codigo_interno"),
+                                                  campo="produto.codigo_interno", opcional=True),
                 estoque=_estoque(row.get("estoque")), variacoes=tuple(parsed),
             ))
     return tuple(products), len(rows), total
