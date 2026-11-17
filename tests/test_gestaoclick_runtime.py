@@ -272,3 +272,41 @@ def test_json_de_contrato_ambiguo_ou_unicode_invalido_nao_vaza_nem_faz_fallback(
     assert "conteudo-protegido" not in str(error.value)
     assert "token-ficticio" not in str(error.value)
     assert transport.calls == []
+
+
+@pytest.mark.parametrize("contract", ["openapi", "read_contract"])
+def test_runtime_rejeita_pdv_mesmo_se_configurado_nos_secrets(contract):
+    """Agendamento e prévia manual não podem habilitar balcão por filtros secretos."""
+    values = secrets(contract=contract)
+    if contract == "openapi":
+        spec = json.loads(values["GESTAOCLICK_OPENAPI_JSON"])
+        spec["paths"]["/vendas"]["get"]["parameters"].append({"in": "query", "name": "tipo"})
+        values["GESTAOCLICK_OPENAPI_JSON"] = json.dumps(spec)
+    else:
+        spec = json.loads(values["GESTAOCLICK_READ_CONTRACT_JSON"])
+        spec["resources"]["vendas"]["filters"].append("tipo")
+        values["GESTAOCLICK_READ_CONTRACT_JSON"] = json.dumps(spec)
+    values["GESTAOCLICK_FIXED_FILTERS_JSON"] = '{"tipo":"vendas_balcao"}'
+    transport = TransporteFicticio([document()])
+    with pytest.raises(ContratoInvalido, match="desativado"):
+        build_reader(values, transport)
+    assert transport.calls == []
+
+
+@pytest.mark.parametrize("contract", ["openapi", "read_contract"])
+def test_runtime_preserva_tipo_produto_quando_explicitamente_configurado(contract):
+    """Filtro de produtos não é confundido com PDV desabilitado."""
+    values = secrets(contract=contract)
+    if contract == "openapi":
+        spec = json.loads(values["GESTAOCLICK_OPENAPI_JSON"])
+        spec["paths"]["/vendas"]["get"]["parameters"].append({"in": "query", "name": "tipo"})
+        values["GESTAOCLICK_OPENAPI_JSON"] = json.dumps(spec)
+    else:
+        spec = json.loads(values["GESTAOCLICK_READ_CONTRACT_JSON"])
+        spec["resources"]["vendas"]["filters"].append("tipo")
+        values["GESTAOCLICK_READ_CONTRACT_JSON"] = json.dumps(spec)
+    values["GESTAOCLICK_FIXED_FILTERS_JSON"] = '{"tipo":"produto"}'
+    transport = TransporteFicticio([document()])
+    reader = build_reader(values, transport)
+    assert reader.read("2020-01-01", "2020-01-31")
+    assert "tipo=produto" in transport.calls[0]
