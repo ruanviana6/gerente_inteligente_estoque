@@ -38,7 +38,7 @@ MAX_VARIACOES_RECEBIDAS = 100
 class VariacaoCatalogo:
     """ID de linha do estoque na loja, não assumido como ID de item vendido."""
 
-    id: str
+    id: str | None
     codigo: str
     estoque: Decimal | None
     variacao_api_id: str | None
@@ -197,13 +197,20 @@ def _projetar(body: dict) -> tuple[tuple[ProdutoCatalogo, ...], int, int | None]
         for variation in variations:
             if not isinstance(variation, dict):
                 raise ContratoInvalido("A prévia contém uma variação inválida.")
-            vid = _id(variation.get("id"), campo="variacao.id", presente="id" in variation)
-            if vid in ids:
-                raise ContratoInvalido("A prévia contém variação repetida no produto.")
-            ids.add(vid)
+            # Um retorno sem ID contraria o contrato documentado do ERP.
+            # A prévia pode continuar, mas não atribui saldo a uma linha sem identidade.
+            # ID nulo ou inválido continua sendo um erro e nunca gera um ID sintético.
+            vid = (_id(variation["id"], campo="variacao.id", presente=True)
+                   if "id" in variation else None)
+            if vid is not None:
+                if vid in ids:
+                    raise ContratoInvalido("A prévia contém variação repetida no produto.")
+                ids.add(vid)
+            codigo = _codigo(variation.get("codigo"))
+            estoque = _estoque(variation.get("estoque"))
             parsed.append(VariacaoCatalogo(
-                id=vid, codigo=_codigo(variation.get("codigo")),
-                estoque=_estoque(variation.get("estoque")),
+                id=vid, codigo=codigo,
+                estoque=estoque if vid is not None else None,
                 variacao_api_id=_codigo(variation.get("variacao_api_id"), opcional=True),
             ))
         if len(products) < MAX_PRODUTOS_EXIBIDOS:
