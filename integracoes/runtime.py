@@ -83,6 +83,8 @@ class GestaoClickReader:
             first, last = validar_periodo(start, end)
         except ValueError as erro:
             raise ContratoInvalido(str(erro)) from None
+        if self._fixed_filters.get("tipo") == "vendas_balcao":
+            raise ContratoInvalido("PDV/vendas de balcão está desativado para a sincronização da empresa.")
         filters = {**self._fixed_filters,
                    self._period_filters["start"]: first.isoformat(),
                    self._period_filters["end"]: last.isoformat()}
@@ -154,6 +156,8 @@ def build_reader(
             set(period.values()) & _FORBIDDEN_FILTERS):
         raise ContratoInvalido("Filtros temporais não confirmados no GET do contrato.")
     fixed = _json(values, "GESTAOCLICK_FIXED_FILTERS_JSON", optional=True)
+    if fixed.get("tipo") == "vendas_balcao":
+        raise ContratoInvalido("PDV/vendas de balcão está desativado para a sincronização da empresa.")
     if (set(fixed) - endpoint_filters or set(fixed) & (_FORBIDDEN_FILTERS | set(period.values())) or
             any(not isinstance(value, str) or not value or len(value) > 512 or
                 any(ord(char) < 32 for char in value) for value in fixed.values())):

@@ -152,3 +152,13 @@ com base no maior número documentado.
 O conector permanece somente leitura, e a automação fiscal permanece separada.
 O limite de 732 dias é uma capacidade do Gerente, não uma declaração de que
 esse histórico já foi recebido ou validado.
+
+
+## Decisão operacional posterior: PDV desativado
+
+A partir de 16/11/2026, o proprietário determinou que este Gerente usará
+**somente vendas de produtos**. A explicação histórica acima compara a API de
+PDV, mas **não autoriza novas consultas de balcão** na aplicação. A prévia
+e a sincronização recusam explicitamente `vendas_balcao`. A consulta
+de produtos já foi observada com retorno real na tela; ela não significa
+que vendas, saldos e histórico estejam consolidados no banco.

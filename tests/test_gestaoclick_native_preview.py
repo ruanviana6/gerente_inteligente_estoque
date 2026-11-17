@@ -82,9 +82,9 @@ def executar(auth, configuracao, conta, response=None, *, depois=None, **kwargs)
     return result, transport
 
 
-@pytest.mark.parametrize("tipo", ["produto", "vendas_balcao"])
+@pytest.mark.parametrize("tipo", ["produto"])
 def test_get_unico_sem_json_maps_rpc_ou_promessa_de_importacao(auth, configuracao, conta, tipo):
-    """Cada universo explícito usa uma consulta fixa e permanece uma amostra."""
+    """Somente vendas de produtos usa um GET fixo e permanece uma amostra."""
     preview, transport = executar(auth, configuracao, conta, tipo=tipo)
     assert len(transport.calls) == 1
     url, headers, timeout = transport.calls[0]
@@ -431,6 +431,7 @@ def test_rotacao_exige_nova_conferencia_e_nao_expoe_chaves_no_snapshot(auth, con
     ("2025-01-01", FIM, "produto"),
     (INICIO, None, "produto"),
     (INICIO, FIM, "servico"),
+    (INICIO, FIM, "vendas_balcao"),
     (INICIO, FIM, "produto&loja_id=outra"),
     (INICIO, FIM, ""),
 ])
@@ -612,7 +613,7 @@ def test_metadado_ausente_exibe_codigo_sem_reproduzir_payload(auth, configuracao
     assert all(tipo == "ausente" for tipo in falha.value.diagnostico["campos"].values())
 
 
-@pytest.mark.parametrize("tipo", ["produto", "vendas_balcao"])
+@pytest.mark.parametrize("tipo", ["produto"])
 def test_cursor_inteiro_canonico_aceito_na_primeira_pagina(auth, configuracao, conta, tipo):
     """Página 2 inteira e texto '2' têm a mesma semântica, sem continuar o GET."""
     rows = [documento(f"venda-{i}") for i in range(5)]
@@ -662,3 +663,17 @@ def test_sem_contador_documentado_nao_aceita_amostra(auth, configuracao, conta):
     with pytest.raises(PaginacaoAmostraInvalida) as falha:
         executar(auth, configuracao, conta, RespostaGestaoClick(200, json.dumps(corpo).encode()))
     assert falha.value.diagnostico["motivo_contagem"] == "CONTADOR_AUSENTE"
+
+
+def test_pdv_desativado_sem_abrir_secrets_ou_consultar_erp(auth, conta):
+    """Uma chamada direta não pode reativar o PDV pela interface ou pelo código."""
+    loader = Mock()
+    transporte = TransporteFicticio()
+    with pytest.raises(ContratoInvalido, match="desativada"):
+        consultar_previa_vendas(
+            auth, loader, conta, "001", INICIO, FIM,
+            tipo="vendas_balcao", autorizado=True, transporte=transporte,
+        )
+    loader.assert_not_called()
+    assert transporte.calls == []
+    auth.rpc.assert_not_called()

@@ -192,14 +192,14 @@ def test_amostra_nao_reaparece_nem_consulta_novamente_no_rerun(previa_ficticia):
     assert not e.auth.calls
 
 
-def test_tipo_pdv_e_escopo_da_loja_sao_explicitos(previa_ficticia):
-    """A seleção de balcão é enviada de modo separado, sem combinar universos de vendas."""
+def test_pdv_oculto_e_escopo_somente_produtos(previa_ficticia):
+    """A interface não oferece PDV, e a consulta enviada permanece só de produtos."""
     e = previa_ficticia
     selecionar_loja(e)
-    next(item for item in e.app.selectbox if item.label == "Tipo de venda da amostra").select("vendas_balcao")
+    assert not any(item.label == "Tipo de venda da amostra" for item in e.app.selectbox)
     consultar_amostra(e)
-    assert parse_qs(urlsplit(e.gets[-1]).query)["tipo"] == ["vendas_balcao"]
-    assert "PDV / vendas de balcão" in texto_interface(e.app)
+    assert parse_qs(urlsplit(e.gets[-1]).query)["tipo"] == ["produto"]
+    assert "PDV / vendas de balcão desativado" in texto_interface(e.app)
     assert len(e.gets) == 3 and not e.auth.calls
 
 

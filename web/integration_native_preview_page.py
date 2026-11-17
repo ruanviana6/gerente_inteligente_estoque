@@ -12,7 +12,7 @@ from integracoes.gestaoclick import GestaoClickError
 from integracoes.native_preview import PaginacaoAmostraInvalida, consultar_previa_vendas
 from web.errors import AuthenticationError, AuthorizationError
 
-_TIPOS = {"produto": "Produtos", "vendas_balcao": "PDV / vendas de balcão"}
+_TIPOS = {"produto": "Produtos"}  # Escopo operacional habilitado.
 
 
 def native_preview_controls(servico, carregar_configuracao, conta, loja_id: str) -> None:
@@ -31,8 +31,8 @@ def native_preview_controls(servico, carregar_configuracao, conta, loja_id: str)
                              max_value=hoje, key="gestaoclick_native_preview_dates")
         st.caption("A amostra aceita até 31 dias, incluindo início e fim. "
                    "O limite de 732 dias da sincronização permanece separado.")
-        tipo = st.selectbox("Tipo de venda da amostra", list(_TIPOS),
-                            format_func=_TIPOS.get, key="gestaoclick_native_preview_type")
+        st.caption("Escopo ativo: vendas de produtos. PDV / vendas de balcão desativado para esta operação.")
+        tipo = "produto"
         autorizado = st.checkbox("Autorizo consultar uma amostra real de vendas desta loja",
                                  key="gestaoclick_native_preview_consent")
         consultar = st.form_submit_button("Conferir amostra de vendas")

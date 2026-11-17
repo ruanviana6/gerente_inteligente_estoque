@@ -37,12 +37,12 @@ from integracoes.gestaoclick import (
 from sincronizacao.service import RPCAuth
 from web.errors import AuthorizationError
 
-VERSAO_CONTRATO = "gestaoclick-vendas-previa-20261116.4"
+VERSAO_CONTRATO = "gestaoclick-vendas-previa-produtos-20261116.5"
 MAX_DOCUMENTOS_EXIBIDOS = 5
 MAX_DOCUMENTOS_RECEBIDOS = 100
 MAX_ITENS_RECEBIDOS = 100
 MAX_DIAS_PREVIA = 31
-_TIPOS = frozenset({"produto", "vendas_balcao"})
+_TIPOS = frozenset({"produto"})  # PDV não é usado na operação atual da empresa.
 
 
 def _normalizar_cursor_numerico(meta: Any) -> Any:
@@ -304,7 +304,7 @@ def consultar_previa_vendas(
         if not isinstance(store_id, str) or store_id not in {row["id"] for row in conta.lojas}:
             raise AuthorizationError("Selecione uma loja da conferência autorizada da conta.")
         if not isinstance(tipo, str) or tipo not in _TIPOS:
-            raise ContratoInvalido("Escolha vendas de produtos ou vendas de balcão para a amostra.")
+            raise ContratoInvalido("A prévia de PDV/vendas de balcão está desativada. Consulte somente vendas de produtos.")
         if (type(inicio) is not date or type(fim) is not date or
                 inicio > fim or (fim - inicio).days >= MAX_DIAS_PREVIA or fim > _hoje()):
             raise ContratoInvalido("Escolha até 31 dias inclusivos, sem datas futuras, para a amostra.")
