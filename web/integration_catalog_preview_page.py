@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 
 from integracoes.account_setup import validar_conta
-from integracoes.catalog_preview import consultar_previa_catalogo
+from integracoes.catalog_preview import IdentificadorCatalogoInvalido, consultar_previa_catalogo
 from integracoes.gestaoclick import GestaoClickError
 from web.errors import AuthenticationError, AuthorizationError
 
@@ -32,6 +32,10 @@ def catalog_preview_controls(servico, carregar_configuracao, conta, loja_id: str
         raise
     except GestaoClickError as erro:
         st.warning(str(erro))
+        if isinstance(erro, IdentificadorCatalogoInvalido):
+            st.caption("Diagnóstico do identificador: somente campo, tipo e motivo; "
+                       "nenhum valor da conta é exibido.")
+            st.json(erro.diagnostico, expanded=False)
         return
 
     st.success("Catálogo consultado. Nenhum saldo foi importado ou modificado.")
