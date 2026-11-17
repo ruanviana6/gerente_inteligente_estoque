@@ -14,6 +14,7 @@ from integracoes.account_setup import (
 )
 from integracoes.gestaoclick import GestaoClickError
 from web.errors import AuthenticationError, AuthorizationError
+from web.integration_catalog_full_page import catalog_full_controls
 from web.integration_catalog_preview_page import catalog_preview_controls
 from web.integration_native_preview_page import native_preview_controls
 
@@ -89,6 +90,7 @@ def account_setup_controls(servico, carregar_configuracao):
         if loja_id is not None:
             native_preview_controls(servico, carregar_configuracao, conta, loja_id)
             catalog_preview_controls(servico, carregar_configuracao, conta, loja_id)
+            catalog_full_controls(servico, carregar_configuracao, conta, loja_id)
 
         if st.button("Registrar fonte analítica desta loja", disabled=loja_id is None,
                      key="gestaoclick_setup_register"):

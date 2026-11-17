@@ -218,6 +218,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/sql/security.sql 2>&1 | tee evidencias-banco.txt
           psql -v ON_ERROR_STOP=1 -f tests/sql/snapshot_history.sql 2>&1 | tee -a evidencias-banco.txt
           psql -v ON_ERROR_STOP=1 -f tests/sql/sync.sql 2>&1 | tee -a evidencias-banco.txt
+          psql -v ON_ERROR_STOP=1 -f tests/sql/catalog_stock.sql 2>&1 | tee -a evidencias-banco.txt
           psql -v ON_ERROR_STOP=1 -f tests/sql/sync_auto.sql 2>&1 | tee -a evidencias-banco.txt
           psql -v ON_ERROR_STOP=1 -f tests/sql/central_acessos.sql 2>&1 | tee -a evidencias-banco.txt
           psql -v ON_ERROR_STOP=1 -f tests/sql/reposicao.sql 2>&1 | tee -a evidencias-banco.txt
@@ -233,6 +234,7 @@ jobs:
           PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/security.sql
           PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/snapshot_history.sql
           PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/sync.sql
+          PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/catalog_stock.sql
           PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/sync_auto.sql
           PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/central_acessos.sql
           PGDATABASE=estoque_restaurado psql -v ON_ERROR_STOP=1 -f tests/sql/reposicao.sql
