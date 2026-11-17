@@ -8,6 +8,7 @@ reconciliação antes de qualquer importação ou cálculo comercial.
 from __future__ import annotations
 
 import hmac
+import math
 import re
 import unicodedata
 from collections.abc import Callable, Mapping
@@ -97,6 +98,10 @@ def _estoque(value: Any) -> Decimal | None:
     if value is None:
         return None
     if type(value) is int:
+        raw = str(value)
+    elif type(value) is float and math.isfinite(value):
+        # A prévia pode receber números decimais no JSON. Apenas representa:
+        # nunca arredonda e jamais persiste esse valor como saldo validado.
         raw = str(value)
     elif isinstance(value, str):
         raw = value
