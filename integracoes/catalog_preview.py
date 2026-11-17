@@ -66,16 +66,57 @@ class PreviaCatalogo:
     coverage_confirmed: bool = field(default=False, init=False)
 
 
-def _id(value: Any) -> str:
-    """Aceita IDs numéricos do catálogo sem coerções de booleanos ou frações."""
+class IdentificadorCatalogoInvalido(ContratoInvalido):
+    """Diagnóstico tipado sem transmitir identificadores nem conteúdo do ERP."""
+
+    def __init__(self, campo: str, tipo: str, motivo: str):
+        # Os argumentos são códigos fixos da aplicação, nunca valores da API.
+        super().__init__("O catálogo retornou um identificador inválido. Nenhum saldo foi importado.")
+        self.diagnostico = {"campo": campo, "tipo": tipo, "motivo": motivo}
+
+
+def _tipo_id(value: Any, presente: bool) -> str:
+    """Classifica somente a espécie do campo, sem incluir o valor recebido."""
+    if not presente:
+        return "ausente"
+    if value is None:
+        return "nulo"
+    if type(value) is bool:
+        return "booleano"
+    if type(value) is int:
+        return "inteiro"
+    if isinstance(value, str):
+        return "texto"
+    if type(value) is float:
+        return "decimal"
+    if isinstance(value, Mapping):
+        return "objeto"
+    if isinstance(value, list):
+        return "lista"
+    return "outro"
+
+
+def _id(value: Any, *, campo: str, presente: bool) -> str:
+    """Confere IDs sem aceitar suposições sobre a estrutura da conta real."""
+    tipo = _tipo_id(value, presente)
+    if tipo == "ausente":
+        raise IdentificadorCatalogoInvalido(campo, tipo, "CAMPO_AUSENTE")
+    if tipo == "nulo":
+        raise IdentificadorCatalogoInvalido(campo, tipo, "CAMPO_NULO")
     if type(value) is int:
         raw = str(value)
     elif isinstance(value, str):
         raw = value
     else:
-        raise ContratoInvalido("O catálogo retornou um identificador inválido.")
-    if not re.fullmatch(r"[0-9]{1,30}", raw) or int(raw) <= 0:
-        raise ContratoInvalido("O catálogo retornou um identificador inválido.")
+        raise IdentificadorCatalogoInvalido(campo, tipo, "TIPO_INCOMPATIVEL")
+    if not raw:
+        raise IdentificadorCatalogoInvalido(campo, tipo, "TEXTO_VAZIO")
+    if len(raw) > 30:
+        raise IdentificadorCatalogoInvalido(campo, tipo, "COMPRIMENTO")
+    if not re.fullmatch(r"[0-9]+", raw):
+        raise IdentificadorCatalogoInvalido(campo, tipo, "NAO_NUMERICO")
+    if int(raw) <= 0:
+        raise IdentificadorCatalogoInvalido(campo, tipo, "NAO_POSITIVO")
     return raw
 
 
@@ -141,7 +182,7 @@ def _projetar(body: dict) -> tuple[tuple[ProdutoCatalogo, ...], int, int | None]
     for row in rows:
         if not isinstance(row, dict):
             raise ContratoInvalido("A prévia do catálogo contém um produto inválido.")
-        id_prod = _id(row.get("id"))
+        id_prod = _id(row.get("id"), campo="produto.id", presente="id" in row)
         if id_prod in seen:
             raise ContratoInvalido("A prévia do catálogo contém produto repetido.")
         seen.add(id_prod)
@@ -156,7 +197,7 @@ def _projetar(body: dict) -> tuple[tuple[ProdutoCatalogo, ...], int, int | None]
         for variation in variations:
             if not isinstance(variation, dict):
                 raise ContratoInvalido("A prévia contém uma variação inválida.")
-            vid = _id(variation.get("id"))
+            vid = _id(variation.get("id"), campo="variacao.id", presente="id" in variation)
             if vid in ids:
                 raise ContratoInvalido("A prévia contém variação repetida no produto.")
             ids.add(vid)
