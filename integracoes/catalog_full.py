@@ -40,6 +40,8 @@ class PaginacaoCatalogoInvalida(ContratoInvalido):
         permitidos = {
             "META", "CONTAGEM", "PAGINA", "LIMITE", "CURSOR",
             "URL", "ALTERACAO", "DUPLICIDADE", "EXCESSO",
+            "CURSOR_TIPO", "CURSOR_PAGINA", "CURSOR_URL_AUSENTE",
+            "CURSOR_URL_INDEVIDA",
         }
         codigo = motivo if motivo in permitidos else "META"
         super().__init__(f"O catálogo completo não pôde ser reconciliado ({codigo}). "
@@ -101,12 +103,27 @@ def _conferir_meta(meta: Any, *, pagina: int, recebidos: int) -> tuple[int, int,
         esperados = {paginas} if total else {0, 1}
         if type(meta["total_paginas"]) is not int or meta["total_paginas"] not in esperados:
             raise PaginacaoCatalogoInvalida("META")
-    proxima = str(pagina + 1) if pagina < paginas else None
-    if "proxima_pagina" in meta and meta["proxima_pagina"] != proxima:
-        raise PaginacaoCatalogoInvalida("CURSOR")
-    if (pagina < paginas and not isinstance(meta["proxima_url"], str) or
-            pagina >= paginas and meta["proxima_url"] is not None):
-        raise PaginacaoCatalogoInvalida("CURSOR")
+    # O ERP pode serializar o número de continuação como inteiro ou texto.
+    # Aceitar ambos não implica confiar na página: o valor precisa ser exato.
+    if "proxima_pagina" in meta:
+        cursor = meta["proxima_pagina"]
+        if pagina < paginas:
+            esperado = pagina + 1
+            if type(cursor) is int:
+                coincide = cursor == esperado
+            elif isinstance(cursor, str):
+                coincide = cursor == str(esperado)
+            else:
+                raise PaginacaoCatalogoInvalida("CURSOR_TIPO")
+            if not coincide:
+                raise PaginacaoCatalogoInvalida("CURSOR_PAGINA")
+        elif cursor is not None:
+            raise PaginacaoCatalogoInvalida("CURSOR_PAGINA")
+    if pagina < paginas:
+        if not isinstance(meta["proxima_url"], str) or not meta["proxima_url"]:
+            raise PaginacaoCatalogoInvalida("CURSOR_URL_AUSENTE")
+    elif meta["proxima_url"] is not None:
+        raise PaginacaoCatalogoInvalida("CURSOR_URL_INDEVIDA")
     return total, limite, paginas
 
 
