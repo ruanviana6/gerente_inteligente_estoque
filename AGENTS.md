@@ -1,3 +1,18 @@
+## Diretriz atual: somente vendas de produtos e prévia segura de catálogo
+
+O usuário desativou PDV/vendas de balcão na operação atual. A prévia de vendas
+e o conector de sincronização recusam `tipo=vendas_balcao`; não reintroduzir
+essa modalidade por UI ou Secrets sem nova decisão e testes.
+
+Para concluir o sistema, o catálogo e saldo por loja também devem vir da API
+de leitura GestãoClick, com correspondência de produtos, variações e unidades.
+A primeira implementação de `GET /produtos` é somente prévia Master, sem
+persistência nem atualização de estoque. O ID da linha de estoque retornada
+em `variacoes[].id` não deve ser confundido automaticamente com ID do item
+de venda. Comparar amostras com ERP e manter os dados desconhecidos antes
+da carga real. Preservar RLS, conta Master, Secrets, histórico e custo zero.
+Nenhuma chamada de escrita no ERP é permitida.
+
 ## Sincronização automática autorizada em 16/11/2026
 
 O proprietário pediu atualização automática independente do navegador e histórico

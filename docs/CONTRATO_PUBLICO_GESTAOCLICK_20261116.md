@@ -162,3 +162,24 @@ PDV, mas **não autoriza novas consultas de balcão** na aplicação. A prévia
 e a sincronização recusam explicitamente `vendas_balcao`. A consulta
 de produtos já foi observada com retorno real na tela; ela não significa
 que vendas, saldos e histórico estejam consolidados no banco.
+
+
+## Prévia de catálogo e estoque por loja (diagnóstico, sem importação)
+
+A aplicação oferece consulta manual Master de **GET /produtos** para a loja
+selecionada, em uma única página de até cinco produtos visíveis. O resultado
+projeta somente ID de produto, código interno, saldo da loja, ID da linha de
+estoque, código da combinação e código de variações. Não expõe nomes de
+clientes, preços ou campos financeiros. O resultado desaparece no rerun e não
+modifica estoque ou indicadores no Supabase e no GestãoClick.
+
+Segundo a [fonte oficial da API](https://central.gestaoclick.com.br/hc/pt-br/articles/1872-api-produtos-o-que-o-sistema-preenche-sozinho-estoque-variacoes-e-bloco-fiscal)
+(atualizada em 15/11/2026), o retorno de estoque depende da loja da consulta
+e as variações representam linhas de estoque específicas dessa loja. **O ID de
+linha da variação do catálogo não está automaticamente comprovado como o ID
+de variação de uma linha de venda.** A relação deve ser testada e reconciliada
+antes de consolidar dados. Também não se confirma abrangência completa por
+uma amostra de cinco produtos.
+
+A consulta é apenas uma ferramenta para conferência do catálogo real.
+A implementação de atualizações de estoque via API continua pendente.
