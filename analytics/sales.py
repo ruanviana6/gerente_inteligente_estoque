@@ -121,8 +121,9 @@ def normalizar_linhas(linhas: Sequence[Mapping[str, Any]]) -> tuple[list[dict], 
 
 
 def _liquida(linha: Mapping[str, Any]) -> float:
-    """Conta venda efetiva líquida; nenhum estado intermediário reduz o estoque."""
-    return linha["quantity"] - linha["returned_quantity"] if linha["status"] == "completed" else 0.0
+    """Conta demanda comercial fechada sem alterar saldo físico do ERP."""
+    return (linha["quantity"] - linha["returned_quantity"]
+            if linha["status"] in {"separating", "completed"} else 0.0)
 
 
 def _pedido(linha: Mapping[str, Any]) -> tuple:
@@ -321,7 +322,7 @@ def analisar_vendas(
     pedidos_anteriores = {_pedido(linha) for linha in anteriores if _liquida(linha) > 0}
     percentual = ((unidades / unidades_anteriores - 1) * 100
                   if comparavel and unidades_anteriores > 0 else None)
-    limitacoes = ["Unidades líquidas de vendas concluídas, sem faturamento, receita ou ticket médio.",
+    limitacoes = ["Unidades líquidas observadas em vendas fechadas (separação ou concretização), sem faturamento ou baixa física.",
                   "Abrangência declarada depende de reconciliação com a origem; HTTP 200 não comprova completude.",
                   "A análise não realiza baixas nem altera o estoque oficial."]
     if not completa:
@@ -472,7 +473,7 @@ def analisar_vendas(
                    "produtos_vendidos": len({linha["product_id"] for linha in vendas}),
                    "linhas_canceladas": sum(linha["status"] == "cancelled" for linha in atuais),
                    "unidades_devolvidas": math.fsum(linha["returned_quantity"] for linha in atuais
-                                                   if linha["status"] in {"completed", "returned"}),
+                                                   if linha["status"] in {"separating", "completed", "returned"}),
                    "linhas_status_desconhecido": desconhecidos, "duplicatas_descartadas": duplicadas},
         "series": _series(atuais, inicio, fim, completa), "produtos": produtos,
         "categorias": _agrupar(atuais, "category"), "fornecedores": _agrupar(atuais, "supplier"),
