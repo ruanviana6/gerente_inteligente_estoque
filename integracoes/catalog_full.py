@@ -146,12 +146,21 @@ def _conferir_proxima_url(
         expected = urlsplit(base + "/produtos")
         if target.fragment or target.username is not None or target.password is not None:
             raise PaginacaoCatalogoInvalida("URL_ORIGEM")
+        # /api e /v1 são aliases oficiais do mesmo endpoint de leitura.
+        # Mesmo quando o ERP usa o outro alias no link, a aplicação mantém
+        # a URL de base previamente autorizada ao construir o GET seguinte.
+        prefixo = expected.path.removesuffix("/produtos")
+        caminhos = {expected.path}
+        if prefixo in {"", "/api", "/v1"}:
+            caminhos.update({"/api/produtos", "/v1/produtos"})
+            if prefixo == "":
+                caminhos.add("/produtos")
         if target.scheme or target.netloc:
             if (target.scheme != expected.scheme or target.netloc != expected.netloc):
                 raise PaginacaoCatalogoInvalida("URL_ORIGEM")
-            if target.path != expected.path:
+            if target.path not in caminhos:
                 raise PaginacaoCatalogoInvalida("URL_CAMINHO")
-        elif target.path not in ("", expected.path, "produtos"):
+        elif target.path not in {"", "produtos", *caminhos}:
             raise PaginacaoCatalogoInvalida("URL_CAMINHO")
         pairs = parse_qsl(
             target.query, keep_blank_values=True, strict_parsing=True, max_num_fields=4,
