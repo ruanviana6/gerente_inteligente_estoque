@@ -62,7 +62,7 @@ def vendas(servico, contexto):
         raise AuthorizationError("O acesso mudou durante a análise.")
     resumo = resultado["resumo"]
     for coluna, titulo, chave in zip(st.columns(3, wrap=True),
-            ("Unidades líquidas", "Pedidos concluídos", "Produtos vendidos"),
+            ("Quantidade fechada", "Pedidos fechados", "Produtos vendidos"),
             ("unidades", "pedidos_concluidos", "produtos_vendidos")):
         with coluna:
             metric_card(titulo, str(resumo[chave]), key="vendas_" + chave)
@@ -86,7 +86,7 @@ def vendas(servico, contexto):
                                 produtos["nome"].str.contains(buscar, case=False, regex=False)]
         st.dataframe(produtos, hide_index=True, width="stretch")
     else:
-        st.info("Não há vendas concluídas para os filtros selecionados.")
+        st.info("Não há vendas fechadas para os filtros selecionados.")
     with st.expander("Categoria, fornecedor e loja"):
         for chave in ("categorias", "fornecedores", "lojas"):
             st.write(chave.capitalize())
