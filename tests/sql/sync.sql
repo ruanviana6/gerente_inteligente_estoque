@@ -59,7 +59,7 @@ select sync_test.check(jsonb_array_length(public.sales_payload(:'source','loja2'
 savepoint teste_demanda_separacao;
 select j->>'id' sep_run,j->>'claim_token' sep_token from public.sync_begin(
  :'source','loja2','74000000-0000-4000-8000-000000000016',
- '2020-01-01','2020-01-31',1,4,repeat('a',64)) j \\gset
+ '2020-01-01','2020-01-31',1,4,repeat('a',64)) j \gset
 select public.sync_stage(:'sep_run',:'sep_token',1,
  sync_test.line(:'source','loja2','separating'));
 select sync_test.check(
