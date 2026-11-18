@@ -18,6 +18,7 @@ from web.integration_catalog_full_page import catalog_full_controls
 from web.integration_catalog_preview_page import catalog_preview_controls
 from web.integration_native_preview_page import native_preview_controls
 from web.integration_sales_audit_page import sales_audit_controls
+from integracoes.fiscal_read_probe import consultar_recurso_nfe
 
 _ACCOUNT_KEY = "_gestaoclick_account_setup"
 _SOURCE_KEY = "_gestaoclick_registered_source"
@@ -91,6 +92,50 @@ def account_setup_controls(servico, carregar_configuracao):
         if loja_id is not None:
             native_preview_controls(servico, carregar_configuracao, conta, loja_id)
             sales_audit_controls(servico, carregar_configuracao, conta, loja_id)
+
+            with st.expander("Verificar leitura de NF-e (sem cadastro e sem emissão)"):
+                st.caption(
+                    "Teste fiscal independente da auditoria de vendas. Executa apenas um GET "
+                    "de até um registro da loja selecionada; descarta dados pessoais e "
+                    "não registra, emite, altera ou cancela notas. Resposta 200 não "
+                    "comprova que a loja efetiva da credencial seja esta."
+                )
+                with st.form("fiscal_probe_readonly"):
+                    consentimento = st.checkbox(
+                        "Autorizo exclusivamente esta consulta de leitura de NF-e, sem gravação",
+                        key="fiscal_probe_consentimento",
+                    )
+                    testar = st.form_submit_button("Testar leitura fiscal")
+                if testar:
+                    if not consentimento:
+                        st.warning("Marque a autorização da consulta de leitura.")
+                    else:
+                        try:
+                            with st.spinner("Testando somente GET de NF-e…"):
+                                diagnostico = consultar_recurso_nfe(
+                                    servico.auth, carregar_configuracao, conta, loja_id,
+                                    autorizado=True,
+                                )
+                        except (AuthenticationError, AuthorizationError):
+                            raise
+                        except GestaoClickError as erro:
+                            st.warning(str(erro))
+                        else:
+                            st.success(
+                                "A leitura do recurso NF-e respondeu na credencial. "
+                                "Nenhuma nota foi cadastrada, emitida, importada ou alterada."
+                            )
+                            st.write({
+                                "Recurso": diagnostico["recurso"],
+                                "Loja solicitada": diagnostico["loja_solicitada"],
+                                "Registros vistos no teste": diagnostico["itens_amostra"],
+                            })
+                            st.warning(
+                                "Teste de leitura, NÃO homologação fiscal: o acesso real à loja "
+                                "de destino, a proteção contra duplicidade e os efeitos de "
+                                "um cadastro ainda precisam de confirmação. Nenhum POST foi liberado."
+                            )
+
             catalog_preview_controls(servico, carregar_configuracao, conta, loja_id)
             catalog_full_controls(servico, carregar_configuracao, conta, loja_id)
 
