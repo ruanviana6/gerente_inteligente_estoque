@@ -31,6 +31,12 @@ insert into public.app_users(user_id,organization_id,display_name,role,active) v
  ('71000000-0000-4000-8000-000000000002','73000000-0000-4000-8000-000000000002','Master2','Master',true),
  ('71000000-0000-4000-8000-000000000003','73000000-0000-4000-8000-000000000001','Operador','Operador',true),
  ('71000000-0000-4000-8000-000000000004','73000000-0000-4000-8000-000000000001','Inativo','Administrador',false);
+select sync_test.check(
+ position('private.sync_preview_core' in pg_get_functiondef('private.sync_preview(uuid,uuid)'::regprocedure))>0,
+ 'preview preserva wrapper autorizado do sincronizador');
+select sync_test.check(
+ position('private.sync_commit_core' in pg_get_functiondef('private.sync_commit(uuid,uuid,boolean)'::regprocedure))>0,
+ 'commit preserva wrapper autorizado do sincronizador');
 set local role authenticated;
 select sync_test.login(1);
 select (public.integration_register_source('teste1','Fonte fictícia',array['loja1','loja2'])->>'id') source \gset
