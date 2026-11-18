@@ -17,6 +17,7 @@ from web.errors import AuthenticationError, AuthorizationError
 from web.integration_catalog_full_page import catalog_full_controls
 from web.integration_catalog_preview_page import catalog_preview_controls
 from web.integration_native_preview_page import native_preview_controls
+from web.integration_sales_audit_page import sales_audit_controls
 
 _ACCOUNT_KEY = "_gestaoclick_account_setup"
 _SOURCE_KEY = "_gestaoclick_registered_source"
@@ -89,6 +90,7 @@ def account_setup_controls(servico, carregar_configuracao):
 
         if loja_id is not None:
             native_preview_controls(servico, carregar_configuracao, conta, loja_id)
+            sales_audit_controls(servico, carregar_configuracao, conta, loja_id)
             catalog_preview_controls(servico, carregar_configuracao, conta, loja_id)
             catalog_full_controls(servico, carregar_configuracao, conta, loja_id)
 
