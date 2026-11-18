@@ -101,15 +101,15 @@ def test_versao_conflitante_sem_ordem_comprovavel_e_recusada(instante):
 
 
 def test_transicao_separating_para_completed_nao_duplica():
-    """O pedido intermediário não representa venda nem uma baixa adicional."""
+    """Separação já é demanda fechada; despachar não duplica nem baixa saldo aqui."""
     antes = linha(status="separating")
     depois = linha(status="completed", source_updated_at="2026-09-11T12:00:00Z")
-    assert analisar([antes])["resumo"]["unidades"] == 0
+    assert analisar([antes])["resumo"]["unidades"] == 2
     assert analisar([antes, depois])["resumo"]["unidades"] == 2
 
 
-@pytest.mark.parametrize("status", ["potential", "separating", "cancelled", "returned", "unknown"])
-def test_estados_nao_concluidos_nao_sao_vendas(status):
+@pytest.mark.parametrize("status", ["potential", "cancelled", "returned", "unknown"])
+def test_estados_nao_fechados_nao_entram_na_demanda(status):
     """Nem pedido potencial nem devolução integral são tratados como compra efetiva."""
     resultado = analisar([linha(status=status)])
     assert resultado["resumo"]["unidades"] == 0
@@ -415,3 +415,19 @@ def test_devolucao_sem_quantidade_confirmada_gera_limitacao():
     assert resultado["resumo"]["unidades"] == 0
     assert resultado["resumo"]["unidades_devolvidas"] == 0
     assert any("devoluções é parcial" in aviso for aviso in resultado["limitacoes"])
+
+
+def test_separacao_e_concretizacao_contam_demanda_fechada_uma_vez_por_documento():
+    """Transição só muda o status da linha canônica; não representa duas vendas."""
+    linhas = [
+        linha(document_id="pedido-separando", line_id="A", status="separating", quantity=3),
+        linha(document_id="pedido-despachado", line_id="B", status="completed", quantity=2),
+        linha(document_id="pedido-aberto", line_id="C", status="potential", quantity=100),
+        linha(document_id="pedido-cancelado", line_id="D", status="cancelled", quantity=100),
+    ]
+    resultado = analisar(linhas)
+    assert resultado["resumo"]["unidades"] == 5
+    assert resultado["resumo"]["pedidos_concluidos"] == 2
+    assert resultado["resumo"]["produtos_vendidos"] == 1
+    assert not any("baixa fisica" in linha.lower() for linha in resultado["limitacoes"]
+                   if "realiza" in linha.lower())
