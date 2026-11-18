@@ -152,11 +152,11 @@ def test_documentos_duplicados_recusados():
 
 
 def test_cestas_status_nao_realizam_baixa():
-    """Somente concretizadas líquidas entram na reconciliação; saldo não existe no contrato."""
+    """Separação e concretização representam demanda fechada, sem baixa física."""
     rows = [line(line_id=str(i), status=status) for i, status in enumerate(
         ['potential', 'separating', 'completed', 'cancelled', 'returned', 'unknown'])]
     result, net = reconcile(rows, SOURCE, 'loja1', '2020-01-01', '2020-01-31')
-    assert net == 4
+    assert net == 8
     assert len(result) == 6
     assert all('stock' not in item for item in result)
 
