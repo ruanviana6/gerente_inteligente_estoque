@@ -181,6 +181,29 @@ def test_continuacoes_equivalentes_mantem_loja_explicita(
     auth.rpc.assert_not_called()
 
 
+@pytest.mark.parametrize("alias", ["/api", "/v1"])
+def test_aliases_oficiais_sem_trocar_endereco_autorizado(
+    auth, configuracao, alias,
+):
+    cfg = dict(configuracao)
+    cfg["GESTAOCLICK_BASE_URL"] = BASE + "/api"
+    conta_alias = consultar(auth, cfg)[0]
+    transporte = TransporteFicticio(
+        pagina_catalogo(1, 101, metas={
+            "proxima_url": BASE + alias + "/produtos?loja_id=001&pagina=2&limite=100",
+        }),
+        pagina_catalogo(2, 101),
+    )
+    catalogo = consultar_catalogo_completo(
+        auth, lambda: cfg, conta_alias, "001",
+        autorizado=True, transporte=transporte,
+    )
+    assert len(catalogo.produtos) == 101
+    assert len(transporte.calls) == 2
+    assert all(url.startswith(BASE + "/api/produtos?") for url, _, _ in transporte.calls)
+    auth.rpc.assert_not_called()
+
+
 @pytest.mark.parametrize("url,motivo", [
     ("https://api.exemplo.invalid/produtos?pagina=2&limite=100&loja_id=001", "URL_ORIGEM"),
     ("http://api.gestaoclick.com/produtos?pagina=2&limite=100&loja_id=001", "URL_ORIGEM"),
