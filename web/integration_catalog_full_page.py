@@ -77,6 +77,13 @@ def catalog_full_controls(servico, carregar_configuracao, conta, loja_id: str) -
             f"{format(catalogo.soma_estoque, 'f') if catalogo.soma_estoque is not None else 'não confirmada'}. "
             "A soma é somente desta loja, segundo o escopo retornado pela API."
         )
+        if catalogo.continuacoes_sem_loja:
+            st.warning(
+                f"{catalogo.continuacoes_sem_loja} URL(s) de continuação não trouxeram "
+                "o filtro da loja. O sistema consultou cada página usando "
+                "a loja selecionada explicitamente, sem seguir essas URLs. "
+                "Confira a loja e a abrangência no ERP antes de salvar a fotografia."
+            )
         pendencias = (
             catalogo.sem_estoque + catalogo.sem_codigo + catalogo.codigos_repetidos
             + catalogo.variacoes_sem_id + catalogo.variacoes_sem_codigo

@@ -42,6 +42,8 @@ class PaginacaoCatalogoInvalida(ContratoInvalido):
             "URL", "ALTERACAO", "DUPLICIDADE", "EXCESSO",
             "CURSOR_TIPO", "CURSOR_PAGINA", "CURSOR_URL_AUSENTE",
             "CURSOR_URL_INDEVIDA",
+            "URL_ORIGEM", "URL_CAMINHO", "URL_PARAMETROS", "URL_LOJA",
+            "URL_PAGINA", "URL_LIMITE",
         }
         codigo = motivo if motivo in permitidos else "META"
         super().__init__(f"O catálogo completo não pôde ser reconciliado ({codigo}). "
@@ -62,6 +64,7 @@ class CatalogoCompleto:
     variacoes_sem_id: int
     variacoes_sem_codigo: int
     checksum: str = field(repr=False)
+    continuacoes_sem_loja: int = 0
 
     def linhas_snapshot(self) -> list[dict]:
         """Representação mínima para cópia analítica, sem preços, cliente ou vendas."""
@@ -129,25 +132,56 @@ def _conferir_meta(meta: Any, *, pagina: int, recebidos: int) -> tuple[int, int,
 
 def _conferir_proxima_url(
     url: Any, *, base: str, loja: str, pagina: int, limite_solicitado: int, limite_efetivo: int,
-) -> int:
-    """Não segue URL retornada pelo ERP; só confere que é a continuação da mesma loja."""
+) -> tuple[int, bool]:
+    """Valida o endereço sem segui-lo; o próximo GET é sempre montado localmente.
+
+    Aceita URL absoluta da mesma origem, caminho relativo exato, ou apenas a
+    query da continuação. A ausência do filtro de loja gera alerta, mas a
+    requisição seguinte mantém sempre loja_id explícito e autorizado.
+    """
     if not isinstance(url, str) or not 0 < len(url) <= 2048 or any(c.isspace() for c in url):
         raise PaginacaoCatalogoInvalida("URL")
     try:
         target = urlsplit(url)
         expected = urlsplit(base + "/produtos")
-        pairs = parse_qsl(target.query, keep_blank_values=True, strict_parsing=True)
+        if target.fragment or target.username is not None or target.password is not None:
+            raise PaginacaoCatalogoInvalida("URL_ORIGEM")
+        # /api e /v1 são aliases oficiais do mesmo endpoint de leitura.
+        # Mesmo quando o ERP usa o outro alias no link, a aplicação mantém
+        # a URL de base previamente autorizada ao construir o GET seguinte.
+        prefixo = expected.path.removesuffix("/produtos")
+        caminhos = {expected.path}
+        if prefixo in {"", "/api", "/v1"}:
+            caminhos.update({"/api/produtos", "/v1/produtos"})
+            if prefixo == "":
+                caminhos.add("/produtos")
+        if target.scheme or target.netloc:
+            if (target.scheme != expected.scheme or target.netloc != expected.netloc):
+                raise PaginacaoCatalogoInvalida("URL_ORIGEM")
+            if target.path not in caminhos:
+                raise PaginacaoCatalogoInvalida("URL_CAMINHO")
+        elif target.path not in {"", "produtos", *caminhos}:
+            raise PaginacaoCatalogoInvalida("URL_CAMINHO")
+        pairs = parse_qsl(
+            target.query, keep_blank_values=True, strict_parsing=True, max_num_fields=4,
+        )
         params = dict(pairs)
+        if (len(params) != len(pairs) or len(params) not in (2, 3)
+                or not {"pagina", "limite"}.issubset(params)
+                or set(params) - {"pagina", "limite", "loja_id", "loja"}
+                or ("loja_id" in params and "loja" in params)):
+            raise PaginacaoCatalogoInvalida("URL_PARAMETROS")
+        loja_vinda = params.get("loja_id", params.get("loja"))
+        if loja_vinda is not None and loja_vinda != loja:
+            raise PaginacaoCatalogoInvalida("URL_LOJA")
+        if params["pagina"] != str(pagina):
+            raise PaginacaoCatalogoInvalida("URL_PAGINA")
         limites = {str(limite_solicitado), str(limite_efetivo)}
-        if (target.scheme != expected.scheme or target.netloc != expected.netloc or
-                target.path != expected.path or target.fragment or
-                len(pairs) != 3 or set(params) != {"loja_id", "pagina", "limite"} or
-                params["loja_id"] != loja or params["pagina"] != str(pagina) or
-                params["limite"] not in limites):
-            raise ValueError("Escopo da próxima página não corresponde à loja.")
-        return int(params["limite"])
+        if params["limite"] not in limites:
+            raise PaginacaoCatalogoInvalida("URL_LIMITE")
+        return int(params["limite"]), loja_vinda is None
     except ValueError:
-        raise PaginacaoCatalogoInvalida("URL") from None
+        raise PaginacaoCatalogoInvalida("URL_PARAMETROS") from None
 
 
 def consultar_catalogo_completo(
@@ -183,6 +217,7 @@ def consultar_catalogo_completo(
         vistos: set[str] = set()
         limite_solicitado = LIMITE_PAGINA
         paginas_consultadas = 0
+        continuacoes_sem_loja = 0
         for pagina in range(1, MAX_PAGINAS_CATALOGO + 1):
             if pagina > 1:
                 time.sleep(config.interval_seconds)
@@ -224,10 +259,12 @@ def consultar_catalogo_completo(
                 break
             if pagina >= MAX_PAGINAS_CATALOGO:
                 raise PaginacaoCatalogoInvalida("EXCESSO")
-            limite_solicitado = _conferir_proxima_url(
+            limite_solicitado, sem_loja = _conferir_proxima_url(
                 payload["meta"]["proxima_url"], base=base, loja=store_id, pagina=pagina + 1,
                 limite_solicitado=limite_solicitado, limite_efetivo=limite,
             )
+            if sem_loja:
+                continuacoes_sem_loja += 1
         revalidar()
         if total_esperado is None or len(produtos) != total_esperado:
             raise PaginacaoCatalogoInvalida("CONTAGEM")
@@ -248,4 +285,5 @@ def consultar_catalogo_completo(
             sum(p.codigo_interno is None for p in produtos), repetidos,
             sum(v.id is None for p in produtos for v in p.variacoes),
             sum(v.codigo is None for p in produtos for v in p.variacoes), checksum,
+            continuacoes_sem_loja,
         )

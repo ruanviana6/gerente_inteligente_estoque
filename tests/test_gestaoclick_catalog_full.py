@@ -157,6 +157,82 @@ def test_cursor_extra_na_ultima_pagina_bloqueia(
     auth.rpc.assert_not_called()
 
 
+@pytest.mark.parametrize("continuacao,sem_loja", [
+    (BASE + "/produtos?pagina=2&limite=100&loja_id=001", False),
+    ("/produtos?pagina=2&limite=100&loja_id=001", False),
+    ("produtos?pagina=2&limite=100&loja_id=001", False),
+    ("?pagina=2&limite=100", True),
+    (BASE + "/produtos?pagina=2&limite=100", True),
+    (BASE + "/produtos?pagina=2&limite=100&loja=001", False),
+])
+def test_continuacoes_equivalentes_mantem_loja_explicita(
+    auth, configuracao, conta, continuacao, sem_loja,
+):
+    catalogo, transporte = ler(
+        auth, configuracao, conta,
+        pagina_catalogo(1, 101, metas={"proxima_url": continuacao}),
+        pagina_catalogo(2, 101),
+    )
+    assert len(catalogo.produtos) == 101
+    assert catalogo.continuacoes_sem_loja == int(sem_loja)
+    # Nunca segue o destino fornecido pela API. Sempre preserva a loja verificada.
+    assert transporte.calls[1][0] == BASE + "/produtos?loja_id=001&pagina=2&limite=100"
+    assert len(transporte.calls) == 2
+    auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("alias", ["/api", "/v1"])
+def test_aliases_oficiais_sem_trocar_endereco_autorizado(
+    auth, configuracao, alias,
+):
+    cfg = dict(configuracao)
+    cfg["GESTAOCLICK_BASE_URL"] = BASE + "/api"
+    conta_alias = consultar(auth, cfg)[0]
+    transporte = TransporteFicticio(
+        pagina_catalogo(1, 101, metas={
+            "proxima_url": BASE + alias + "/produtos?loja_id=001&pagina=2&limite=100",
+        }),
+        pagina_catalogo(2, 101),
+    )
+    catalogo = consultar_catalogo_completo(
+        auth, lambda: cfg, conta_alias, "001",
+        autorizado=True, transporte=transporte,
+    )
+    assert len(catalogo.produtos) == 101
+    assert len(transporte.calls) == 2
+    assert all(url.startswith(BASE + "/api/produtos?") for url, _, _ in transporte.calls)
+    auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("url,motivo", [
+    ("https://api.exemplo.invalid/produtos?pagina=2&limite=100&loja_id=001", "URL_ORIGEM"),
+    ("http://api.gestaoclick.com/produtos?pagina=2&limite=100&loja_id=001", "URL_ORIGEM"),
+    ("//api.exemplo.invalid/produtos?pagina=2&limite=100", "URL_ORIGEM"),
+    ("/v2/produtos?pagina=2&limite=100&loja_id=001", "URL_CAMINHO"),
+    ("../produtos?pagina=2&limite=100", "URL_CAMINHO"),
+    ("?pagina=2&limite=100&loja_id=002", "URL_LOJA"),
+    ("?pagina=3&limite=100&loja_id=001", "URL_PAGINA"),
+    ("?pagina=2&limite=200&loja_id=001", "URL_LIMITE"),
+    ("?pagina=2&limite=100&loja_id=001&extra=1", "URL_PARAMETROS"),
+    ("?pagina=2&pagina=2&limite=100", "URL_PARAMETROS"),
+    ("?pagina=2&limite=100&loja_id=001&loja=001", "URL_PARAMETROS"),
+    ("?pagina=2&limite=100#outro", "URL_ORIGEM"),
+])
+def test_url_invalida_interrompe_sem_seguir_endereco(
+    auth, configuracao, conta, url, motivo,
+):
+    transporte = TransporteFicticio(pagina_catalogo(1, 101, metas={"proxima_url": url}))
+    with pytest.raises(PaginacaoCatalogoInvalida) as exc:
+        consultar_catalogo_completo(
+            auth, lambda: configuracao, conta, "001",
+            autorizado=True, transporte=transporte,
+        )
+    assert exc.value.diagnostico == {"motivo": motivo}
+    assert len(transporte.calls) == 1
+    assert url not in str(exc.value)
+    auth.rpc.assert_not_called()
+
+
 @pytest.mark.parametrize("metas", [
     {"pagina_atual": 9},
     {"proxima_url": "https://exemplo.invalid/produtos?loja_id=001&pagina=2&limite=100"},
