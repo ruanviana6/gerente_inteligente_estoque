@@ -415,3 +415,19 @@ def test_devolucao_sem_quantidade_confirmada_gera_limitacao():
     assert resultado["resumo"]["unidades"] == 0
     assert resultado["resumo"]["unidades_devolvidas"] == 0
     assert any("devoluções é parcial" in aviso for aviso in resultado["limitacoes"])
+
+
+def test_separacao_e_concretizacao_contam_demanda_fechada_uma_vez_por_documento():
+    """Transição só muda o status da linha canônica; não representa duas vendas."""
+    linhas = [
+        linha(document_id="pedido-separando", line_id="A", status="separating", quantity=3),
+        linha(document_id="pedido-despachado", line_id="B", status="completed", quantity=2),
+        linha(document_id="pedido-aberto", line_id="C", status="potential", quantity=100),
+        linha(document_id="pedido-cancelado", line_id="D", status="cancelled", quantity=100),
+    ]
+    resultado = analisar(linhas)
+    assert resultado["resumo"]["unidades"] == 5
+    assert resultado["resumo"]["pedidos_concluidos"] == 2
+    assert resultado["resumo"]["produtos_vendidos"] == 1
+    assert not any("baixa fisica" in linha.lower() for linha in resultado["limitacoes"]
+                   if "realiza" in linha.lower())
