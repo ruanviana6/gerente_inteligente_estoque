@@ -62,7 +62,7 @@ def vendas(servico, contexto):
         raise AuthorizationError("O acesso mudou durante a análise.")
     resumo = resultado["resumo"]
     for coluna, titulo, chave in zip(st.columns(3, wrap=True),
-            ("Unidades fechadas (UN)", "Pedidos fechados", "Produtos vendidos"),
+            ("Quantidade fechada", "Pedidos fechados", "Produtos vendidos"),
             ("unidades", "pedidos_concluidos", "produtos_vendidos")):
         with coluna:
             metric_card(titulo, str(resumo[chave]), key="vendas_" + chave)
