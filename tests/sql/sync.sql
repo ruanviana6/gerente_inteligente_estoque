@@ -55,6 +55,23 @@ select sync_test.check((public.sales_payload(:'source','loja1','2019-12-01','202
 select sync_test.check(public.sales_payload(:'source','loja1','2019-12-01','2020-01-31')->'metadata'->>'coverage_start'='2020-01-01',
  'início da cobertura retorna a ilha confirmada sem inventar dados anteriores');
 select sync_test.check(jsonb_array_length(public.sales_payload(:'source','loja2','2020-01-01','2020-01-31')->'rows')=0,'lojas não são consolidadas');
+-- Pedido em separação é venda fechada, não baixa física. Check transacional isolado.
+savepoint teste_demanda_separacao;
+select j->>'id' sep_run,j->>'claim_token' sep_token from public.sync_begin(
+ :'source','loja2','74000000-0000-4000-8000-000000000016',
+ '2020-01-01','2020-01-31',1,4,repeat('a',64)) j \\gset
+select public.sync_stage(:'sep_run',:'sep_token',1,
+ sync_test.line(:'source','loja2','separating'));
+select sync_test.check(
+ (public.sync_preview(:'sep_run',:'sep_token')->>'net_quantity')::numeric=4,
+ 'em separação entra na reconciliação de demanda fechada');
+select sync_test.check(
+ public.sync_commit(:'sep_run',:'sep_token',true)->>'status'='completed',
+ 'separação pode reconciliar lote sem baixar estoque');
+select sync_test.check(
+ public.sales_payload(:'source','loja2','2020-01-01','2020-01-31')->'rows'->0->>'status'='separating',
+ 'status em separação preservado no histórico canônico');
+rollback to savepoint teste_demanda_separacao;
 select sync_test.denied($q$select * from public.sales_line_versions$q$,'42501','nenhuma leitura bruta das versões');
 select sync_test.denied($q$update public.sales_lines_current set store_id='outra'$q$,'42501','DML direto bloqueado');
 select sync_test.check(jsonb_array_length(public.sync_history(:'source','loja1'))=1,'histórico expõe resultado sem claim token');
