@@ -84,6 +84,15 @@ select catalog_test.check(
 select catalog_test.check(
  jsonb_array_length(public.catalog_stock_history(:'source','loja1'))=1,
  'histórico da loja contém apenas um lote');
+select catalog_test.check(
+ (public.catalog_stock_latest(:'source','loja1')->>'product_count')::int=1,
+ 'RPC de leitura informa todos os produtos da fotografia');
+select catalog_test.check(
+ jsonb_array_length(public.catalog_stock_latest(:'source','loja1')->'products')=1,
+ 'RPC de leitura retorna produto sem expor tabela bruta');
+select catalog_test.check(
+ (public.catalog_stock_latest(:'source','loja2')->>'found')::boolean is false,
+ 'outra loja autorizada sem histórico não inventa saldo');
 select catalog_test.denied($q$select * from public.catalog_stock_rows$q$,
  '42501','linhas brutas inacessíveis via REST');
 select catalog_test.denied($q$delete from public.catalog_stock_batches$q$,
@@ -94,6 +103,9 @@ select catalog_test.denied(format(
 ),'22023','duplicação e contagem inconsistente rejeitadas');
 select catalog_test.login(2);
 select catalog_test.denied(format(
+ 'select public.catalog_stock_latest(%L,%L)',:'source','loja1'
+),'42501','outra organização não lê a última fotografia');
+select catalog_test.denied(format(
  'select public.catalog_stock_history(%L,%L)',:'source','loja1'
 ),'42501','outra organização não lê o histórico');
 select catalog_test.denied(format(
@@ -101,6 +113,9 @@ select catalog_test.denied(format(
  :'source','loja1',catalog_test.rows()::text
 ),'42501','outra organização não escreve o catálogo');
 select catalog_test.login(3);
+select catalog_test.denied(format(
+ 'select public.catalog_stock_latest(%L,%L)',:'source','loja1'
+),'42501','Operador não lê fotografia administrativa');
 select catalog_test.denied(format(
  'select public.catalog_stock_commit(%L,%L,1,11,%L::jsonb,true)',
  :'source','loja1',catalog_test.rows()::text
