@@ -9,7 +9,6 @@ import hmac
 import time
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any
 from urllib.parse import urlencode
 
 from integracoes.account_setup import (
