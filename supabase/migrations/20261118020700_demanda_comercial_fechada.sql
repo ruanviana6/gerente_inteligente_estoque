@@ -1,29 +1,17 @@
 begin;
--- Correção da métrica de DEMANDA COMERCIAL FECHADA:
--- Em separação e Concretizada contam como um único pedido em seu status atual.
--- Não altera estoque, histórico de linhas, permissões ou regras de exclusão.
-create or replace function private.sync_preview(p_run_id uuid,p_claim_token uuid) returns jsonb
-language plpgsql security definer set search_path='' as $$
-declare r public.sync_runs:=private.sync_lock_run(p_run_id,p_claim_token); q numeric;
+-- Alterar SOMENTE os corpos CORE existentes; wrappers Master e ACLs permanecem intactos.
+-- Sem mudanças de IDs, RLS, estoque ou exclusoes.
+CREATE OR REPLACE FUNCTION private.sync_commit_core(p_org uuid, p_actor uuid, p_run_id uuid, p_claim_token uuid, p_coverage_confirmed boolean DEFAULT false)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare r public.sync_runs; row record; old jsonb; v bigint; changed integer:=0; reconciled_rows integer; reconciled_quantity numeric; org uuid:=p_org;
 begin
-  select coalesce(sum(case when payload->>'status' in ('separating','completed')
-    then (payload->>'quantity')::numeric-(payload->>'returned_quantity')::numeric else 0 end),0) into q
-    from public.sync_staging where run_id=r.id;
-  if r.row_count<>r.expected_rows or q<>r.expected_quantity then
-    raise exception 'Reconciliação de quantidade ou registros não confere.' using errcode='22023'; end if;
-  update public.sync_runs set status='previewed',net_quantity=q,lease_until=now()+interval '30 minutes'
-    where id=r.id returning * into r;
-  return private.sync_run_payload(r)||jsonb_build_object('sample',coalesce((select jsonb_agg(payload) from
-    (select payload from public.sync_staging where run_id=r.id order by document_id,line_id limit 10) t),'[]'::jsonb));
-end $$;
-create or replace function private.sync_commit(p_run_id uuid,p_claim_token uuid,p_coverage_confirmed boolean default false) returns jsonb
-language plpgsql security definer set search_path='' as $$
-declare r public.sync_runs; row record; old jsonb; v bigint; changed integer:=0; reconciled_rows integer; reconciled_quantity numeric; org uuid:=private.require_master();
-begin
-  perform private.require_permission('integrations.manage');
   select * into r from public.sync_runs where id=p_run_id and organization_id=org for update;
   if found and r.status='completed' and r.claim_token=p_claim_token then return private.sync_run_payload(r); end if;
-  r:=private.sync_lock_run(p_run_id,p_claim_token);
+  r:=private.sync_lock_run_core(p_org,p_actor,p_run_id,p_claim_token);
   if r.status<>'previewed' then raise exception 'Confira a pré-visualização antes de confirmar.' using errcode='22023'; end if;
   perform pg_advisory_xact_lock(hashtextextended(org::text,13));
   if (select count(*) from public.sales_lines_current where organization_id=org)+r.row_count>100000
@@ -63,7 +51,26 @@ begin
   -- O histórico definitivo permanece nas versões; staging não é histórico operacional.
   delete from public.sync_staging where run_id=r.id;
   insert into public.audit_events(organization_id,author_id,action,target,details)
-    values(org,auth.uid(),'integrations.sync',r.id::text,jsonb_build_object('rows',r.row_count,'changed',changed));
+    values(org,p_actor,'integrations.sync',r.id::text,jsonb_build_object('rows',r.row_count,'changed',changed));
   return private.sync_run_payload(r);
-end $$;
+end $function$;
+
+CREATE OR REPLACE FUNCTION private.sync_preview_core(p_org uuid, p_actor uuid, p_run_id uuid, p_claim_token uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare r public.sync_runs:=private.sync_lock_run_core(p_org,p_actor,p_run_id,p_claim_token); q numeric;
+begin
+  select coalesce(sum(case when payload->>'status' in ('separating','completed')
+    then (payload->>'quantity')::numeric-(payload->>'returned_quantity')::numeric else 0 end),0) into q
+    from public.sync_staging where run_id=r.id;
+  if r.row_count<>r.expected_rows or q<>r.expected_quantity then
+    raise exception 'Reconciliação de quantidade ou registros não confere.' using errcode='22023'; end if;
+  update public.sync_runs set status='previewed',net_quantity=q,lease_until=now()+interval '30 minutes'
+    where id=r.id returning * into r;
+  return private.sync_run_payload(r)||jsonb_build_object('sample',coalesce((select jsonb_agg(payload) from
+    (select payload from public.sync_staging where run_id=r.id order by document_id,line_id limit 10) t),'[]'::jsonb));
+end $function$;
 commit;
