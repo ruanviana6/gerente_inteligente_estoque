@@ -107,10 +107,10 @@ def verificar(browser, base: str, destino: Path, strict: bool):
             # notRunning sinaliza o servidor, mas o navegador ainda pode estar
             # conciliando a árvore React. A asserção com espera verifica a UI
             # efetivamente visível, sem sleeps ou cliques forçados.
-            expect(page.get_by_text("Unidades líquidas", exact=True)).to_be_visible(timeout=30000)
+            expect(page.get_by_text("Quantidade fechada", exact=True)).to_be_visible(timeout=30000)
             expect(page.get_by_test_id("stDataFrame").first).to_be_visible(timeout=30000)
             aguardar_tela(page)
-            expect(page.get_by_text("Unidades líquidas", exact=True)).to_be_visible(timeout=30000)
+            expect(page.get_by_text("Quantidade fechada", exact=True)).to_be_visible(timeout=30000)
             result["telas"][f"vendas-analisadas-{width}"] = verificar_layout(
                 page, f"vendas-analisadas-{width}", destino, strict, False)
             integrar(page)
