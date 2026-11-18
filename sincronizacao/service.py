@@ -97,7 +97,7 @@ def reconcile(rows: Iterable[Mapping], source_id: str, store_id: str, start: str
                 raise ValueError
         except (InvalidOperation, KeyError, ValueError, TypeError):
             raise ValueError('Quantidades inválidas ou devolução não informada.') from None
-        if row['status'] == 'completed':
+        if row['status'] in {'separating', 'completed'}:
             net += quantity - returned
         normalized.append(row)
     return normalized, net

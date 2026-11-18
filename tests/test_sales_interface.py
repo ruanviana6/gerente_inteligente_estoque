@@ -155,7 +155,7 @@ def test_vendas_so_consultam_linhas_apos_acao_explicita(monkeypatch):
     assert [name for name, _, _ in servico.auth.calls].count("sales_payload") == 1
     assert len(app.metric) == 3
     metricas = {metrica.label: metrica.value for metrica in app.metric}
-    assert metricas["Pedidos concluídos"] == "90"
+    assert metricas["Pedidos fechados"] == "90"
     assert metricas["Produtos vendidos"] == "3"
 
 
@@ -194,7 +194,7 @@ def test_sem_linhas_no_periodo_nao_inventa_crescimento(monkeypatch):
     app = abrir_vendas(monkeypatch, servico)
     analisar_pagina(app)
     assert not app.exception
-    assert any("Não há vendas concluídas" in item.value for item in app.info)
+    assert any("Não há vendas fechadas" in item.value for item in app.info)
     assert any("indisponível" in item.value for item in app.caption)
     assert not any("inf%" in item.value for item in app.caption)
 
