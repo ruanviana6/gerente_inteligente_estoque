@@ -127,9 +127,26 @@ def account_setup_controls(servico, carregar_configuracao):
                             )
                             st.write({
                                 "Recurso": diagnostico["recurso"],
+                                "Loja selecionada (cadastro de lojas)": lojas[loja_id],
                                 "Loja solicitada": diagnostico["loja_solicitada"],
                                 "Registros vistos no teste": diagnostico["itens_amostra"],
                             })
+                            if diagnostico["loja_no_registro_confere"] is False:
+                                st.error(
+                                    "A nota consultada declarou uma loja DIFERENTE da solicitada. "
+                                    "O token pode estar vinculado a outra loja; não permitir cadastro "
+                                    "fiscal até corrigir e homologar o escopo."
+                                )
+                            elif diagnostico["loja_no_registro_confere"] is True:
+                                st.info(
+                                    "O registro de exemplo declara a loja solicitada. "
+                                    "Isso não comprova acesso a todas as notas nem a permissão de cadastrar."
+                                )
+                            else:
+                                st.info(
+                                    "A amostra não permitiu confirmar a loja efetivamente usada "
+                                    "pela API. É necessário conferir o token e os registros no ERP."
+                                )
                             st.warning(
                                 "Teste de leitura, NÃO homologação fiscal: o acesso real à loja "
                                 "de destino, a proteção contra duplicidade e os efeitos de "
