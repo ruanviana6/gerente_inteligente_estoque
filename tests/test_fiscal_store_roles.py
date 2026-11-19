@@ -1,6 +1,5 @@
 """Confere papéis fiscais sem alterar o ERP, com lojas fictícias."""
 import pytest
-
 from fiscal.lojas import validar_lojas_fiscais
 from integracoes.gestaoclick import ContratoInvalido
 
