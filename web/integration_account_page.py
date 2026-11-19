@@ -6,6 +6,7 @@ import json
 
 import streamlit as st
 
+from fiscal.lojas import validar_lojas_fiscais
 from integracoes.account_setup import (
     PaginacaoSituacoesInvalida,
     consultar_conta,
@@ -14,7 +15,6 @@ from integracoes.account_setup import (
 )
 from integracoes.fiscal_read_probe import consultar_recurso_nfe
 from integracoes.gestaoclick import GestaoClickError
-from fiscal.lojas import validar_lojas_fiscais
 from web.errors import AuthenticationError, AuthorizationError
 from web.integration_catalog_full_page import catalog_full_controls
 from web.integration_catalog_preview_page import catalog_preview_controls
