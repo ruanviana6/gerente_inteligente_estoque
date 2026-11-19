@@ -113,7 +113,7 @@ def test_produto_repetido_bloqueia():
     with pytest.raises(ContratoInvalido):
         construir_observacao(
             auditoria,
-            replace(resumo, agrupamento=(("101", Decimal("1")), ("101", Decimal("2"))),
+            replace(resumo, agrupamento=(("101", Decimal("1")), ("101", Decimal("2")))),
             SOURCE,
         )
 
