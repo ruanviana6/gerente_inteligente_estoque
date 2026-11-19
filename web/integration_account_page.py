@@ -7,6 +7,7 @@ import json
 import streamlit as st
 
 from fiscal.lojas import validar_lojas_fiscais
+from web.fiscal_origin_lookup_page import fiscal_order_lookup_controls
 from integracoes.account_setup import (
     PaginacaoSituacoesInvalida,
     consultar_conta,
@@ -119,6 +120,9 @@ def account_setup_controls(servico, carregar_configuracao):
                         "permissão de cadastrar, correspondência fiscal nem ausência "
                         "de emissão automática. O cadastro real continua bloqueado."
                     )
+            fiscal_order_lookup_controls(
+                servico, carregar_configuracao, conta, origem, destino,
+            )
 
         loja_id = st.selectbox("Loja para a cópia analítica", list(lojas), index=None,
                                placeholder="Escolha a loja conferida",
