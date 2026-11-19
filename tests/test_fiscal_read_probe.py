@@ -121,3 +121,33 @@ def test_revogacao_e_troca_de_secrets_abortam(auth, configuracao, conta):
         consultar_recurso_nfe(auth, lambda: configuracao, conta, "001",
                               autorizado=True, transporte=transporte)
     assert len(transporte.calls) == 1
+
+
+
+@pytest.mark.parametrize(("loja_registro", "esperado"), [
+    ("001", True),
+    (1, False),  # não confundir loja textual com o inteiro 1
+    ("002", False),
+    (2, False),
+    (None, None),
+    (True, None),
+    ("invalido", None),
+])
+def test_confere_escopo_apenas_quando_nota_explica_loja(
+    auth, configuracao, conta, loja_registro, esperado,
+):
+    linhas = [{"id": "123", "loja_id": loja_registro, "cliente": PRIVADO}]
+    resultado, transporte = rodar(auth, configuracao, conta, resposta(linhas))
+    assert resultado["loja_no_registro_confere"] is esperado
+    assert resultado["loja_efetiva_comprovada"] is False
+    assert resultado["escrita_habilitada"] is False
+    assert len(transporte.calls) == 1
+    assert PRIVADO not in str(resultado)
+    assert "002" not in str(resultado)
+
+
+def test_lista_vazia_nao_prova_loja_efetiva(auth, configuracao, conta):
+    resultado, transporte = rodar(auth, configuracao, conta, resposta([]))
+    assert resultado["loja_no_registro_confere"] is None
+    assert resultado["loja_efetiva_comprovada"] is False
+    assert len(transporte.calls) == 1
