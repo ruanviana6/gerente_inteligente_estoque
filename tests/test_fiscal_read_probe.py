@@ -6,7 +6,11 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 from test_gestaoclick_account_setup import (
-    ACCESS_TOKEN, BASE, PRIVADO, SECRET_TOKEN, TransporteFicticio, consultar,
+    ACCESS_TOKEN,
+    PRIVADO,
+    SECRET_TOKEN,
+    TransporteFicticio,
+    consultar,
 )
 from test_gestaoclick_account_setup import auth as auth
 from test_gestaoclick_account_setup import configuracao as configuracao
@@ -105,11 +109,14 @@ def test_contrato_divergente_nao_expoe_payload(auth, configuracao, conta, retorn
 
 
 def test_revogacao_e_troca_de_secrets_abortam(auth, configuracao, conta):
+    geracao_anterior = auth.generation
     transporte = TransporteFicticio(resposta([]), depois=lambda n: setattr(auth, "generation", auth.generation+1))
     with pytest.raises(AuthorizationError):
         consultar_recurso_nfe(auth, lambda: configuracao, conta, "001",
                               autorizado=True, transporte=transporte)
     assert len(transporte.calls) == 1
+    # Restaura a sessão original antes do segundo cenário independente.
+    auth.generation = geracao_anterior
     transporte = TransporteFicticio(resposta([]), depois=lambda n: configuracao.update(GESTAOCLICK_ACCESS_TOKEN="NOVO"))
     with pytest.raises(AuthorizationError):
         consultar_recurso_nfe(auth, lambda: configuracao, conta, "001",
