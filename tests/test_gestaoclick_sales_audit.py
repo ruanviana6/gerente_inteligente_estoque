@@ -241,7 +241,7 @@ def test_exportacao_agregada_todos_produtos_sem_pii_ou_saldo():
     assert texto.splitlines() == ["produto_id;quantidade_observada_un", "101;6"]
     for proibido in (PRIVADO, SECRET_TOKEN, ACCESS_TOKEN, "999"):
         assert proibido not in texto
-    assert b"\\xef\\xbb\\xbf" not in conteudo[3:]  # BOM apenas no início
+    assert conteudo[:3] == bytes((0xEF, 0xBB, 0xBF))  # BOM para Excel
 
 
 def test_exportacao_rejeita_dados_inconsistentes():
