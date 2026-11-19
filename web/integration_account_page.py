@@ -15,6 +15,7 @@ from integracoes.account_setup import (
 )
 from integracoes.fiscal_read_probe import consultar_recurso_nfe
 from integracoes.gestaoclick import GestaoClickError
+from web.demand_observation_page import demand_observation_controls
 from web.errors import AuthenticationError, AuthorizationError
 from web.fiscal_origin_lookup_page import fiscal_order_lookup_controls
 from web.integration_catalog_full_page import catalog_full_controls
@@ -140,6 +141,7 @@ def account_setup_controls(servico, carregar_configuracao):
         if loja_id is not None:
             native_preview_controls(servico, carregar_configuracao, conta, loja_id)
             sales_audit_controls(servico, carregar_configuracao, conta, loja_id)
+            demand_observation_controls(servico, carregar_configuracao, conta, loja_id)
 
             with st.expander("Verificar leitura de NF-e (sem cadastro e sem emissão)"):
                 st.caption(
