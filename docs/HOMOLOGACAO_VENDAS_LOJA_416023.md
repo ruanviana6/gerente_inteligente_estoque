@@ -27,17 +27,20 @@
 
 | Campo | Resultado |
 | --- | --- |
-| Data/hora local da conferência | Pendente |
-| Perfil Master autorizado | Pendente |
-| Loja confirmada 416023 | Pendente |
-| Período efetivamente consultado (até sete dias) | Pendente |
-| Páginas / documentos / itens (somente totais) | Pendente |
-| Documentos Em separação / Concretizada | Pendente |
-| Total no ERP para filtros equivalentes | Pendente |
-| Produtos sem correspondência (quantidade) | Pendente |
-| Itens com unidades ausentes / não suportadas (quantidades) | Pendente |
-| Divergência observada e causa, sem PII | Pendente |
-| Resultado | **Não homologado até confirmação real** |
+| Data/hora local da conferência | 18/11/2026, ~08:03–08:04 (capturas fornecidas pelo Master) |
+| Perfil Master autorizado | Capturas mostram consentimento marcado; verificação independente do papel ainda pendente |
+| Loja confirmada 416023 | 416023 exibida pelo aplicativo; correspondência operacional no ERP ainda deve ser conferida |
+| Período efetivamente consultado (até sete dias) | 12/11/2026 a 18/11/2026 (sete dias inclusivos) |
+| Páginas / documentos / itens (somente totais) | 2 / 169 / 1.759 |
+| Documentos Em separação / Concretizada | 89 / 66 — total fechado 155 |
+| Outras situações não classificadas | 14 |
+| Produtos vistos / conciliados | 123 / 123 (por ID, dentro da fotografia de 245 produtos) |
+| Quantidade UN observada | 3.740 (demanda observada, não saldo nem previsão) |
+| Total no ERP para filtros equivalentes | **Pendente:** não houve comparação de totais diretamente no ERP |
+| Produtos sem correspondência (quantidade) | Nenhum identificado na síntese (123 de 123 conciliados); demais validações ainda pendentes |
+| Itens com unidades ausentes / não suportadas (quantidades) | Pendente: não aparecem nas capturas |
+| Divergência observada e causa, sem PII | Pendente de comparação direta no ERP |
+| Resultado | **Consulta real observada com sucesso; homologação operacional e fiscal ainda pendentes** |
 
 ## Bloqueios antes da sincronização real
 
@@ -52,7 +55,7 @@
 
 ## Decisão de liberação
 
-**Estado inicial: BLOQUEADO.** Só considerar carregamento de vendas operacionais e atualização automática da Reposição Inteligente depois de:
+**Estado atual: BLOQUEADO PARA SINCRONIZAÇÃO OPERACIONAL.** A consulta observada foi bem-sucedida, mas não valida cobertura nem eventos de alteração/exclusão. Só considerar carregamento de vendas operacionais e atualização automática da Reposição Inteligente depois de:
 - auditoria autenticada e conciliação com a fonte oficial documentadas;
 - todos os bloqueios acima resolvidos e testados;
 - testes de Python 3.11/3.12, SQL/RLS, autenticação, interface e regressão aprovados;
