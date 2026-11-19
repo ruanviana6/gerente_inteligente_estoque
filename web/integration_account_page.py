@@ -12,13 +12,13 @@ from integracoes.account_setup import (
     registrar_fonte,
     validar_conta,
 )
+from integracoes.fiscal_read_probe import consultar_recurso_nfe
 from integracoes.gestaoclick import GestaoClickError
 from web.errors import AuthenticationError, AuthorizationError
 from web.integration_catalog_full_page import catalog_full_controls
 from web.integration_catalog_preview_page import catalog_preview_controls
 from web.integration_native_preview_page import native_preview_controls
 from web.integration_sales_audit_page import sales_audit_controls
-from integracoes.fiscal_read_probe import consultar_recurso_nfe
 
 _ACCOUNT_KEY = "_gestaoclick_account_setup"
 _SOURCE_KEY = "_gestaoclick_registered_source"
