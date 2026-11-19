@@ -4,7 +4,6 @@ from unittest.mock import Mock
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-
 from test_gestaoclick_account_setup import (
     ACCESS_TOKEN,
     PRIVADO,
