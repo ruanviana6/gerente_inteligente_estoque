@@ -83,6 +83,17 @@ def consultar_recurso_nfe(
                 payload.get("status") != "success" or not isinstance(rows, list) or
                 len(rows) > 1 or any(not isinstance(row, dict) for row in rows)):
             raise ContratoInvalido("Formato do retorno de NF-e divergente; leitura não comprovada.")
+        # O token pode fixar a loja e ignorar ?loja_id=. Um registro que
+        # declara explicitamente loja_id permite apenas comparar essa amostra.
+        # Não inferir a loja pelo ID da nota, pelo retorno 200 ou por lista vazia.
+        loja_registro_confere: bool | None = None
+        if len(rows) == 1:
+            valor_loja = rows[0].get("loja_id")
+            if type(valor_loja) is int and valor_loja > 0:
+                loja_registro_confere = hmac.compare_digest(str(valor_loja), loja_id)
+            elif (isinstance(valor_loja, str) and valor_loja.isascii() and
+                    valor_loja.isdecimal() and valor_loja):
+                loja_registro_confere = hmac.compare_digest(valor_loja, loja_id)
         # Não retorna nem guarda linha, chave, nota, destinatário, valor ou metadados brutos.
         return {
             "get_autorizado": True,
@@ -90,6 +101,7 @@ def consultar_recurso_nfe(
             "loja_solicitada": loja_id,
             "itens_amostra": len(rows),
             "loja_efetiva_comprovada": False,
+            "loja_no_registro_confere": loja_registro_confere,
             "cobertura_comprovada": False,
             "escrita_habilitada": False,
             "resultado": "GET_RESPONDEU_SEM_HOMOLOGAR_CADASTRO",
