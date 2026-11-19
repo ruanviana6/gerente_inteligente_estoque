@@ -10,7 +10,6 @@ from integracoes.gestaoclick import ContratoInvalido
 from integracoes.native_preview import DocumentoPreviaVenda, ItemPreviaVenda
 from integracoes.sales_audit import AuditoriaVendas
 
-
 INICIO = date(2026, 1, 1)
 FIM = date(2026, 1, 7)
 PRIVADO = "CLIENTE-SECRETO-FICTICIO"
