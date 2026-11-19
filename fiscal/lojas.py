@@ -17,7 +17,7 @@ def _nome_normalizado(nome: str) -> str:
         return ""
     texto = unicodedata.normalize("NFKD", nome)
     texto = "".join(c for c in texto if not unicodedata.combining(c))
-    texto = re.sub(r"\\s*[-–—‐‑]\\s*", " - ", texto)
+    texto = re.sub(r"\s*[-–—‐‑]\s*", " - ", texto)
     return " ".join(texto.casefold().split())
 
 
