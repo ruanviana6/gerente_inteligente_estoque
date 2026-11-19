@@ -43,7 +43,7 @@ def construir_observacao(
     linhas = []
     vistos = set()
     total = Decimal(0)
-    for ident, quantidade in sorted(resumo.agrupamento, key=lambda linha: int(linha[0])):
+    for ident, quantidade in resumo.agrupamento:
         if (not isinstance(ident, str) or not re.fullmatch(r"[0-9]{1,30}", ident) or
                 int(ident) < 1 or ident in vistos or
                 not isinstance(quantidade, Decimal) or not quantidade.is_finite() or
@@ -53,6 +53,7 @@ def construir_observacao(
         vistos.add(ident)
         total += quantidade
         linhas.append({"product_id": ident, "observed_un": format(quantidade, "f")})
+    linhas.sort(key=lambda linha: int(linha["product_id"]))
     if total != resumo.unidades_fechadas_un:
         raise ContratoInvalido("As quantidades do agrupamento não conferem com o total.")
     if len(linhas) > 1000:
