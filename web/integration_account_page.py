@@ -16,6 +16,7 @@ from integracoes.account_setup import (
 from integracoes.fiscal_read_probe import consultar_recurso_nfe
 from integracoes.gestaoclick import GestaoClickError
 from web.errors import AuthenticationError, AuthorizationError
+from web.fiscal_origin_lookup_page import fiscal_order_lookup_controls
 from web.integration_catalog_full_page import catalog_full_controls
 from web.integration_catalog_preview_page import catalog_preview_controls
 from web.integration_native_preview_page import native_preview_controls
@@ -119,6 +120,9 @@ def account_setup_controls(servico, carregar_configuracao):
                         "permissão de cadastrar, correspondência fiscal nem ausência "
                         "de emissão automática. O cadastro real continua bloqueado."
                     )
+            fiscal_order_lookup_controls(
+                servico, carregar_configuracao, conta, origem, destino,
+            )
 
         loja_id = st.selectbox("Loja para a cópia analítica", list(lojas), index=None,
                                placeholder="Escolha a loja conferida",
