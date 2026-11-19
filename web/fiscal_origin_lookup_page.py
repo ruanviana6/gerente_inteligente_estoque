@@ -5,6 +5,7 @@ informação entra no banco. O status não valida elegibilidade fiscal.
 """
 from __future__ import annotations
 
+import re
 from datetime import timedelta
 
 import streamlit as st
@@ -57,7 +58,10 @@ def fiscal_order_lookup_controls(
     if not autoriza:
         st.warning("Confirme explicitamente a autorização da consulta de vendas.")
         return
-    if len(periodo) != 2:
+    if not isinstance(numero, str) or not re.fullmatch(r"[0-9]{1,20}", numero):
+        st.warning("Informe o número comercial da venda usando até 20 algarismos.")
+        return
+    if not isinstance(periodo, (list, tuple)) or len(periodo) != 2:
         st.warning("Escolha as datas inicial e final.")
         return
     try:
@@ -77,8 +81,11 @@ def fiscal_order_lookup_controls(
                 validar_conta(servico.auth, conta)
     except (AuthenticationError, AuthorizationError):
         raise
-    except (AppError, GestaoClickError, ValueError, TypeError) as erro:
+    except (AppError, GestaoClickError) as erro:
         st.warning(str(erro))
+        return
+    except (ValueError, TypeError):
+        st.warning("A consulta fiscal recebeu parâmetros inválidos.")
         return
     st.caption(
         f"Origem solicitada: {origem_id} · Destino selecionado: {destino_id} · "
