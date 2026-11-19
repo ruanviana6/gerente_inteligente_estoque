@@ -14,6 +14,7 @@ from integracoes.account_setup import (
 )
 from integracoes.fiscal_read_probe import consultar_recurso_nfe
 from integracoes.gestaoclick import GestaoClickError
+from fiscal.lojas import validar_lojas_fiscais
 from web.errors import AuthenticationError, AuthorizationError
 from web.integration_catalog_full_page import catalog_full_controls
 from web.integration_catalog_preview_page import catalog_preview_controls
@@ -76,6 +77,49 @@ def account_setup_controls(servico, carregar_configuracao):
         if not lojas:
             st.warning("A chave não retornou lojas. Confira as permissões no GestãoClick.")
             return
+        with st.expander("Conferir lojas da automação fiscal (sem gravação)"):
+            st.caption(
+                "Selecione separadamente a origem FLT Comércio e o destino "
+                "Flagship - Flatter, conforme o cadastro retornado pelo ERP. "
+                "Esta conferência não consulta notas ou pedidos, não salva "
+                "identificadores e não ativa o cadastro fiscal."
+            )
+            with st.form("validar_lojas_fiscais"):
+                origem = st.selectbox(
+                    "Origem fiscal — FLT Comércio (atacado)",
+                    list(lojas), index=None, key="fiscal_loja_origem",
+                    format_func=lambda valor: f"{lojas[valor]} · ID {valor}",
+                    placeholder="Selecione a loja de origem",
+                )
+                destino = st.selectbox(
+                    "Destino fiscal — Flagship - Flatter (varejo)",
+                    list(lojas), index=None, key="fiscal_loja_destino",
+                    format_func=lambda valor: f"{lojas[valor]} · ID {valor}",
+                    placeholder="Selecione a loja de destino",
+                )
+                conferir_papeis = st.form_submit_button("Conferir origem e destino")
+            if conferir_papeis:
+                try:
+                    validar_conta(servico.auth, conta)
+                    id_origem, id_destino = validar_lojas_fiscais(
+                        conta.lojas, origem, destino,
+                    )
+                except (AuthenticationError, AuthorizationError):
+                    raise
+                except GestaoClickError as erro:
+                    st.warning(str(erro))
+                else:
+                    st.success(
+                        f"Papéis conferidos no cadastro: origem {lojas[id_origem]} "
+                        f"(ID {id_origem}) → destino {lojas[id_destino]} "
+                        f"(ID {id_destino}). Nenhum dado foi alterado."
+                    )
+                    st.info(
+                        "A conferência de nomes não comprova a loja efetiva do token, "
+                        "permissão de cadastrar, correspondência fiscal nem ausência "
+                        "de emissão automática. O cadastro real continua bloqueado."
+                    )
+
         loja_id = st.selectbox("Loja para a cópia analítica", list(lojas), index=None,
                                placeholder="Escolha a loja conferida",
                                format_func=lambda valor: f"{lojas[valor]} · ID {valor}",
