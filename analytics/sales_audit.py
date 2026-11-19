@@ -6,6 +6,8 @@ presume que documentos ausentes foram cancelados/excluídos.
 """
 from __future__ import annotations
 
+import csv
+import io
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 
@@ -123,3 +125,20 @@ def conciliar_vendas_com_catalogo(
         unidades_fechadas_un=sum(agrupado.values(), Decimal(0)),
         agrupamento=linhas,
     )
+
+
+def csv_demanda_observada(resultado: ConciliacaoVendas) -> bytes:
+    """Exporta somente totais UN por produto; nunca dados de clientes, saldo ou linha."""
+
+    if not isinstance(resultado, ConciliacaoVendas):
+        raise TypeError("É necessária uma conciliação de vendas validada.")
+    arquivo = io.StringIO(newline="")
+    tabela = csv.writer(arquivo, delimiter=";", lineterminator="\n")
+    tabela.writerow(("produto_id", "quantidade_observada_un"))
+    for produto_id, quantidade in resultado.agrupamento:
+        # A origem já valida IDs do catálogo; conferimos novamente na fronteira de exportação.
+        if (not isinstance(produto_id, str) or not produto_id.isascii() or not produto_id.isdecimal()
+                or not isinstance(quantidade, Decimal) or not quantidade.is_finite() or quantidade < 0):
+            raise ContratoInvalido("Dados de exportação incompatíveis.")
+        tabela.writerow((produto_id, format(quantidade, "f").replace(".", ",")))
+    return arquivo.getvalue().encode("utf-8-sig")

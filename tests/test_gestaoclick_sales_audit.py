@@ -225,3 +225,35 @@ def test_status_sem_mapeamento_explicito_rejeitado():
         conciliar_vendas_com_catalogo(
             amostra(),foto,separacao_id="1",concretizada_id="1",
         )
+
+
+def test_exportacao_agregada_todos_produtos_sem_pii_ou_saldo():
+    from analytics.sales_audit import csv_demanda_observada
+
+    foto = {"store_id": "001", "product_count": 2, "products": [
+        {"id": "101", "estoque": 999}, {"id": "102", "estoque": 10},
+    ]}
+    resultado = conciliar_vendas_com_catalogo(
+        amostra(("1", "0")), foto, separacao_id="1", concretizada_id="0"
+    )
+    conteudo = csv_demanda_observada(resultado)
+    texto = conteudo.decode("utf-8-sig")
+    assert texto.splitlines() == ["produto_id;quantidade_observada_un", "101;6"]
+    for proibido in (PRIVADO, SECRET_TOKEN, ACCESS_TOKEN, "999"):
+        assert proibido not in texto
+    assert conteudo[:3] == bytes((0xEF, 0xBB, 0xBF))  # BOM para Excel
+
+
+def test_exportacao_rejeita_dados_inconsistentes():
+    from dataclasses import replace
+
+    from analytics.sales_audit import csv_demanda_observada
+
+    foto = {"store_id": "001", "product_count": 1, "products": [
+        {"id": "101", "estoque": 10},
+    ]}
+    resultado = conciliar_vendas_com_catalogo(
+        amostra(("1",)), foto, separacao_id="1", concretizada_id="0"
+    )
+    with pytest.raises(ContratoInvalido):
+        csv_demanda_observada(replace(resultado, agrupamento=(("=CMD()", Decimal("1")),)))

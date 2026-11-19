@@ -6,7 +6,7 @@ from uuid import UUID
 
 import streamlit as st
 
-from analytics.sales_audit import conciliar_vendas_com_catalogo
+from analytics.sales_audit import conciliar_vendas_com_catalogo, csv_demanda_observada
 from dados import hoje_local
 from integracoes.account_setup import validar_conta
 from integracoes.gestaoclick import ContratoInvalido, GestaoClickError
@@ -168,6 +168,18 @@ def sales_audit_controls(servico, carregar_configuracao, conta, loja_id: str) ->
             [{"Produto (ID)": x, "Quantidade observada (UN)": format(y, "f")}
              for x, y in resumo.agrupamento[:25]],
             hide_index=True, width="stretch",
+        )
+        st.caption(
+            "A tabela exibe até 25 produtos. O CSV inclui todos os produtos com "
+            "UN observada; não contém clientes, preços nem saldo do ERP."
+        )
+        st.download_button(
+            "Exportar todos os produtos observados (CSV)",
+            data=csv_demanda_observada(resumo),
+            file_name=f"auditoria_vendas_loja_{loja_id}_{datas[0]}_{datas[1]}.csv",
+            mime="text/csv; charset=utf-8",
+            key="sales_audit_export",
+            on_click="ignore",
         )
         st.warning(
             "AUDITORIA, NÃO SINCRONIZAÇÃO: a API ainda não comprovou ID estável "
