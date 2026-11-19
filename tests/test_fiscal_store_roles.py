@@ -1,8 +1,8 @@
 """Confere papéis fiscais sem alterar o ERP, com lojas fictícias."""
 import pytest
+
 from fiscal.lojas import validar_lojas_fiscais
 from integracoes.gestaoclick import ContratoInvalido
-
 
 LOJAS = [  # IDs inteiramente fictícios; não pressupõem IDs reais da origem/destino
     {"id": "101", "nome": "FLT Comércio"},
