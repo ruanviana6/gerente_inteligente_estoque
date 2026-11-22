@@ -1,6 +1,5 @@
 begin;
--- Código interno da MESMA fotografia da loja, sem consultar ou alterar ERP.
--- Mantém autorização via private.sync_source e todas as flags de bloqueio.
+-- Somente leitura da fotografia do catálogo, no escopo autorizado.
 create or replace function private.demand_observation_review(
     p_source_id uuid, p_store_id text
 ) returns jsonb
@@ -30,39 +29,7 @@ begin
   select count(*),coalesce(sum(d.observed_un),0),
          coalesce(jsonb_agg(jsonb_build_object(
            'product_id',d.product_id,
-           'internal_code', case
-              when btrim(c.codigo_interno) ~ '^[A-Za-z0-9][A-Za-z0-9 ._/-]{0,79},d.observed_un,
-           'stock_snapshot',c.estoque
-         ) order by d.observed_un desc,d.product_id),'[]'::jsonb)
-    into qtd,soma,linhas
-    from public.demand_observation_rows d
-    left join public.catalog_stock_rows c on
-         c.organization_id=org and c.batch_id=foto.id and c.product_id=d.product_id
-    where d.organization_id=org and d.batch_id=obs.id;
-  if qtd<>obs.product_count or soma<>obs.total_observed_un or qtd>1000 then
-    raise exception 'A observação não confere com o histórico.'
-      using errcode='22023';
-  end if;
-
-  return jsonb_build_object(
-    'found',true,'store_id',p_store_id,
-    'observed_at',obs.observed_at,
-    'period_start',obs.period_start,
-    'period_end',obs.period_end,
-    'documents',obs.documents,
-    'closed_documents',obs.closed_documents,
-    'other_documents',obs.other_documents,
-    'product_count',obs.product_count,
-    'total_observed_un',obs.total_observed_un,
-    'stock_snapshot_at',foto.created_at,
-    'stock_snapshot_products',foto.product_count,
-    'rows',linhas,
-    'stock_is_live',false,
-    'ready_for_replenishment',false,
-    'fiscal_real_enabled',false
-  );
-end $$;
-              then btrim(c.codigo_interno) else null end,
+           'internal_code', CASE WHEN btrim(c.codigo_interno) ~ '^[A-Za-z0-9][A-Za-z0-9 ._/-]{0,79}$' THEN btrim(c.codigo_interno) ELSE null END,
            'observed_un',d.observed_un,
            'stock_snapshot',c.estoque
          ) order by d.observed_un desc,d.product_id),'[]'::jsonb)
