@@ -177,7 +177,7 @@ def _historico(servico, contexto):
 def fiscal(servico, contexto):
     """Renderiza uma única área fiscal; nenhuma leitura da tela executa o emissor."""
     page_header('Automação / Notas Fiscais', 'Uma API · FLT Comércio → Flagship - Flatter · Somente cadastro de NF-e.')
-    st.warning('DEMONSTRAÇÃO · Emissão exclusivamente manual no GestãoClick. A automação nunca emite, cria vendas ou pedidos. Sem chamadas reais e sem XML/PDF.')
+    st.warning('Cadastro de NF-e permanece em DEMO; a nova área abaixo consulta vendas e notas reais apenas por GET. Emissão exclusivamente manual no GestãoClick. Sem POST fiscal ou XML/PDF.')
     with st.expander('Regras aplicadas ao cadastro'):
         st.write('Destino Ceará: CE, Ceará ou Ceara. Em separação e Concretizada permitem solicitação. Em andamento exige aprovação identificada. Nota existente ou resultado incerto exige conferência e reconciliação.')
         st.write('Frete e contribuinte são escolhas manuais, sem padrão. CFOP, NCM, CST/CSOSN e impostos dependem da validação fiscal e da API; não recebem valores inventados.')
