@@ -28,8 +28,9 @@ class AuthFake:
         self.generation = 1
         self.invalidar = invalidar
         self.calls = []
-        self.response = resposta if resposta is not None else payload()
-        self.response["store_id"] = "416023"
+        self.response = deepcopy(resposta) if resposta is not None else payload()
+        if resposta is None:
+            self.response["store_id"] = "416023"
 
     @contextmanager
     def operation(self):
