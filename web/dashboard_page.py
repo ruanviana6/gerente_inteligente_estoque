@@ -31,7 +31,6 @@ def _historico_real_na_abertura(servico, contexto):
     """Mostra os últimos dados reais salvos, não chama ERP nem sugere compras."""
     if contexto.profile.role != "Master" or not contexto.can("integrations.manage"):
         return
-    st.subheader("Dados reais da Flatter · última coleta salva")
     try:
         dados = consultar_status_real(servico.auth)
     except (AuthenticationError, AuthorizationError):
@@ -43,8 +42,8 @@ def _historico_real_na_abertura(servico, contexto):
         )
         return
     if dados is None:
-        st.info("Nenhuma observação real disponível. Consulte Administração → Integrações.")
         return
+    st.subheader("Dados reais da Flatter · última coleta salva")
     a, b, c = st.columns(3)
     a.metric("Pedidos fechados observados", dados.closed_documents)
     b.metric("Unidades UN observadas", f"{dados.total_observed_un:,.0f}".replace(",", "."))
