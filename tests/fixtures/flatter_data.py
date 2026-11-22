@@ -145,6 +145,9 @@ class Scenario:
         elif chave == "rpc_replenishment_rules":
             resultado = {"configuration": {"cycle_primary": 14, "cycle_alternative": 21, "reference_boxes": 80},
                          "rules": [], "revisions": {}}
+        elif chave == "rpc_integration_sources":
+            # Fixture 100% DEMO: sem fonte real, o painel não deve misturar dados.
+            resultado = []
         elif chave == "rpc_dashboard_payload":
             if 'dashboard.view' not in self.permissions:
                 status, resultado = 403, {}
