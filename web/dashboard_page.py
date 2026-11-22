@@ -3,6 +3,9 @@
 import pandas as pd
 import streamlit as st
 
+from integracoes.gestaoclick import GestaoClickError
+from web.errors import AppError, AuthenticationError, AuthorizationError
+from web.real_home_status import consultar_status_real
 from web.theme import metric_card, page_header, surface
 
 ALERTAS = {
@@ -22,9 +25,46 @@ def _abrir(pagina, foco=''):
     st.session_state['_foco_prioridade'] = foco
 
 
+def _historico_real_na_abertura(servico, contexto):
+    """Mostra os últimos dados reais salvos, não chama ERP nem sugere compras."""
+    if contexto.profile.role != "Master" or not contexto.can("integrations.manage"):
+        return
+    st.subheader("Dados reais da Flatter · última coleta salva")
+    try:
+        dados = consultar_status_real(servico.auth)
+    except (AuthenticationError, AuthorizationError):
+        raise
+    except (AppError, GestaoClickError, ValueError, TypeError):
+        st.warning(
+            "A última coleta real não pôde ser conferida neste momento. "
+            "Consulte Administração → Integrações para revisar a fonte."
+        )
+        return
+    if dados is None:
+        st.info("Nenhuma observação real disponível. Consulte Administração → Integrações.")
+        return
+    a, b, c = st.columns(3)
+    a.metric("Pedidos fechados observados", dados.closed_documents)
+    b.metric("Unidades UN observadas", f"{dados.total_observed_un:,.0f}".replace(",", "."))
+    c.metric("Produtos com UN observada", dados.product_count)
+    observado = dados.observed_at.astimezone().strftime("%d/%m/%Y %H:%M")
+    estoque = dados.stock_snapshot_at.astimezone().strftime("%d/%m/%Y %H:%M")
+    st.caption(
+        f"Loja {dados.store_id} · Vendas observadas de "
+        f"{dados.period_start:%d/%m/%Y} a {dados.period_end:%d/%m/%Y} · "
+        f"Observação gravada {observado} · Estoque fotografado {estoque}."
+    )
+    st.warning(
+        "Fotografias do Supabase, não leituras ao vivo. "
+        "Esses números NÃO são vendas consolidadas nem cálculo de reposição. "
+        "Atualize os dados pela Administração antes de tomar decisões."
+    )
+
+
 def visao_geral(servico, contexto):
     """Não chama load_inventory, motor, treinamento, histórico bruto nem ERP."""
     page_header('Visão Geral', 'O que precisa de atenção, por quê e onde conferir.')
+    _historico_real_na_abertura(servico, contexto)
     dados = servico.dashboard()
     meta = dados.get('metadata') or {}
     resumo = dados.get('summary')
