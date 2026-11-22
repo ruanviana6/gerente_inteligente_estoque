@@ -1,5 +1,7 @@
 """Visão Geral com até seis KPIs, cinco prioridades e dois gráficos compactos."""
 
+from zoneinfo import ZoneInfo
+
 import pandas as pd
 import streamlit as st
 
@@ -47,12 +49,21 @@ def _historico_real_na_abertura(servico, contexto):
     a.metric("Pedidos fechados observados", dados.closed_documents)
     b.metric("Unidades UN observadas", f"{dados.total_observed_un:,.0f}".replace(",", "."))
     c.metric("Produtos com UN observada", dados.product_count)
-    observado = dados.observed_at.astimezone().strftime("%d/%m/%Y %H:%M")
-    estoque = dados.stock_snapshot_at.astimezone().strftime("%d/%m/%Y %H:%M")
+    observado = dados.observed_at.astimezone(ZoneInfo("America/Fortaleza")).strftime("%d/%m/%Y %H:%M")
+    estoque = dados.stock_snapshot_at.astimezone(ZoneInfo("America/Fortaleza")).strftime("%d/%m/%Y %H:%M")
     st.caption(
         f"Loja {dados.store_id} · Vendas observadas de "
         f"{dados.period_start:%d/%m/%Y} a {dados.period_end:%d/%m/%Y} · "
         f"Observação gravada {observado} · Estoque fotografado {estoque}."
+    )
+    zerados = sum(row.stock_snapshot == 0 for row in dados.rows)
+    baixos = sum(
+        row.stock_snapshot is not None and 0 < row.stock_snapshot <= 10
+        for row in dados.rows
+    )
+    st.caption(
+        f"Na última fotografia, {zerados} produtos observados tinham saldo zero "
+        f"e {baixos} tinham entre 1 e 10 unidades. Confira no ERP antes de agir."
     )
     st.warning(
         "Fotografias do Supabase, não leituras ao vivo. "
