@@ -80,7 +80,7 @@ def operational_review_controls(servico, conta, loja_id):
         b.metric("Produtos com movimento UN observado", dados.product_count)
         c.metric("Unidades UN observadas no período", f"{dados.total_observed_un:,.0f}".replace(",", "."))
         st.caption(
-            "Ordenado por unidades comercialmente observadas no período, "
+            "Ordenado por unidades comercialmente observadas no período; o código interno pertence à fotografia salva, não é uma consulta atual ao ERP. "
             "sem somar outras janelas ou reconsultas. Saldo da fotografia "
             "é apenas referência histórica para checagem manual."
         )
@@ -88,6 +88,7 @@ def operational_review_controls(servico, conta, loja_id):
         for item in dados.rows:
             linhas.append({
                 "Produto (ID)": item.product_id,
+                "Código interno (fotografia)": item.internal_code or "Não informado",
                 "UN observadas no período": float(item.observed_un),
                 "Saldo na fotografia (não atual)": (
                     float(item.stock_snapshot) if item.stock_snapshot is not None else None
