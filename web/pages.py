@@ -21,6 +21,7 @@ from web.downloads import csv_export
 from web.errors import AuthorizationError
 from web.insights import gerar_insights
 from web.reports import filtrar_relatorio
+from web.real_replenishment_triage import real_triage_controls
 from web.theme import metric_card, page_header, status_badge, surface
 
 PERMISSOES = {
@@ -341,6 +342,7 @@ def _reposicao(servico: Any, contexto: Any) -> None:
 def _planejamento_reposicao(servico: Any, contexto: Any) -> None:
     """Apresenta ciclos explicáveis sem depender de fornecedores ou alterar o ERP."""
     page_header("Reposição Inteligente", "Planeje solicitações à indústria com revisão humana.")
+    real_triage_controls(servico, contexto)
     modulo = "replenishment.view" if contexto.can("replenishment.view") else "trends.view"
     dados = _carregar(servico, modulo, contexto)
     if dados is None:
