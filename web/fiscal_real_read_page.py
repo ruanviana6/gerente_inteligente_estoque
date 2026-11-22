@@ -127,10 +127,10 @@ def fiscal_real_read_controls(servico, contexto):
                             "A loja efetiva do token não pôde ser comprovada na amostra. "
                             "Não liberar cadastro fiscal."
                         )
-        with st.expander("Localizar venda real da FLT Comércio por número (GET)"):
-            fiscal_order_lookup_controls(
-                servico, _secrets, conta, origem_id, destino_id,
-            )
+        st.divider()
+        fiscal_order_lookup_controls(
+            servico, _secrets, conta, origem_id, destino_id,
+        )
         st.warning(
             "CADASTRO REAL AINDA BLOQUEADO: faltam validação fiscal completa "
             "(destinatário, UF CE, NCM, CFOP, CST/CSOSN e impostos), nota anterior, "
