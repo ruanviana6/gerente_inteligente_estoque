@@ -29,8 +29,8 @@ def payload():
         "ready_for_replenishment": False,
         "fiscal_real_enabled": False,
         "rows": [
-            {"product_id": "101", "observed_un": 3, "stock_snapshot": 0},
-            {"product_id": "102", "observed_un": 2, "stock_snapshot": None},
+            {"product_id": "101", "internal_code": "FL-101", "observed_un": 3, "stock_snapshot": 0},
+            {"product_id": "102", "internal_code": None, "observed_un": 2, "stock_snapshot": None},
         ],
     }
 
@@ -41,6 +41,7 @@ def test_conferencia_valida_ultima_fotografia_sem_calcular_saldo():
     assert out.total_observed_un == Decimal("5")
     assert out.stock_snapshot_products == 245
     assert [x.product_id for x in out.rows] == ["101", "102"]
+    assert out.rows[0].internal_code == "FL-101"
     assert out.rows[0].stock_snapshot == Decimal(0)
     assert out.rows[1].stock_snapshot is None
 
@@ -60,6 +61,10 @@ def test_sem_observacao_retorna_ausencia_explicita():
     lambda p: p.update(stock_snapshot_at="2026-11-18"),
     lambda p: p["rows"][0].update(product_id="=1+1"),
     lambda p: p["rows"][0].update(product_id="102"),
+    lambda p: p["rows"][0].update(internal_code="=SUM(1,1)"),
+    lambda p: p["rows"][0].update(internal_code="+PAYLOAD"),
+    lambda p: p["rows"][0].update(internal_code="  @CMD"),
+    lambda p: p["rows"][0].update(internal_code="a\\nb"),
     lambda p: p["rows"][0].update(observed_un=-1),
     lambda p: p["rows"][0].update(stock_snapshot=-1),
     lambda p: p["rows"][0].update(observed_un="NaN"),
@@ -77,14 +82,14 @@ def test_csv_so_observacao_e_fotografia_sem_execucao():
     csv = exportar_conferencia_csv(data)
     assert csv.startswith(bytes((0xEF, 0xBB, 0xBF)))
     texto = csv.decode("utf-8-sig")
-    assert "101;3;0;" in texto
-    assert "102;2;;" in texto
+    assert "101;FL-101;3;0;" in texto
+    assert "102;;2;;" in texto
     for proibido in ("cliente", "cpf", "cnpj", "chave_nfe", "valor", "sugerir"):
         assert proibido not in texto.lower()
 
 
 def test_rejeita_cobertura_falsa_no_payload():
     raw = payload()
-    raw["rows"].append({"product_id": "103", "observed_un": 1, "stock_snapshot": 4})
+    raw["rows"].append({"product_id": "103", "internal_code": "FL-103", "observed_un": 1, "stock_snapshot": 4})
     with pytest.raises(ContratoInvalido):
         conferir_observacao(raw, "LOJA_FICTICIA")

@@ -17,6 +17,7 @@ from integracoes.gestaoclick import ContratoInvalido
 @dataclass(frozen=True)
 class LinhaConferencia:
     product_id: str
+    internal_code: str | None
     observed_un: Decimal
     stock_snapshot: Decimal | None
 
@@ -101,7 +102,7 @@ def conferir_observacao(payload: object, loja: str) -> ConferenciaObservada | No
     soma = Decimal(0)
     for item in linhas_brutas:
         if not isinstance(item, dict) or set(item) != {
-            "product_id", "observed_un", "stock_snapshot"
+            "product_id", "internal_code", "observed_un", "stock_snapshot"
         }:
             raise ContratoInvalido("Linha da observação com formato inesperado.")
         pid = item["product_id"]
@@ -109,12 +110,17 @@ def conferir_observacao(payload: object, loja: str) -> ConferenciaObservada | No
                 int(pid) == 0 or pid in ids):
             raise ContratoInvalido("ID de produto inválido ou repetido.")
         ids.add(pid)
+        codigo = item["internal_code"]
+        if codigo is not None and (
+                not isinstance(codigo, str) or
+                not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._/-]{0,79}", codigo)):
+            raise ContratoInvalido("Código interno inválido na fotografia.")
         quantidade = _decimal(item["observed_un"])
         saldo = _decimal(item["stock_snapshot"], permite_nulo=True)
         if quantidade == 0 or (saldo is not None and saldo > 1000000000):
             raise ContratoInvalido("Quantidade inesperada na conferência.")
         soma += quantidade
-        linhas.append(LinhaConferencia(pid, quantidade, saldo))
+        linhas.append(LinhaConferencia(pid, codigo, quantidade, saldo))
     if soma != total:
         raise ContratoInvalido("Soma das quantidades observadas não confere.")
     linhas.sort(key=lambda r: (-r.observed_un, int(r.product_id)))
@@ -130,10 +136,11 @@ def exportar_conferencia_csv(dados: ConferenciaObservada) -> bytes:
         raise TypeError("É necessária uma conferência validada.")
     arquivo = io.StringIO(newline="")
     w = csv.writer(arquivo, delimiter=";", lineterminator="\n")
-    w.writerow(("produto_id", "unidades_observadas", "saldo_ultima_fotografia",
+    w.writerow(("produto_id", "codigo_interno_fotografia", "unidades_observadas", "saldo_ultima_fotografia",
                 "data_ultima_fotografia_utc"))
     for linha in dados.rows:
-        w.writerow((linha.product_id, format(linha.observed_un, "f").replace(".", ","),
+        w.writerow((linha.product_id, linha.internal_code or "",
+                    format(linha.observed_un, "f").replace(".", ","),
                     "" if linha.stock_snapshot is None else
                     format(linha.stock_snapshot, "f").replace(".", ","),
                     dados.stock_snapshot_at.isoformat()))
