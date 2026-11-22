@@ -22,6 +22,7 @@ from web.integration_catalog_full_page import catalog_full_controls
 from web.integration_catalog_preview_page import catalog_preview_controls
 from web.integration_native_preview_page import native_preview_controls
 from web.integration_sales_audit_page import sales_audit_controls
+from web.operational_review_page import operational_review_controls
 
 _ACCOUNT_KEY = "_gestaoclick_account_setup"
 _SOURCE_KEY = "_gestaoclick_registered_source"
@@ -142,6 +143,7 @@ def account_setup_controls(servico, carregar_configuracao):
             native_preview_controls(servico, carregar_configuracao, conta, loja_id)
             sales_audit_controls(servico, carregar_configuracao, conta, loja_id)
             demand_observation_controls(servico, carregar_configuracao, conta, loja_id)
+            operational_review_controls(servico, conta, loja_id)
 
             with st.expander("Verificar leitura de NF-e (sem cadastro e sem emissão)"):
                 st.caption(
