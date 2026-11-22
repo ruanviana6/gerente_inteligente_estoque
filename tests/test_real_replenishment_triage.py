@@ -3,13 +3,13 @@ from dataclasses import replace
 from decimal import Decimal
 
 import pytest
+from test_observational_review import payload
 
 from analytics.observational_review import (
     LinhaConferencia,
     conferir_observacao,
 )
 from integracoes.gestaoclick import ContratoInvalido
-from test_observational_review import payload
 from web.real_replenishment_triage import priorizar_conferencia
 
 
