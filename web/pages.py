@@ -20,8 +20,8 @@ from reposicao.embalagens import ler_embalagens
 from web.downloads import csv_export
 from web.errors import AuthorizationError
 from web.insights import gerar_insights
-from web.reports import filtrar_relatorio
 from web.real_replenishment_triage import real_triage_controls
+from web.reports import filtrar_relatorio
 from web.theme import metric_card, page_header, status_badge, surface
 
 PERMISSOES = {
