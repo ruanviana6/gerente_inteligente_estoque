@@ -8,7 +8,12 @@ from test_observational_review import payload
 
 from integracoes.gestaoclick import ContratoInvalido
 from web.errors import AuthorizationError
-from web.real_home_status import (consultar_fontes_reais, consultar_status_real,\n                                  listar_fontes_reais, selecionar_fonte_real)
+from web.real_home_status import (
+    consultar_fontes_reais,
+    consultar_status_real,
+    listar_fontes_reais,
+    selecionar_fonte_real,
+)
 
 _ID = "10000000-0000-4000-8000-000000000001"
 _FONTE = {"id": _ID, "name": "GestãoClick: loja 416023",
