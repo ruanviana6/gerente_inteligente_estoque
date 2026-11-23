@@ -83,7 +83,7 @@ def integrar(page):
 
 
 def verificar(browser, base: str, destino: Path, strict: bool):
-    """Executa análise, staging, cancelamento e confirmação explícita nas duas larguras."""
+    """Exercita leitura em fixture e confirma que a tela produtiva bloqueia DEMO."""
     from playwright.sync_api import expect
 
     result = {"telas": {}, "fluxos": {}}
@@ -116,32 +116,33 @@ def verificar(browser, base: str, destino: Path, strict: bool):
             integrar(page)
             result["telas"][f"integracoes-inicial-{width}"] = verificar_layout(
                 page, f"integracoes-inicial-{width}", destino, strict, False)
-            expect(page.get_by_text("Controle DEMO: confirmações=0; cancelamentos=0", exact=True)).to_be_visible()
-            page.get_by_text("Usar somente dados fictícios identificados como DEMO", exact=True).click()
-            expect(page.get_by_role("checkbox", name="Usar somente dados fictícios identificados como DEMO", exact=True)).to_be_checked()
+            # O modo DEMO permanece exclusivamente na fixture de testes,
+            # mas não há mais opção de gerar dados fictícios na interface produtiva.
+            expect(page.get_by_text(
+                "Usar somente dados fictícios identificados como DEMO", exact=True,
+            )).to_have_count(0)
+            expect(page.get_by_role("button", name="Preparar prévia", exact=True)).to_be_visible()
+            page.get_by_text(
+                "Confirmo autorização da empresa, contrato e permissões de leitura (consulta real)",
+                exact=True,
+            ).click()
             page.get_by_role("button", name="Preparar prévia", exact=True).click()
-            expect(page.get_by_role("heading", name="Conferir prévia", exact=True)).to_be_visible(timeout=30000)
-            expect(page.get_by_role("button", name="Cancelar esta prévia", exact=True)).to_be_visible(timeout=30000)
-            aguardar_tela(page)
-            expect(page.get_by_role("button", name="Confirmar sincronização interna", exact=True)).to_be_disabled()
+            expect(page.get_by_text(
+                "A consulta real ainda não foi configurada.",
+                exact=False,
+            )).to_be_visible(timeout=30000)
+            expect(page.get_by_role("heading", name="Conferir prévia", exact=True)).to_have_count(0)
             expect(page.get_by_text("Controle DEMO: confirmações=0; cancelamentos=0", exact=True)).to_be_visible()
-            result["telas"][f"integracoes-previa-{width}"] = verificar_layout(
-                page, f"integracoes-previa-{width}", destino, strict, False)
-            page.get_by_role("button", name="Cancelar esta prévia", exact=True).click()
-            expect(page.get_by_text("Controle DEMO: confirmações=0; cancelamentos=1", exact=True)).to_be_visible()
             aguardar_tela(page)
-            page.get_by_role("button", name="Preparar prévia", exact=True).click()
-            expect(page.get_by_role("heading", name="Conferir prévia", exact=True)).to_be_visible(timeout=30000)
-            expect(page.get_by_role("button", name="Cancelar esta prévia", exact=True)).to_be_visible(timeout=30000)
-            aguardar_tela(page)
-            page.get_by_text("Conferi a amostra, quantidades, totais e abrangência completa do período", exact=True).click()
-            expect(page.get_by_role("checkbox", name="Conferi a amostra, quantidades, totais e abrangência completa do período")).to_be_checked()
-            expect(page.get_by_role("button", name="Confirmar sincronização interna", exact=True)).to_be_enabled()
-            page.get_by_role("button", name="Confirmar sincronização interna", exact=True).click()
-            expect(page.get_by_text("Controle DEMO: confirmações=1; cancelamentos=1", exact=True)).to_be_visible()
-            aguardar_tela(page)
-            result["fluxos"][str(width)] = {"analise_vendas": True, "previa_sem_commit_automatico": True,
-                                           "cancelamento": True, "confirmacao_explicita": True}
+            result["telas"][f"integracoes-api-bloqueada-{width}"] = verificar_layout(
+                page, f"integracoes-api-bloqueada-{width}", destino, strict, False,
+            )
+            result["fluxos"][str(width)] = {
+                "analise_vendas_ficticias_apenas_na_fixture": True,
+                "operacao_sem_gerar_demo": True,
+                "api_real_sem_configuracao_e_bloqueada": True,
+                "nenhum_commit_e_cancelamento": True,
+            }
         finally:
             context.close()
     return result

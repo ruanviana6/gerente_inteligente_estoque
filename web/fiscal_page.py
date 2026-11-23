@@ -5,7 +5,6 @@ import streamlit as st
 from fiscal.regras import ESTADOS, MODALIDADES_FRETE, TIPOS_CONTRIBUINTE, elegibilidade
 from web.errors import AppError
 from web.fiscal_real_read_page import fiscal_real_read_controls
-from web.fiscal_service import FiscalService
 from web.theme import page_header, surface
 
 
@@ -175,23 +174,21 @@ def _historico(servico, contexto):
 
 
 def fiscal(servico, contexto):
-    """Renderiza uma única área fiscal; nenhuma leitura da tela executa o emissor."""
-    page_header('Automação / Notas Fiscais', 'Uma API · FLT Comércio → Flagship - Flatter · Somente cadastro de NF-e.')
-    st.warning('Cadastro de NF-e permanece em DEMO; a nova área abaixo consulta vendas e notas reais apenas por GET. Emissão exclusivamente manual no GestãoClick. Sem POST fiscal ou XML/PDF.')
-    with st.expander('Regras aplicadas ao cadastro'):
-        st.write('Destino Ceará: CE, Ceará ou Ceara. Em separação e Concretizada permitem solicitação. Em andamento exige aprovação identificada. Nota existente ou resultado incerto exige conferência e reconciliação.')
-        st.write('Frete e contribuinte são escolhas manuais, sem padrão. CFOP, NCM, CST/CSOSN e impostos dependem da validação fiscal e da API; não recebem valores inventados.')
+    """Consulta fiscal real autorizada; a produção não oferece cenários simulados."""
+    page_header(
+        'Automação / Notas Fiscais',
+        'Consulta real · FLT Comércio → Flagship - Flatter · Emissão manual no ERP.',
+    )
     if not contexto.can('fiscal.view'):
         st.error('Acesso fiscal não autorizado.')
         return
+    st.info(
+        'Os pedidos fictícios e o cadastro DEMO foram retirados da operação. '
+        'Consulte vendas e notas fiscais diretamente pela API real, somente GET.'
+    )
     fiscal_real_read_controls(servico, contexto)
-    st.divider()
-    if st.session_state.pop('_fiscal_reset_next', False):
-        _reiniciar_escolhas()
-    fiscal_servico = FiscalService(servico.auth)
-    if fiscal_servico.estado().get("demo_enabled"):
-        _pedido(fiscal_servico, contexto)
-    else:
-        st.info("Modo DEMO desativado pelo Master. O histórico continua disponível.")
-    st.divider()
-    _historico(fiscal_servico, contexto)
+    st.warning(
+        'Cadastro real de NF-e ainda não homologado. Não criar nota, pedido ou venda '
+        'automaticamente antes de validar cliente, itens, tributação, duplicidade '
+        'e o comportamento de envio automático. Emissão continuará manual no GestãoClick.'
+    )

@@ -37,7 +37,7 @@ PERMISSOES = frozenset({
 })
 AREAS = (
     ("Integrações", "Integrações"),
-    ("Importação manual / DEMO", "Importar catálogo e vendas"),
+    ("Importação CSV", "Importar catálogo e vendas"),
     ("Regras de Reposição", "Regras de Reposição"),
     ("Auditoria", "Auditoria"),
 )
@@ -143,32 +143,20 @@ def test_trocar_areas_e_reexecutar_preserva_titulos_e_nao_dispara_operacoes():
     assert servico.importacoes == []
 
 
-def test_sincronizacao_demo_por_administracao_confirma_uma_vez_apos_previa():
-    """O roteamento preserva o coordenador real e o rerun depois da confirmação."""
+def test_producao_nao_oferece_geracao_de_vendas_demo():
+    """Master visualiza somente integração real e não pode recriar DEMO."""
     app, servico = abrir_administracao()
     assert not app.exception
-    checkbox(app, "Usar somente dados fictícios identificados como DEMO").check()
-    botao(app, "Preparar prévia").click().run()
-    assert not app.exception
-    assert servico.auth.pages
-    assert not servico.auth.consolidated
-    assert botao(app, "Confirmar sincronização interna").disabled
-    checkbox(app, "Conferi a amostra, quantidades, totais e abrangência completa do período").check().run()
-    assert not servico.auth.consolidated
-    botao(app, "Confirmar sincronização interna").click().run()
-    assert not app.exception
-    assert servico.auth.consolidated
-    assert [item.value for item in app.title] == ["Administração", "Integrações"]
-    assert "_sync_preview" not in app.session_state
+    assert not any("dados fictícios identificados como DEMO" in x.label for x in app.checkbox)
+    assert not any(x.label == "Importar demonstração fictícia" for x in app.button)
+    assert botao(app, "Preparar prévia")
     app.run()
-    assert not app.exception
-    assert [name for name, _ in servico.auth.calls].count("sync_commit") == 1
-    assert servico.importacoes == []
-
+    assert not servico.auth.calls
+    assert not servico.importacoes
 
 def test_importacao_manual_valida_formulario_sem_arquivos():
     """O formulário completo continua acessível e recusa submissão incompleta."""
-    app, servico = abrir_administracao("Importação manual / DEMO")
+    app, servico = abrir_administracao("Importação CSV")
     assert not app.exception
     assert [item.label for item in app.get("file_uploader")] == ["produtos.csv", "vendas.csv"]
     botao(app, "Validar e importar").click().run()
@@ -178,27 +166,19 @@ def test_importacao_manual_valida_formulario_sem_arquivos():
     assert servico.auth.calls == []
 
 
-def test_importacao_demo_exige_confirmacao_e_nao_repete_no_rerun():
-    """A navegação não importa DEMO e o clique explícito permanece separado do aceite."""
-    app, servico = abrir_administracao("Importação manual / DEMO")
+def test_importacao_nao_possui_opcao_de_criar_lote_ficticio():
+    """A rotina produtiva CSV não permite gerar exemplos."""
+    app, servico = abrir_administracao("Importação CSV")
     assert not app.exception
-    assert botao(app, "Importar demonstração fictícia").disabled
-    checkbox(app, "Autorizo substituir a referência operacional por este lote fictício.").check().run()
-    assert not app.exception
-    assert servico.importacoes == []
-    assert not botao(app, "Importar demonstração fictícia").disabled
-    botao(app, "Importar demonstração fictícia").click().run()
-    assert not app.exception
-    assert len(servico.importacoes) == 1
+    assert not any("demonstração fictícia" in x.label.lower() for x in app.button)
+    assert not any("lote fictício" in x.label.lower() for x in app.checkbox)
     app.run()
     assert not app.exception
-    assert len(servico.importacoes) == 1
-    assert servico.auth.calls == []
-
+    assert not servico.importacoes
 
 @pytest.mark.parametrize("papel", ["Administrador", "Operador", "Visualizador"])
 @pytest.mark.parametrize(("permissao", "area", "titulo"), [
-    ("inventory.import", "Importação manual / DEMO", "Importar catálogo e vendas"),
+    ("inventory.import", "Importação CSV", "Importar catálogo e vendas"),
     ("parameters.edit", "Regras de Reposição", "Regras de Reposição"),
     ("audit.view", "Auditoria", "Auditoria"),
 ])
@@ -235,13 +215,9 @@ def test_master_sem_permissao_de_integracao_nao_recebe_diagnostico():
 
 @pytest.mark.parametrize("alteracao", ["permissao", "papel"])
 def test_revogacao_reseleciona_area_sem_exibir_ou_confirmar_previa(alteracao):
-    """A prévia existente não permanece na tela quando a integração perde acesso."""
+    """Revogação desativa a integração e não oferece importação simulada."""
     app, servico = abrir_administracao()
     assert not app.exception
-    checkbox(app, "Usar somente dados fictícios identificados como DEMO").check()
-    botao(app, "Preparar prévia").click().run()
-    assert not app.exception
-    assert app.dataframe
     chamadas = list(servico.auth.calls)
     contexto = servico.auth.context
     if alteracao == "permissao":
@@ -258,7 +234,6 @@ def test_revogacao_reseleciona_area_sem_exibir_ou_confirmar_previa(alteracao):
                    for item in app.button)
     assert servico.auth.calls == chamadas
     assert not servico.auth.consolidated
-
 
 @pytest.fixture
 def diagnostico_administrativo(monkeypatch):

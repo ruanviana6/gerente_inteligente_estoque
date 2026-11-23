@@ -1,4 +1,4 @@
-"""Valida fluxo fiscal DEMO em Chromium no computador e celular, sem ERP."""
+"""Confere que a interface fiscal de produção não abre cadastros DEMO."""
 
 import argparse
 import json
@@ -9,7 +9,7 @@ from validar_interface_vendas import servidor
 
 
 def verificar(browser, base, destino):
-    """Usa widgets reais e transporte fictício; RLS/Auth são testados separadamente."""
+    """Usa fixture de teste isolada; nenhum botão deve criar notas fictícias."""
     from playwright.sync_api import expect
     results = {'aprovado': False, 'natureza': 'Navegador real, gateway exclusivamente fictício', 'telas': {}}
     for width in [1440, 390]:
@@ -21,39 +21,20 @@ def verificar(browser, base, destino):
             page.goto(base, wait_until='domcontentloaded')
             expect(page.get_by_role('heading', name='Automação / Notas Fiscais', exact=True)).to_be_visible()
             expect(page.get_by_text('Controle fictício: execuções=0; solicitações=0', exact=True)).to_be_visible()
-            page.get_by_label('Número do pedido da FLT Comércio', exact=True).fill('1001')
-            page.get_by_role('button', name='Consultar pedido DEMO', exact=True).click()
-            expect(page.get_by_text('Dados fiscais manuais', exact=True)).to_be_visible()
-            expect(page.get_by_role('combobox', name='Modalidade do frete', exact=True)).to_have_value('')
-            expect(page.get_by_role('combobox', name='Tipo de contribuinte', exact=True)).to_have_value('')
-            aguardar_tela(page)
-            results['telas'][f'fiscal-selecoes-{width}'] = verificar_layout(page, f'fiscal-selecoes-{width}', destino, True, False)
-            frete = page.get_by_role('combobox', name='Modalidade do frete', exact=True)
-            frete.scroll_into_view_if_needed()
-            # Abrir pelo clique reproduz o uso real. Apenas focar e enviar uma
-            # seta depende do estado do popup e falhava no Chromium do CI.
-            frete.click()
-            page.get_by_role('option', name='1 · FOB: por conta do destinatário', exact=True).click()
-            expect(frete).to_have_value('1 · FOB: por conta do destinatário')
-            contribuinte = page.get_by_role('combobox', name='Tipo de contribuinte', exact=True)
-            contribuinte.scroll_into_view_if_needed()
-            contribuinte.click()
-            page.get_by_role('option', name='2 · Contribuinte isento de inscrição estadual', exact=True).click()
-            expect(contribuinte).to_have_value('2 · Contribuinte isento de inscrição estadual')
-            page.get_by_role('button', name='Gerar prévia DEMO', exact=True).click()
-            expect(page.get_by_role('heading', name='Prévia de cadastro da NF-e · DEMO', exact=True)).to_be_visible()
-            expect(page.get_by_role('combobox', name='Modalidade do frete', exact=True)).to_have_count(0)
-            expect(page.get_by_role('combobox', name='Tipo de contribuinte', exact=True)).to_have_count(0)
-            confirm = page.get_by_role('button', name='Confirmar cadastro da NF-e · DEMO', exact=True)
-            expect(confirm).to_be_disabled()
+            # A aplicação produtiva NÃO deve mais aceitar pedidos fiscais DEMO.
+            # O gateway da fixture continua existindo apenas para provar ausência de chamadas.
+            expect(page.get_by_text(
+                'Os pedidos fictícios e o cadastro DEMO foram retirados da operação.',
+                exact=False,
+            )).to_be_visible()
+            expect(page.get_by_role('button', name='Consultar pedido DEMO', exact=True)).to_have_count(0)
+            expect(page.get_by_role('button', name='Gerar prévia DEMO', exact=True)).to_have_count(0)
+            expect(page.get_by_role('button', name='Confirmar cadastro da NF-e · DEMO', exact=True)).to_have_count(0)
             expect(page.get_by_text('Controle fictício: execuções=0; solicitações=0', exact=True)).to_be_visible()
-            page.get_by_text('Conferi a prévia e autorizo somente o cadastro DEMO da NF-e; a emissão será manual no ERP', exact=True).click()
-            expect(confirm).to_be_enabled()
-            confirm.click()
-            expect(page.get_by_text('Controle fictício: execuções=1; solicitações=1', exact=True)).to_be_visible()
-            expect(page.get_by_text('DEMO: Cadastrada (DEMO), emissão manual no ERP', exact=True)).to_be_visible()
             aguardar_tela(page)
-            results['telas'][f'fiscal-resultado-{width}'] = verificar_layout(page, f'fiscal-resultado-{width}', destino, True, False)
+            results['telas'][f'fiscal-sem-demo-{width}'] = verificar_layout(
+                page, f'fiscal-sem-demo-{width}', destino, True, False,
+            )
             assert page.get_by_role('button', name='Baixar XML', exact=True).count() == 0
             assert page.get_by_role('button', name='Baixar PDF', exact=True).count() == 0
         except Exception:

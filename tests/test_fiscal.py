@@ -174,9 +174,7 @@ class GatewayFiscalDemo:
 
 def abrir_fiscal(monkeypatch):
     """Executa widgets Streamlit verdadeiros, sem servidor público nem bypass produtivo."""
-    import web.fiscal_page
     gateway = GatewayFiscalDemo(AuthFiscal())
-    monkeypatch.setattr(web.fiscal_page, 'FiscalService', lambda auth: gateway)
     script = "from web.fiscal_page import fiscal\nfrom test_fiscal import AuthFiscal\nfrom types import SimpleNamespace\na=AuthFiscal()\nfiscal(SimpleNamespace(auth=a),a.require('fiscal.view'))\n"
     app = AppTest.from_string(script, default_timeout=30).run()
     assert not app.exception
@@ -188,45 +186,27 @@ def clicar(app, label):
     assert not app.exception
 
 
-def test_interface_nao_emite_ao_abrir_e_exige_duas_escolhas(monkeypatch):
+def test_interface_produtiva_nao_oferece_cadastro_demo(monkeypatch):
+    """Abrir a área fiscal não gera solicitações nem disponibiliza cenários fake."""
     app, gateway = abrir_fiscal(monkeypatch)
-    assert gateway.executions == 0 and not app.selectbox
-    app.text_input[0].set_value('1001')
-    clicar(app, 'Consultar pedido DEMO')
-    assert all(s.value is None for s in app.selectbox)
-    assert not gateway.previews and not gateway.requests
-    app.selectbox[0].set_value(1)
-    assert app.selectbox[1].value is None and not gateway.requests
-    app.selectbox[1].set_value(2)
-    clicar(app, 'Gerar prévia DEMO')
-    assert next(b for b in app.button if b.label == 'Confirmar cadastro da NF-e · DEMO').disabled
-    next(c for c in app.checkbox if c.key == 'fiscal_confirmacao').check().run()
-    clicar(app, 'Confirmar cadastro da NF-e · DEMO')
-    assert gateway.executions == 1 and gateway.requests[0]['taxpayer'] == 2
-    app.run()
-    assert gateway.executions == 1
-    assert all(s.value is None for s in app.selectbox)
+    assert not app.exception
+    assert not app.text_input
+    assert not app.selectbox
+    assert not any("DEMO" in b.label or "fictício" in b.label for b in app.button)
+    assert any("pedidos fictícios e o cadastro DEMO foram retirados" in str(i.value)
+               for i in app.info)
+    assert gateway.executions == 0 and not gateway.requests
     assert not app.get('download_button')
 
 
-def test_editar_escolha_invalida_previa(monkeypatch):
+def test_reexecutar_interface_fiscal_nao_aciona_executor_demo(monkeypatch):
+    """Reruns são exclusivamente leituras de página, nunca simulações de nota."""
     app, gateway = abrir_fiscal(monkeypatch)
-    app.text_input[0].set_value('1001')
-    clicar(app, 'Consultar pedido DEMO')
-    app.selectbox[0].set_value(1)
-    app.selectbox[1].set_value(2)
-    clicar(app, 'Gerar prévia DEMO')
-    assert any(b.label == 'Confirmar cadastro da NF-e · DEMO' for b in app.button)
-    assert not app.selectbox
-    next(c for c in app.checkbox if c.key == 'fiscal_confirmacao').check().run()
-    clicar(app, 'Alterar regras e gerar nova prévia')
-    app.selectbox[0].set_value(1)
-    app.selectbox[1].set_value(9)
-    assert all(b.label != 'Confirmar cadastro da NF-e · DEMO' for b in app.button)
-    clicar(app, 'Gerar prévia DEMO')
-    assert next(c for c in app.checkbox if c.key == 'fiscal_confirmacao').value is False
-    assert next(b for b in app.button if b.label == 'Confirmar cadastro da NF-e · DEMO').disabled
-    assert not gateway.requests
+    app.run()
+    assert not app.exception
+    assert gateway.executions == 0
+    assert not gateway.requests and not gateway.previews
+    assert not any(b.label == 'Gerar prévia DEMO' for b in app.button)
 
 
 def test_contratos_sql_preservam_catalogo_legado_e_regra_atual():

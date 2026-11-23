@@ -20,6 +20,7 @@ from reposicao.embalagens import ler_embalagens
 from web.downloads import csv_export
 from web.errors import AuthorizationError
 from web.insights import gerar_insights
+from web.real_catalog_stock_page import real_catalog_controls
 from web.real_replenishment_triage import real_triage_controls
 from web.reports import filtrar_relatorio
 from web.theme import metric_card, page_header, status_badge, surface
@@ -169,7 +170,7 @@ def _carregar(servico: Any, modulo: str, contexto: Any) -> dict | None:
     _validar_contexto(contexto, dados.get("_access_context"))
     _origem(dados)
     if dados["panel"].empty:
-        st.info("Ainda não há produtos. Um usuário com permissão de importação pode carregar os CSVs.")
+        st.info("Ainda não há base canônica de estoque e vendas para calcular indicadores. Use a fotografia real acima ou a triagem na Reposição Inteligente; não gere sugestões com dados incompletos.")
         return None
     return dados
 
@@ -239,7 +240,8 @@ def _filtros(painel: pd.DataFrame, prefixo: str) -> tuple[pd.DataFrame, dict]:
 
 def _estoque(servico: Any, contexto: Any) -> None:
     """Apresenta catálogo paginado e calcula séries somente quando solicitadas."""
-    page_header("Estoque e histórico", "Encontre o produto e confira a memória dos indicadores.")
+    page_header("Estoque e histórico", "Conferência das fotografias reais e dados consolidados.")
+    real_catalog_controls(servico, contexto)
     dados = _carregar(servico, "inventory.view", contexto)
     if dados is None:
         return
@@ -540,15 +542,7 @@ def _importacao(servico: Any, contexto: Any) -> None:
         dados = servico.load_inventory("inventory.view")
         _validar_contexto(contexto, dados.get("_access_context"))
         _tabela(pd.DataFrame(dados.get("imports", [])), key="importacoes_historico", paginar=False)
-    if _perfil(contexto, "role") == "Master":
-        with st.expander("Carregar dados fictícios para validação"):
-            st.caption("Cria um lote demonstrativo nesta organização. Não consulta o ERP.")
-            referencia = st.date_input("Data da demonstração", value=hoje, max_value=hoje)
-            confirmar = st.checkbox("Autorizo substituir a referência operacional por este lote fictício.")
-            if st.button("Importar demonstração fictícia", disabled=not confirmar):
-                with st.spinner("Preparando o lote fictício…"):
-                    servico.import_demo(referencia, referencia - pd.Timedelta(days=119), referencia)
-                st.success("Lote fictício importado. Abra o painel para analisar os resultados.")
+
 
 
 def _parametros(servico: Any, contexto: Any) -> None:
@@ -764,7 +758,7 @@ def _administracao(servico: Any, contexto: Any) -> None:
     if contexto.can("parameters.edit"):
         opcoes["Regras de Reposição"] = _parametros
     if contexto.can("inventory.import"):
-        opcoes["Importação manual / DEMO"] = _importacao
+        opcoes["Importação CSV"] = _importacao
     if master and contexto.can("integrations.manage"):
         opcoes["Integrações"] = integracoes
     if contexto.can("audit.view"):
@@ -783,13 +777,11 @@ def _administracao(servico: Any, contexto: Any) -> None:
     elif area == "Relatórios por e-mail":
         _configurar_relatorios(servico, servico.admin_list_users())
     elif area == "Configuração fiscal":
-        fiscal = FiscalService(servico.auth)
-        config = fiscal.configuracao()
-        st.info("Uma API · FLT Comércio → Flagship - Flatter · Somente cadastro. Emissão manual no GestãoClick, nunca pela automação. Sem XML/PDF.")
-        habilitado = st.checkbox("Habilitar módulo DEMO", value=config['demo_enabled'])
-        if st.button("Salvar configuração fiscal"):
-            fiscal.configurar(habilitado)
-            st.success("Configuração DEMO salva. A emissão real permanece bloqueada.")
+        st.info(
+            "Os cenários simulados foram retirados da operação. "
+            "A consulta real de vendas e NF-e está na aba Automação / Notas Fiscais. "
+            "Cadastro real só será liberado após homologação fiscal e proteção contra duplicidade."
+        )
     else:
         fiscal = FiscalService(servico.auth)
         registros = fiscal.auditar()

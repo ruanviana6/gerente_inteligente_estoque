@@ -1,0 +1,109 @@
+"""Exibição da última fotografia real do catálogo, sem atualizar ou modificar o ERP."""
+from __future__ import annotations
+
+from datetime import datetime
+from decimal import Decimal, InvalidOperation
+from uuid import UUID
+from zoneinfo import ZoneInfo
+
+import streamlit as st
+
+from integracoes.gestaoclick import ContratoInvalido, GestaoClickError
+from web.errors import AppError, AuthenticationError, AuthorizationError
+from web.real_home_status import selecionar_fonte_real
+from web.sales_service import access_stamp
+
+
+def validar_fotografia(value, loja):
+    """Recusa lotes ambíguos, parciais ou com somatório inconsistente."""
+    if not isinstance(value, dict) or value.get("store_id") != loja:
+        raise ContratoInvalido("A fotografia não pertence à loja autorizada.")
+    if value.get("found") is False and set(value) == {"found", "store_id"}:
+        return None
+    produtos = value.get("products")
+    n = value.get("product_count")
+    if value.get("found") is not True or not isinstance(produtos, list) or type(n) is not int or not 1 <= n <= 1000 or len(produtos) != n:
+        raise ContratoInvalido("A fotografia não possui cobertura reconciliada.")
+    try:
+        data = datetime.fromisoformat(value["created_at"].replace("Z", "+00:00"))
+        total = Decimal(str(value["total_stock"]))
+    except (KeyError, ValueError, TypeError, InvalidOperation, AttributeError):
+        raise ContratoInvalido("Metadados da fotografia inválidos.") from None
+    if data.utcoffset() is None or not total.is_finite() or total < 0:
+        raise ContratoInvalido("A fotografia não possui data ou saldo válido.")
+    linhas = []
+    vistos = set()
+    soma = Decimal("0")
+    for row in produtos:
+        if not isinstance(row, dict):
+            raise ContratoInvalido("Produto inválido na fotografia.")
+        codigo = row.get("id")
+        if not isinstance(codigo, str) or not 1 <= len(codigo) <= 20 or not codigo.isascii() or not codigo.isdigit() or codigo in vistos:
+            raise ContratoInvalido("ID de produto duplicado ou inválido.")
+        valor = row.get("estoque")
+        if isinstance(valor, bool) or not isinstance(valor, (int, float, str, Decimal)):
+            raise ContratoInvalido("Quantidade de estoque inválida.")
+        try:
+            saldo = Decimal(str(valor))
+        except InvalidOperation:
+            raise ContratoInvalido("Quantidade de estoque inválida.") from None
+        if not saldo.is_finite() or saldo < 0 or saldo > Decimal("1000000000000"):
+            raise ContratoInvalido("Quantidade de estoque fora do limite.")
+        vistos.add(codigo)
+        soma += saldo
+        linhas.append({"Produto (ID)": codigo, "Saldo na fotografia (não atual)": float(saldo)})
+    if soma != total:
+        raise ContratoInvalido("Os saldos da fotografia não conciliam.")
+    linhas.sort(key=lambda x: int(x["Produto (ID)"]))
+    return {"store_id": loja, "created_at": data, "total_stock": total, "rows": linhas}
+
+
+def consultar_catalogo_real(auth):
+    """Usa somente duas RPCs autorizadas no Supabase, sem conexão ao GestãoClick."""
+    with auth.operation():
+        antes = auth.require("integrations.manage")
+        if antes.profile.role != "Master":
+            raise AuthorizationError("Catálogo real disponível somente para Master.")
+        stamp = access_stamp(antes, auth.generation)
+        fonte = selecionar_fonte_real(auth.rpc("integration_sources", {}, "trends.view"))
+        if fonte is None:
+            return None
+        fonte_id, loja_id = fonte
+        UUID(fonte_id)
+        bruto = auth.rpc("catalog_stock_latest", {
+            "p_source_id": fonte_id, "p_store_id": loja_id,
+        }, "integrations.manage")
+        if stamp != access_stamp(auth.require("integrations.manage"), auth.generation):
+            raise AuthorizationError("A autorização mudou durante a consulta.")
+        return validar_fotografia(bruto, loja_id)
+
+
+def real_catalog_controls(servico, contexto):
+    """Permite conferir todos os produtos reais no Estoque, sem importar DEMO."""
+    if contexto.profile.role != "Master" or not contexto.can("integrations.manage"):
+        return
+    st.subheader("Catálogo real · última fotografia do GestãoClick")
+    try:
+        foto = consultar_catalogo_real(servico.auth)
+    except (AuthenticationError, AuthorizationError):
+        raise
+    except (AppError, GestaoClickError, ValueError, TypeError):
+        st.warning("Não foi possível carregar a fotografia real. Confira Administração → Integrações.")
+        return
+    if foto is None:
+        st.info("Nenhuma fotografia real disponível no Supabase.")
+        return
+    data = foto["created_at"].astimezone(ZoneInfo("America/Fortaleza"))
+    a, b = st.columns(2)
+    a.metric("Produtos na fotografia", len(foto["rows"]))
+    b.metric("Saldo agregado da fotografia", f'{foto["total_stock"]:,.0f}'.replace(",", "."))
+    st.caption(f'Loja {foto["store_id"]} · Última fotografia: {data:%d/%m/%Y %H:%M} (Fortaleza).')
+    st.warning(
+        "Esta é a última fotografia gravada no Supabase, NÃO o estoque ao vivo. "
+        "Não subtraia vendas observadas deste saldo nem use a lista para fazer pedidos automaticamente."
+    )
+    busca = st.text_input("Buscar produto pelo ID", key="estoque_catalogo_real_busca").strip()
+    linhas = foto["rows"]
+    if busca:
+        linhas = [r for r in linhas if busca in r["Produto (ID)"]]
+    st.dataframe(linhas, hide_index=True, width="stretch", key="estoque_catalogo_real_tabela")
