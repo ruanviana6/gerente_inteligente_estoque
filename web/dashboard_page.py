@@ -8,6 +8,7 @@ import streamlit as st
 from integracoes.gestaoclick import GestaoClickError
 from web.errors import AppError, AuthenticationError, AuthorizationError
 from web.real_home_status import consultar_status_real
+from web.real_store_selector import escolher_loja_real
 from web.theme import metric_card, page_header, surface
 
 ALERTAS = {
@@ -31,8 +32,11 @@ def _historico_real_na_abertura(servico, contexto):
     """Mostra os últimos dados reais salvos, não chama ERP nem sugere compras."""
     if contexto.profile.role != "Master" or not contexto.can("integrations.manage"):
         return
+    loja_id = escolher_loja_real(servico.auth)
+    if loja_id is None:
+        return
     try:
-        dados = consultar_status_real(servico.auth)
+        dados = consultar_status_real(servico.auth, loja_id)
     except (AuthenticationError, AuthorizationError):
         raise
     except (AppError, GestaoClickError, ValueError, TypeError):
@@ -42,6 +46,10 @@ def _historico_real_na_abertura(servico, contexto):
         )
         return
     if dados is None:
+        st.caption(
+            f"A loja {loja_id} ainda não tem observação real de demanda reconciliada. "
+            "Isso não significa que não houve vendas. Consulte Administração → Integrações."
+        )
         return
     st.subheader("Dados reais da Flatter · última coleta salva")
     a, b, c = st.columns(3)
