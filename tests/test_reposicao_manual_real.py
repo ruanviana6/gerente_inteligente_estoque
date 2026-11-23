@@ -7,7 +7,11 @@ import pytest
 
 from reposicao.cenario_manual_real import preparar_reposicao_real
 from web.real_catalog_stock_page import validar_fotografia
-from web.real_manual_replenishment_page import (\n    exportar_cenario_manual_csv,\n    produtos_reais_identificados,\n    rotulo_produto_real,\n)
+from web.real_manual_replenishment_page import (
+    exportar_cenario_manual_csv,
+    produtos_reais_identificados,
+    rotulo_produto_real,
+)
 
 DATA = date(2026, 11, 23)
 
