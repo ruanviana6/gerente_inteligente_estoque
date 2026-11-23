@@ -49,9 +49,22 @@ def validar_fotografia(value, loja):
             raise ContratoInvalido("Quantidade de estoque inválida.") from None
         if not saldo.is_finite() or saldo < 0 or saldo > Decimal("1000000000000"):
             raise ContratoInvalido("Quantidade de estoque fora do limite.")
+        nome, categoria, codigo_interno = (row.get(k) for k in ("nome", "categoria", "codigo_interno"))
+        for campo, rotulo in ((nome, "nome"), (categoria, "categoria"), (codigo_interno, "código interno")):
+            if campo is not None and (
+                not isinstance(campo, str) or not 1 <= len(campo.strip()) <= 200
+                or any(ord(c) < 32 or ord(c) == 127 or c in "<>" for c in campo)
+            ):
+                raise ContratoInvalido(f"Identificação inválida no {rotulo} do produto.")
         vistos.add(codigo)
         soma += saldo
-        linhas.append({"Produto (ID)": codigo, "Saldo na fotografia (não atual)": float(saldo)})
+        linhas.append({
+            "Produto": nome or "Não informado",
+            "Categoria": categoria or "Não informada",
+            "Código interno": codigo_interno or "Não informado",
+            "Produto (ID)": codigo,
+            "Saldo na fotografia (não atual)": float(saldo),
+        })
     if soma != total:
         raise ContratoInvalido("Os saldos da fotografia não conciliam.")
     linhas.sort(key=lambda x: int(x["Produto (ID)"]))
@@ -102,8 +115,22 @@ def real_catalog_controls(servico, contexto):
         "Esta é a última fotografia gravada no Supabase, NÃO o estoque ao vivo. "
         "Não subtraia vendas observadas deste saldo nem use a lista para fazer pedidos automaticamente."
     )
-    busca = st.text_input("Buscar produto pelo ID", key="estoque_catalogo_real_busca").strip()
+    sem_nome = sum(r["Produto"] == "Não informado" for r in foto["rows"])
+    sem_categoria = sum(r["Categoria"] == "Não informada" for r in foto["rows"])
+    if sem_nome or sem_categoria:
+        st.info(
+            f"Identificação pendente: {sem_nome} produto(s) sem nome e "
+            f"{sem_categoria} sem categoria na última fotografia. "
+            "Em Administração → Integrações, consulte o catálogo completo da loja "
+            "e salve uma nova fotografia para trazer os dados reais."
+        )
+    busca = st.text_input("Buscar por nome, categoria, código ou ID",
+                          key="estoque_catalogo_real_busca").strip()
     linhas = foto["rows"]
     if busca:
-        linhas = [r for r in linhas if busca in r["Produto (ID)"]]
+        termo = busca.casefold()
+        linhas = [r for r in linhas if any(
+            termo in str(r[c]).casefold() for c in
+            ("Produto", "Categoria", "Código interno", "Produto (ID)")
+        )]
     st.dataframe(linhas, hide_index=True, width="stretch", key="estoque_catalogo_real_tabela")
