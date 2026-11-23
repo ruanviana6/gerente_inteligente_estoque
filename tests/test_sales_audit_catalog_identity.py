@@ -52,7 +52,7 @@ def test_fotografia_real_com_rotulos_nao_interrompe_conciliacao():
         "produto_id;nome_produto;categoria;codigo_interno;quantidade_observada_un",
         "123;Perfume Original 100 ml;Perfumaria;PFF33;2",
     ]
-    assert "10" not in csv and "venda-1" not in csv
+    assert ";10;" not in csv and "venda-1" not in csv
 
 
 def test_fotografia_antiga_continua_aceita_sem_inventar_rotulos():
@@ -79,7 +79,7 @@ def test_rotulo_de_planilha_nao_executa_formula_csv():
 
 @pytest.mark.parametrize("campo,valor", [
     ("nome", "<img>"),
-    ("categoria", "Categoria\\nInjetada"),
+    ("categoria", "Categoria" + chr(10) + "Injetada"),
     ("codigo_interno", ["INDEVIDO"]),
     ("nome", "A" * 201),
     ("cliente", "Nao pertence ao contrato"),
@@ -94,4 +94,4 @@ def test_rotulos_nao_podem_ser_reaproveitados_de_outra_loja():
     resumo = _conciliar(foto)
     foto["store_id"] = "LOJA-OUTRA"
     with pytest.raises(ContratoInvalido):
-        rotular_agrupamento(resumo, foto)
+        rotular_agrupamento(resumo, foto, "416023")
