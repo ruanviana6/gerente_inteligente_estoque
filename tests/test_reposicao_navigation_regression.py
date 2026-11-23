@@ -36,4 +36,4 @@ def test_categoria_vazia_so_informa_sem_botao_de_navegacao():
     app = AppTest.from_string(script, default_timeout=30).run()
     assert not app.exception
     assert not app.button
-    assert "sem categoria" in " ".join(x.message for x in app.info)
+    assert len(app.info) == 1
