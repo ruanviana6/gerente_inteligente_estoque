@@ -52,6 +52,8 @@ class ProdutoCatalogo:
     codigo_interno: str | None
     estoque: Decimal | None
     variacoes: tuple[VariacaoCatalogo, ...]
+    nome: str | None = None
+    categoria: str | None = None
 
 
 @dataclass(frozen=True, repr=False)
@@ -152,6 +154,33 @@ def _codigo(value: Any, *, campo: str, opcional: bool = False) -> str | None:
     return value.strip()
 
 
+def _rotulo_erp(value: Any, *, campo: str) -> str | None:
+    """Preserva somente o nome devolvido pelo ERP, sem deduzir por SKU/ID."""
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str) or not 1 <= len(value.strip()) <= 200:
+        raise ContratoInvalido(f"O catálogo devolveu {campo} em formato inválido.")
+    texto = value.strip()
+    if any(unicodedata.category(ch).startswith("C") or ch in "<>" for ch in texto):
+        raise ContratoInvalido(f"O catálogo devolveu {campo} com caracteres inválidos.")
+    return texto
+
+
+def _categoria_erp(row: Mapping[str, Any]) -> str | None:
+    """Grupo de produto é sua categoria, quando o nome estiver no retorno."""
+    for chave in ("nome_grupo", "grupo_nome", "nome_grupo_produto", "nome_categoria", "categoria"):
+        if chave in row:
+            nome = _rotulo_erp(row[chave], campo="grupo do produto")
+            if nome:
+                return nome
+    grupo = row.get("grupo")
+    if isinstance(grupo, Mapping):
+        return _rotulo_erp(grupo.get("nome"), campo="grupo do produto")
+    if isinstance(grupo, str):
+        return _rotulo_erp(grupo, campo="grupo do produto")
+    return None
+
+
 def _estoque(value: Any) -> Decimal | None:
     """Preserva quantidades decimais, inclusive negativas, sem converter unidades."""
     if value is None:
@@ -241,6 +270,8 @@ def _projetar(
                 id=id_prod, codigo_interno=_codigo(row.get("codigo_interno"),
                                                   campo="produto.codigo_interno", opcional=True),
                 estoque=_estoque(row.get("estoque")), variacoes=tuple(parsed),
+                nome=_rotulo_erp(row.get("nome"), campo="nome do produto"),
+                categoria=_categoria_erp(row),
             ))
     return tuple(products), len(rows), total
 

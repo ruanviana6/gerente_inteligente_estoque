@@ -81,6 +81,8 @@ def catalog_preview_controls(servico, carregar_configuracao, conta, loja_id: str
     for produto in previa.produtos:
         if not produto.variacoes:
             linhas.append({
+                "Produto": produto.nome or "Não informado",
+                "Categoria": produto.categoria or "Não informada",
                 "Produto (ID)": produto.id,
                 "Código interno": produto.codigo_interno or "Não informado",
                 "Estoque do produto (loja)": valor(produto.estoque),
@@ -91,6 +93,8 @@ def catalog_preview_controls(servico, carregar_configuracao, conta, loja_id: str
             })
         for variacao in produto.variacoes:
             linhas.append({
+                "Produto": produto.nome or "Não informado",
+                "Categoria": produto.categoria or "Não informada",
                 "Produto (ID)": produto.id,
                 "Código interno": produto.codigo_interno or "Não informado",
                 "Estoque do produto (loja)": valor(produto.estoque),

@@ -87,6 +87,8 @@ def operational_review_controls(servico, conta, loja_id):
         linhas = []
         for item in dados.rows:
             linhas.append({
+                "Produto": item.product_name or "Não informado",
+                "Categoria": item.category or "Não informada",
                 "Produto (ID)": item.product_id,
                 "Código interno (fotografia)": item.internal_code or "Não informado",
                 "UN observadas no período": float(item.observed_un),

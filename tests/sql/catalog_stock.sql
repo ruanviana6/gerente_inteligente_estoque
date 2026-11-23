@@ -101,6 +101,19 @@ select catalog_test.denied(format(
  'select public.catalog_stock_commit(%L,%L,1,11,%L::jsonb,true)',
  :'source','loja1',jsonb_build_array(catalog_test.rows()->0,catalog_test.rows()->0)::text
 ),'22023','duplicação e contagem inconsistente rejeitadas');
+-- A identificação é uma nova fotografia real: não altera saldos, histórico ou o ERP.
+savepoint teste_identificacao;
+select catalog_test.check(
+ (public.catalog_stock_commit(:'source','loja1',1,11,
+   jsonb_build_array(catalog_test.rows()->0 ||
+     '{"nome":"Perfume Teste","categoria":"Perfumaria"}'::jsonb),true)
+  ->>'reused')::boolean is false,
+ 'novo nome/categoria gera versão sem sobrescrever fotografia anterior');
+select catalog_test.check(
+ public.catalog_stock_latest(:'source','loja1')->'products'->0->>'nome'='Perfume Teste'
+ and public.catalog_stock_latest(:'source','loja1')->'products'->0->>'categoria'='Perfumaria',
+ 'leitura preserva nome e categoria reais do produto pela mesma fonte e loja');
+rollback to savepoint teste_identificacao;
 select catalog_test.login(2);
 select catalog_test.denied(format(
  'select public.catalog_stock_latest(%L,%L)',:'source','loja1'

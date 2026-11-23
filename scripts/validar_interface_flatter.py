@@ -231,8 +231,8 @@ def verificar_fluxos(browser, base: str, destino: Path, controle: Path, estrito:
                 pagina, f"painel-{largura}", destino, estrito, miniaturas,
             )
             navegar(pagina, "Estoque")
-            pagina.get_by_label("Buscar por nome ou SKU", exact=True).fill("FT-00002")
-            pagina.get_by_label("Buscar por nome ou SKU", exact=True).press("Enter")
+            pagina.get_by_label("Buscar por nome, categoria ou SKU", exact=True).fill("FT-00002")
+            pagina.get_by_label("Buscar por nome, categoria ou SKU", exact=True).press("Enter")
             aguardar_tela(pagina)
             pagina.get_by_text("SKU FT-00002", exact=False).wait_for()
             graficos = pagina.get_by_label("Mostrar gráficos do produto", exact=True)
@@ -321,7 +321,7 @@ def verificar_fluxos(browser, base: str, destino: Path, controle: Path, estrito:
         master.get_by_role("button", name="Sair", exact=True).click()
         master.get_by_role("button", name="Entrar", exact=True).wait_for()
         navegar(paginas["Operador"], "Estoque")
-        assert paginas["Operador"].get_by_label("Buscar por nome ou SKU", exact=True).is_visible()
+        assert paginas["Operador"].get_by_label("Buscar por nome, categoria ou SKU", exact=True).is_visible()
         conferir_perfil(paginas["Visualizador"], "Visualizador")
         resultados["fluxos"]["logout-isolado-entre-contextos"] = "aprovado"
 

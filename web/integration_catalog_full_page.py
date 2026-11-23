@@ -99,6 +99,8 @@ def catalog_full_controls(servico, carregar_configuracao, conta, loja_id: str) -
                 "Essas informações não serão usadas no motor de estoque."
             )
         linhas = [{
+            "Produto": p.nome or "Não informado pelo GestãoClick",
+            "Categoria": p.categoria or "Não informada pelo GestãoClick",
             "Produto (ID)": p.id,
             "Código interno": p.codigo_interno or "Não informado",
             "Estoque desta loja": format(p.estoque, "f") if p.estoque is not None else "Não informado",
@@ -111,6 +113,18 @@ def catalog_full_controls(servico, carregar_configuracao, conta, loja_id: str) -
             "O HTTP 200 não comprova, sozinho, que a chave enxerga o estoque da empresa inteira."
         )
 
+        sem_nome = sum(p.nome is None for p in catalogo.produtos)
+        sem_categoria = sum(p.categoria is None for p in catalogo.produtos)
+        st.caption(
+            f"Identificação no retorno real: {len(catalogo.produtos) - sem_nome} "
+            f"produto(s) com nome e {len(catalogo.produtos) - sem_categoria} com categoria."
+        )
+        if sem_nome or sem_categoria:
+            st.warning(
+                f"O retorno da API não informou {sem_nome} nome(s) e "
+                f"{sem_categoria} categoria(s). Esses campos permanecerão não informados "
+                "em vez de receberem valores inventados. Confira o cadastro do produto no ERP."
+            )
         if catalogo.sem_estoque or not catalogo.produtos:
             st.warning("Há produtos sem saldo informado ou catálogo vazio. "
                        "Nenhuma fotografia pode ser salva.")

@@ -30,6 +30,8 @@ def priorizar_conferencia(dados: ConferenciaObservada) -> list[dict]:
             ordem, etiqueta = 4, "Conferir saldo atual"
         linhas.append({
             "_ordem": ordem,
+            "Produto": row.product_name or "Não informado",
+            "Categoria": row.category or "Não informada",
             "Produto (ID)": row.product_id,
             "Código interno": row.internal_code or "Não informado",
             "Situação da fotografia": etiqueta,

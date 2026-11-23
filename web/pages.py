@@ -49,16 +49,16 @@ PERMISSOES = {
 }
 
 COLUNAS_ESTOQUE = [
-    "codigo", "nome", "estoque", "venda_media_diaria", "cobertura_dias", "status",
+    "codigo", "nome", "categoria", "estoque", "venda_media_diaria", "cobertura_dias", "status",
 ]
 COLUNAS_REPOSICAO = [
-    "fornecedor", "codigo", "nome", "status", "estoque", "reservas", "pedidos_pendentes",
+    "fornecedor", "codigo", "nome", "categoria", "status", "estoque", "reservas", "pedidos_pendentes",
     "venda_media_diaria", "cobertura_dias", "prazo_entrega_dias", "estoque_seguranca",
     "ponto_pedido", "posicao_estoque", "estoque_alvo", "risco_prazo", "quantidade_sugerida",
     "demanda_estimavel", "requer_revisao", "aviso_qualidade",
 ]
 ROTULOS = {
-    "codigo": "SKU", "nome": "Produto", "fornecedor": "Fornecedor", "status": "Situação",
+    "codigo": "SKU", "nome": "Produto", "categoria": "Categoria", "fornecedor": "Fornecedor", "status": "Situação",
     "estoque": "Estoque (un.)", "venda_media_diaria": "Demanda/dia", "cobertura_dias": "Cobertura (dias)",
     "prazo_entrega_dias": "Prazo (dias)", "risco_prazo": "Risco antes da entrega",
     "aviso_qualidade": "Qualidade do histórico", "custo_unitario": "Custo unitário (R$)",
@@ -211,7 +211,7 @@ def _filtros(painel: pd.DataFrame, prefixo: str) -> tuple[pd.DataFrame, dict]:
     """Mantém busca direta e filtros visíveis, sem alterar o conjunto recebido."""
     estados = sorted(painel["status"].unique().tolist())
     with surface("flatter_filtros_" + prefixo):
-        busca = st.text_input("Buscar por nome ou SKU", key=prefixo + "_busca", max_chars=120,
+        busca = st.text_input("Buscar por nome, categoria ou SKU", key=prefixo + "_busca", max_chars=120,
                               placeholder="Digite o código ou o nome do produto").strip()
         status = st.multiselect("Situações", estados, default=estados, key=prefixo + "_status")
         opcoes = {"": "Todos os produtos", "ruptura": "Em ruptura", "risco": "Risco antes da entrega",
@@ -227,8 +227,12 @@ def _filtros(painel: pd.DataFrame, prefixo: str) -> tuple[pd.DataFrame, dict]:
                   key=prefixo + "_limpar")
     vista = painel.loc[painel["status"].isin(status)].copy()
     if busca:
-        vista = vista.loc[vista["codigo"].str.contains(busca, case=False, regex=False)
-                          | vista["nome"].str.contains(busca, case=False, regex=False)]
+        encontrado = (vista["codigo"].str.contains(busca, case=False, regex=False)
+                      | vista["nome"].str.contains(busca, case=False, regex=False))
+        if "categoria" in vista:
+            encontrado = encontrado | vista["categoria"].fillna("").str.contains(
+                busca, case=False, regex=False)
+        vista = vista.loc[encontrado]
     if filtro == "ruptura":
         vista = vista.loc[vista["status"].eq("Ruptura")]
     elif filtro == "risco":
@@ -258,7 +262,7 @@ def _estoque(servico: Any, contexto: Any) -> None:
     item = vista.loc[vista["codigo"].eq(codigo)].iloc[0]
     with surface("flatter_produto"):
         st.subheader(str(item["nome"]))
-        st.caption(f"SKU {codigo}")
+        st.caption(f"SKU {codigo}" + (f" · Categoria: {item['categoria']}" if "categoria" in item.index and pd.notna(item["categoria"]) else ""))
         status_badge(str(item["status"]), tone=TONS_STATUS.get(str(item["status"]), "neutral"))
         if item["risco_prazo"]:
             status_badge("Risco antes da entrega", tone="danger")

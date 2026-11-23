@@ -20,6 +20,8 @@ class LinhaConferencia:
     internal_code: str | None
     observed_un: Decimal
     stock_snapshot: Decimal | None
+    product_name: str | None = None
+    category: str | None = None
 
 
 @dataclass(frozen=True)
@@ -65,6 +67,23 @@ def _instante(valor: object) -> datetime:
     return instante
 
 
+def _rotulo(value: object) -> str | None:
+    """Recusa texto potencialmente perigoso sem inventar identificações."""
+    if value is None:
+        return None
+    if (not isinstance(value, str) or not 1 <= len(value.strip()) <= 200
+            or any(ord(c) < 32 or ord(c) == 127 or c in "<>" for c in value)):
+        raise ContratoInvalido("Nome ou categoria inválido na observação.")
+    return value.strip()
+
+
+def _csv_rotulo(value: str | None) -> str:
+    """Protege Excel contra fórmulas em rótulos vindos de sistemas externos."""
+    if value is None:
+        return ""
+    return "'" + value if value.lstrip().startswith(("=", "+", "-", "@")) else value
+
+
 def conferir_observacao(payload: object, loja: str) -> ConferenciaObservada | None:
     """Confere integridade antes de qualquer exibição ou exportação."""
     if not isinstance(payload, dict) or payload.get("store_id") != loja:
@@ -101,9 +120,9 @@ def conferir_observacao(payload: object, loja: str) -> ConferenciaObservada | No
     ids = set()
     soma = Decimal(0)
     for item in linhas_brutas:
-        if not isinstance(item, dict) or set(item) != {
-            "product_id", "internal_code", "observed_un", "stock_snapshot"
-        }:
+        obrigatorios = {"product_id", "internal_code", "observed_un", "stock_snapshot"}
+        if (not isinstance(item, dict) or not obrigatorios.issubset(item)
+                or set(item) - obrigatorios - {"product_name", "category"}):
             raise ContratoInvalido("Linha da observação com formato inesperado.")
         pid = item["product_id"]
         if (not isinstance(pid, str) or not re.fullmatch(r"[0-9]{1,30}", pid) or
@@ -120,7 +139,10 @@ def conferir_observacao(payload: object, loja: str) -> ConferenciaObservada | No
         if quantidade == 0 or (saldo is not None and saldo > 1000000000):
             raise ContratoInvalido("Quantidade inesperada na conferência.")
         soma += quantidade
-        linhas.append(LinhaConferencia(pid, codigo, quantidade, saldo))
+        linhas.append(LinhaConferencia(
+            pid, codigo, quantidade, saldo,
+            _rotulo(item.get("product_name")), _rotulo(item.get("category")),
+        ))
     if soma != total:
         raise ContratoInvalido("Soma das quantidades observadas não confere.")
     linhas.sort(key=lambda r: (-r.observed_un, int(r.product_id)))
@@ -137,11 +159,12 @@ def exportar_conferencia_csv(dados: ConferenciaObservada) -> bytes:
     arquivo = io.StringIO(newline="")
     w = csv.writer(arquivo, delimiter=";", lineterminator="\n")
     w.writerow(("produto_id", "codigo_interno_fotografia", "unidades_observadas", "saldo_ultima_fotografia",
-                "data_ultima_fotografia_utc"))
+                "data_ultima_fotografia_utc", "nome_produto", "categoria"))
     for linha in dados.rows:
         w.writerow((linha.product_id, linha.internal_code or "",
                     format(linha.observed_un, "f").replace(".", ","),
                     "" if linha.stock_snapshot is None else
                     format(linha.stock_snapshot, "f").replace(".", ","),
-                    dados.stock_snapshot_at.isoformat()))
+                    dados.stock_snapshot_at.isoformat(),
+                    _csv_rotulo(linha.product_name), _csv_rotulo(linha.category)))
     return arquivo.getvalue().encode("utf-8-sig")

@@ -92,7 +92,7 @@ def test_limpar_filtros_restaura_catalogo_visivel(monkeypatch):
     """O controle limpa busca e restrições sem perder a sessão autorizada."""
     servico = ServicoFicticio(["inventory.view"])
     app, _ = abrir(monkeypatch, servico)
-    next(c for c in app.text_input if c.label == "Buscar por nome ou SKU").set_value("inexistente").run()
+    next(c for c in app.text_input if c.label == "Buscar por nome, categoria ou SKU").set_value("inexistente").run()
     assert app.dataframe[0].value.empty
     next(b for b in app.button if b.label == "Limpar filtros").click().run()
     assert not app.exception
