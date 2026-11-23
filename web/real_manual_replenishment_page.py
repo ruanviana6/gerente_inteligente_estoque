@@ -6,11 +6,13 @@ import io
 
 import streamlit as st
 
+from analytics.observational_review import ConferenciaObservada
 from dados import hoje_local
 from integracoes.gestaoclick import GestaoClickError
 from reposicao.cenario_manual_real import PreviaReposicaoReal, preparar_reposicao_real
 from web.errors import AppError, AuthenticationError, AuthorizationError
 from web.real_catalog_stock_page import consultar_catalogo_real
+from web.real_home_status import consultar_status_real
 
 
 def exportar_cenario_manual_csv(previa: PreviaReposicaoReal) -> bytes:
@@ -61,6 +63,19 @@ def rotulo_produto_real(row: dict) -> str:
         f'{row["Produto"]} · {row["Categoria"]} · ID {row["Produto (ID)"]} '
         f'· Saldo histórico: {saldo_legivel} UN'
     )
+
+
+def observacao_produto_real(
+    dados: ConferenciaObservada | None, loja_id: str, produto_id: str,
+):
+    """Somente observação exata da mesma loja; ausente não significa venda zero."""
+    if dados is None:
+        return None
+    if not isinstance(dados, ConferenciaObservada) or dados.store_id != loja_id:
+        raise ValueError("A observação não pertence à loja da simulação.")
+    if not isinstance(produto_id, str) or not produto_id.isascii() or not produto_id.isdigit():
+        raise ValueError("É necessário identificar um produto autorizado.")
+    return next((linha for linha in dados.rows if linha.product_id == produto_id), None)
 
 
 def reposicao_real_manual_controls(servico, contexto, loja_id: str | None) -> None:
@@ -127,19 +142,57 @@ def reposicao_real_manual_controls(servico, contexto, loja_id: str | None) -> No
                 "Se a própria API não fornecer nomes, não prossiga como se os dados fossem completos."
             )
             return
-        with st.form(f"reposicao_real_conferencia_{loja_id}", clear_on_submit=True):
-            selecionado = st.selectbox(
-                "Produto real identificado", list(opcoes), index=None,
-                format_func=lambda codigo: rotulo_produto_real(opcoes[codigo]),
-                placeholder="Selecione um produto com nome informado pelo ERP",
+        selecionado = st.selectbox(
+            "Produto real identificado", list(opcoes), index=None,
+            format_func=lambda codigo: rotulo_produto_real(opcoes[codigo]),
+            placeholder="Selecione um produto com nome informado pelo ERP",
+            key=f"reposicao_produto_real_{loja_id}",
+        )
+        if selecionado is not None:
+            selecionado_row = opcoes[selecionado]
+            st.caption(
+                f'Saldo da fotografia: {selecionado_row["Saldo na fotografia (não atual)"]:g} UN. '
+                "Este número é histórico, não é a quantidade atual; "
+                "confira o saldo disponível hoje no GestãoClick antes de simular."
             )
-            if selecionado is not None:
-                selecionado_row = opcoes[selecionado]
+            with st.container(border=True):
                 st.caption(
-                    f'Saldo da fotografia: {selecionado_row["Saldo na fotografia (não atual)"]:g} UN. '
-                    "Este número é histórico, não é a quantidade atual; "
-                    "confira o saldo disponível hoje no GestãoClick antes de simular."
+                    "Consulta somente a última observação agregada já salva no Supabase. "
+                    "Não consulta o ERP, não registra venda e não preenche automaticamente "
+                    "a média diária do cálculo. Vendas excluídas ou devolvidas podem não estar cobertas."
                 )
+                if st.button(
+                    "Consultar observação histórica do produto",
+                    key=f"reposicao_volume_observado_{loja_id}",
+                ):
+                    try:
+                        dados_observados = consultar_status_real(servico.auth, loja_id)
+                        linha_observada = observacao_produto_real(
+                            dados_observados, loja_id, selecionado,
+                        )
+                    except (AuthenticationError, AuthorizationError):
+                        raise
+                    except (AppError, GestaoClickError, ValueError, TypeError):
+                        st.warning("Não foi possível conferir a observação desta loja.")
+                    else:
+                        if dados_observados is None:
+                            st.info("Nenhuma observação real foi salva para a loja selecionada.")
+                        elif linha_observada is None:
+                            st.info(
+                                "Este produto não consta da última observação do período. "
+                                "Isso não comprova que teve zero vendas."
+                            )
+                        else:
+                            st.metric(
+                                "UN em vendas fechadas observadas (não demanda validada)",
+                                format(linha_observada.observed_un, "f"),
+                            )
+                            st.caption(
+                                f"Período observado: {dados_observados.period_start:%d/%m/%Y} "
+                                f"a {dados_observados.period_end:%d/%m/%Y}; "
+                                f"loja {loja_id}. Total parcial, não previsão de compras."
+                            )
+        with st.form(f"reposicao_real_conferencia_{loja_id}", clear_on_submit=True):
             a, b = st.columns(2)
             with a:
                 saldo = st.text_input("Saldo atual conferido no GestãoClick (UN)", max_chars=12,

@@ -9,7 +9,6 @@ from analytics.observational_review import ConferenciaObservada, exportar_confer
 from integracoes.gestaoclick import ContratoInvalido, GestaoClickError
 from web.errors import AppError, AuthenticationError, AuthorizationError
 from web.real_home_status import consultar_status_real
-from web.real_store_selector import escolher_loja_real
 
 
 def priorizar_conferencia(dados: ConferenciaObservada) -> list[dict]:
@@ -55,9 +54,6 @@ def real_triage_controls(servico, contexto, loja_id: str | None = None):
             "Somente os dados reais salvos no Supabase. A triagem não calcula "
             "cobertura, previsão ou quantidade a pedir e NÃO cria pedidos."
         )
-        loja_id = escolher_loja_real(servico.auth)
-        if loja_id is None:
-            return
         if not st.button("Consultar produtos para conferência", key="triagem_real_reposicao"):
             return
         try:
