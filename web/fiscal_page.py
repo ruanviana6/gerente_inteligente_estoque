@@ -5,7 +5,6 @@ import streamlit as st
 from fiscal.regras import ESTADOS, MODALIDADES_FRETE, TIPOS_CONTRIBUINTE, elegibilidade
 from web.errors import AppError
 from web.fiscal_real_read_page import fiscal_real_read_controls
-from web.fiscal_service import FiscalService
 from web.theme import page_header, surface
 
 
