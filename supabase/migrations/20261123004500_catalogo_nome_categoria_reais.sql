@@ -49,7 +49,7 @@ begin
     if jsonb_typeof(linha) <> 'object' then
       raise exception 'Produto inválido no lote.' using errcode='22023';
     end if;
-    if not (linha ?& array['id','codigo_interno','nome','categoria','estoque','variacoes_sem_id','variacoes_sem_codigo'])
+    if not (linha ?& array['id','codigo_interno','estoque','variacoes_sem_id','variacoes_sem_codigo'])
       or exists (
         select 1 from jsonb_object_keys(linha) as k(chave)
         where chave <> all(array['id','codigo_interno','nome','categoria','estoque','variacoes_sem_id','variacoes_sem_codigo'])
