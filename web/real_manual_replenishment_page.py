@@ -63,11 +63,6 @@ def rotulo_produto_real(row: dict) -> str:
     )
 
 
-def _ir_para_estoque():
-    st.session_state["_pagina"] = "Estoque"
-    st.rerun()
-
-
 def reposicao_real_manual_controls(servico, contexto, loja_id: str | None) -> None:
     """Somente o Master acessa a simulação com um produto da loja escolhida."""
     if (contexto.profile.role != "Master" or not contexto.can("integrations.manage")
@@ -108,8 +103,9 @@ def reposicao_real_manual_controls(servico, contexto, loja_id: str | None) -> No
             if st.button(
                 "Abrir Estoque e histórico para atualizar o catálogo real",
                 key=f"repor_abrir_estoque_atualizacao_{loja_id}",
-                on_click=_ir_para_estoque,
             ):
+                st.session_state["_pagina"] = "Estoque"
+                st.rerun()
                 return
         if not opcoes:
             st.error(
