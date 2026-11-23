@@ -43,6 +43,31 @@ def exportar_cenario_manual_csv(previa: PreviaReposicaoReal) -> bytes:
     return buffer.getvalue().encode("utf-8-sig")
 
 
+def produtos_reais_identificados(foto: dict) -> tuple[dict[str, dict], int]:
+    """Não apresenta uma lista de IDs anônimos como catálogo pronto para operação."""
+    linhas = foto["rows"]
+    identificados = {
+        row["Produto (ID)"]: row for row in linhas
+        if row["Produto"] != "Não informado"
+    }
+    return identificados, len(linhas) - len(identificados)
+
+
+def rotulo_produto_real(row: dict) -> str:
+    """Identificação e saldo datado, nunca quantidade atual."""
+    saldo = row["Saldo na fotografia (não atual)"]
+    saldo_legivel = f"{saldo:.6f}".rstrip("0").rstrip(".")
+    return (
+        f'{row["Produto"]} · {row["Categoria"]} · ID {row["Produto (ID)"]} '
+        f'· Saldo histórico: {saldo_legivel} UN'
+    )
+
+
+def _ir_para_estoque():
+    st.session_state["_pagina"] = "Estoque"
+    st.rerun()
+
+
 def reposicao_real_manual_controls(servico, contexto, loja_id: str | None) -> None:
     """Somente o Master acessa a simulação com um produto da loja escolhida."""
     if (contexto.profile.role != "Master" or not contexto.can("integrations.manage")
@@ -71,14 +96,54 @@ def reposicao_real_manual_controls(servico, contexto, loja_id: str | None) -> No
             f'Loja {loja_id} · Fotografia histórica: {foto["created_at"]:%d/%m/%Y %H:%M %Z}. '
             "O saldo da fotografia NÃO será usado como saldo atual do cálculo."
         )
-        opcoes = {x["Produto (ID)"]: x for x in foto["rows"]}
+        opcoes, sem_nome = produtos_reais_identificados(foto)
+        sem_categoria = sum(row["Categoria"] == "Não informada" for row in foto["rows"])
+        if sem_nome or sem_categoria:
+            st.warning(
+                f"A fotografia desta loja contém {sem_nome} produto(s) sem nome e "
+                f"{sem_categoria} sem categoria. É necessário fazer uma nova consulta "
+                "do catálogo completo para preencher a identificação real do GestãoClick. "
+                "Não vamos adivinhar nomes ou categorias."
+            )
+            if st.button(
+                "Abrir Estoque e histórico para atualizar o catálogo real",
+                key=f"repor_abrir_estoque_atualizacao_{loja_id}",
+                on_click=_ir_para_estoque,
+            ):
+                return
+        if not opcoes:
+            st.error(
+                "Nenhum produto desta fotografia possui nome. O simulador está "
+                "bloqueado até salvar uma fotografia com identificação real."
+            )
+            st.dataframe([
+                {
+                    "Produto (ID)": row["Produto (ID)"],
+                    "Código interno": row["Código interno"],
+                    "Saldo na fotografia (histórico, UN)": row["Saldo na fotografia (não atual)"],
+                }
+                for row in foto["rows"][:20]
+            ], hide_index=True, width="stretch")
+            st.caption(
+                "Acima: até 20 registros existentes no Supabase, com saldos históricos. "
+                "Na aba Estoque e histórico: autorize a leitura completa por GET, "
+                "confira a quantidade de nomes/categorias retornados e salve a nova fotografia. "
+                "Se a própria API não fornecer nomes, não prossiga como se os dados fossem completos."
+            )
+            return
         with st.form(f"reposicao_real_conferencia_{loja_id}", clear_on_submit=True):
             selecionado = st.selectbox(
-                "Produto real", list(opcoes), index=None,
-                format_func=lambda codigo: (
-                    f'{opcoes[codigo]["Produto"]} · {opcoes[codigo]["Categoria"]} · ID {codigo}'
-                ), placeholder="Selecione o produto para uma simulação",
+                "Produto real identificado", list(opcoes), index=None,
+                format_func=lambda codigo: rotulo_produto_real(opcoes[codigo]),
+                placeholder="Selecione um produto com nome informado pelo ERP",
             )
+            if selecionado is not None:
+                selecionado_row = opcoes[selecionado]
+                st.caption(
+                    f'Saldo da fotografia: {selecionado_row["Saldo na fotografia (não atual)"]:g} UN. '
+                    "Este número é histórico, não é a quantidade atual; "
+                    "confira o saldo disponível hoje no GestãoClick antes de simular."
+                )
             a, b = st.columns(2)
             with a:
                 saldo = st.text_input("Saldo atual conferido no GestãoClick (UN)", max_chars=12,
