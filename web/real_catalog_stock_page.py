@@ -153,14 +153,19 @@ def real_catalog_controls(servico, contexto):
     )
     sem_nome = sum(r["Produto"] == "Não informado" for r in foto["rows"])
     sem_categoria = sum(r["Categoria"] == "Não informada" for r in foto["rows"])
-    if sem_nome or sem_categoria:
+    if sem_nome:
         st.warning(
-            f"Identificação pendente nesta fotografia: {sem_nome} produto(s) sem nome e "
-            f"{sem_categoria} sem categoria. No painel de atualização ACIMA, escolha "
-            "'Conferir conexão e loja do estoque', depois 'Conferir catálogo completo' "
-            "e, após validar os dados do ERP, 'Salvar fotografia analítica no Supabase'. "
-            "O saldo da foto antiga continuará identificado como histórico. "
-            "Se a consulta completa não devolver os nomes, não serão inventados."
+            f"{sem_nome} produto(s) sem nome na fotografia. "
+            "No painel de atualização acima, consulte o catálogo completo da loja "
+            "e salve uma nova fotografia somente após conferir os dados retornados. "
+            "Nomes ausentes não serão inventados."
+        )
+    if sem_categoria:
+        st.info(
+            f"{sem_categoria} produto(s) sem categoria na fotografia. "
+            "O GestãoClick não informou essas categorias na última leitura. "
+            "Confira o cadastro no ERP; repetir a consulta sem corrigir a origem "
+            "pode manter os mesmos campos vazios."
         )
     busca = st.text_input("Buscar por nome, categoria, código ou ID",
                           key="estoque_catalogo_real_busca").strip()

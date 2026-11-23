@@ -79,6 +79,39 @@ def observacao_produto_real(
     return next((linha for linha in dados.rows if linha.product_id == produto_id), None)
 
 
+def _abrir_estoque_pelo_menu() -> None:
+    """Troca o radio de navegação antes de o Streamlit instanciar o widget.
+
+    on_click roda no início do rerun seguinte, evitando
+    StreamlitWidgetAlreadyInstantiatedError no menu com key="_pagina".
+    """
+    st.session_state["_pagina"] = "Estoque"
+
+
+def avisar_identificacao_incompleta(foto: dict, loja_id: str) -> None:
+    """Diferencia ausência de nome (precisa reler) de categoria opcional ausente."""
+    sem_nome = sum(row["Produto"] == "Não informado" for row in foto["rows"])
+    sem_categoria = sum(row["Categoria"] == "Não informada" for row in foto["rows"])
+    if sem_nome:
+        st.warning(
+            f"{sem_nome} produto(s) ainda sem nome na fotografia desta loja. "
+            "Consulte novamente o catálogo no GestãoClick antes de usar os itens "
+            "sem identificação; nenhum nome será inferido do ID."
+        )
+        st.button(
+            "Abrir Estoque e histórico para atualizar o catálogo real",
+            key=f"repor_abrir_estoque_atualizacao_{loja_id}",
+            on_click=_abrir_estoque_pelo_menu,
+        )
+    if sem_categoria:
+        st.info(
+            f"{sem_categoria} produto(s) sem categoria na fotografia. "
+            "Isso não impede o cálculo para produtos com nome identificado. "
+            "Se o GestãoClick não fornece a categoria, uma nova fotografia "
+            "não preenche esse campo; confira o cadastro no ERP."
+        )
+
+
 def reposicao_real_manual_controls(servico, contexto, loja_id: str | None) -> None:
     """Somente o Master acessa a simulação com um produto da loja escolhida."""
     if (contexto.profile.role != "Master" or not contexto.can("integrations.manage")
@@ -108,21 +141,7 @@ def reposicao_real_manual_controls(servico, contexto, loja_id: str | None) -> No
             "O saldo da fotografia NÃO será usado como saldo atual do cálculo."
         )
         opcoes, sem_nome = produtos_reais_identificados(foto)
-        sem_categoria = sum(row["Categoria"] == "Não informada" for row in foto["rows"])
-        if sem_nome or sem_categoria:
-            st.warning(
-                f"A fotografia desta loja contém {sem_nome} produto(s) sem nome e "
-                f"{sem_categoria} sem categoria. É necessário fazer uma nova consulta "
-                "do catálogo completo para preencher a identificação real do GestãoClick. "
-                "Não vamos adivinhar nomes ou categorias."
-            )
-            if st.button(
-                "Abrir Estoque e histórico para atualizar o catálogo real",
-                key=f"repor_abrir_estoque_atualizacao_{loja_id}",
-            ):
-                st.session_state["_pagina"] = "Estoque"
-                st.rerun()
-                return
+        avisar_identificacao_incompleta(foto, loja_id)
         if not opcoes:
             st.error(
                 "Nenhum produto desta fotografia possui nome. O simulador está "
