@@ -10,6 +10,8 @@ from analytics.observational_review import conferir_observacao
 from reposicao.cenario_manual_real import preparar_reposicao_real
 from web.real_catalog_stock_page import validar_fotografia
 from web.real_manual_replenishment_page import (
+    _abrir_estoque_pelo_menu,
+    avisar_identificacao_incompleta,
     exportar_cenario_manual_csv,
     observacao_produto_real,
     produtos_reais_identificados,
@@ -174,3 +176,47 @@ def test_observacao_de_venda_nunca_alimenta_media_diaria_da_simulacao():
     assert observacao_produto_real(dados, "LOJA_FICTICIA", "101").observed_un == 3
     with pytest.raises(ValueError, match="média"):
         simular(media_diaria="")
+
+
+def test_categoria_ausente_nao_exige_novo_get_nem_dispara_navegacao(monkeypatch):
+    """Dez categorias ausentes não são erro nem motivo de reler 245 produtos."""
+    from web import real_manual_replenishment_page as page
+
+    avisos, informacoes, botoes = [], [], []
+    monkeypatch.setattr(page.st, "warning", avisos.append)
+    monkeypatch.setattr(page.st, "info", informacoes.append)
+    monkeypatch.setattr(
+        page.st, "button",
+        lambda *args, **kwargs: botoes.append((args, kwargs)),
+    )
+    registros = [{"Produto": f"Produto {i}", "Categoria": "Não informada"}
+                 for i in range(10)]
+    avisar_identificacao_incompleta({"rows": registros}, "416023")
+    assert not avisos
+    assert not botoes
+    assert len(informacoes) == 1
+    assert "10 produto(s) sem categoria" in informacoes[0]
+    assert "não impede o cálculo" in informacoes[0]
+
+
+def test_navegar_estoque_usa_callback_antes_de_instanciar_radio(monkeypatch):
+    """A reprodução real falhava ao escrever em _pagina depois de st.radio."""
+    from web import real_manual_replenishment_page as page
+
+    botoes = []
+    estado = {"_pagina": "Reposição Inteligente"}
+    monkeypatch.setattr(page.st, "session_state", estado)
+    monkeypatch.setattr(page.st, "warning", lambda text: None)
+    monkeypatch.setattr(page.st, "info", lambda text: None)
+    monkeypatch.setattr(
+        page.st, "button",
+        lambda *args, **kwargs: botoes.append(kwargs),
+    )
+    avisar_identificacao_incompleta({
+        "rows": [{"Produto": "Não informado", "Categoria": "Não informada"}],
+    }, "416023")
+    assert estado["_pagina"] == "Reposição Inteligente"
+    assert len(botoes) == 1
+    assert botoes[0]["on_click"] is _abrir_estoque_pelo_menu
+    botoes[0]["on_click"]()
+    assert estado["_pagina"] == "Estoque"
