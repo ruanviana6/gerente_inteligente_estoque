@@ -7,6 +7,7 @@ from datetime import timedelta
 import streamlit as st
 
 from analytics.demand_observation import construir_observacao
+from analytics.sales_audit import rotular_agrupamento
 from analytics.sales_audit import conciliar_vendas_com_catalogo
 from dados import hoje_local
 from integracoes.account_setup import validar_conta
@@ -105,6 +106,7 @@ def demand_observation_controls(servico, carregar_configuracao, conta, loja_id: 
                             "stamp": _stamp(auth), "store": loja_id, "source_id": source_id,
                             "expires": time.monotonic() + _TTL,
                             "snapshot_id": foto["snapshot_id"], "data": dados,
+                            "products": rotular_agrupamento(conciliado, foto),
                             "unmatched": len(conciliado.produtos_sem_correspondencia),
                         }
             except (AuthenticationError, AuthorizationError):
@@ -139,6 +141,14 @@ def demand_observation_controls(servico, carregar_configuracao, conta, loja_id: 
                 "Itens com unidade não informada": dados["p_unknown_unit"],
                 "Itens com unidade não suportada": dados["p_unsupported_unit"],
             })
+            if previa["products"]:
+                st.dataframe(
+                    list(previa["products"][:25]), hide_index=True, width="stretch",
+                )
+                st.caption(
+                    "Até 25 produtos com nome, categoria e código da fotografia desta loja. "
+                    "Os saldos não são alterados, e a gravação armazena somente os agregados."
+                )
             st.warning(
                 "A cobertura da loja, as exclusões, devoluções e alterações dos "
                 "pedidos não foram comprovadas. Gravar esta observação NÃO "
