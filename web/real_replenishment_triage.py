@@ -45,9 +45,10 @@ def priorizar_conferencia(dados: ConferenciaObservada) -> list[dict]:
     return linhas
 
 
-def real_triage_controls(servico, contexto):
+def real_triage_controls(servico, contexto, loja_id: str | None = None):
     """Consulta histórica só com clique explícito, após verificar Master."""
-    if contexto.profile.role != "Master" or not contexto.can("integrations.manage"):
+    if (contexto.profile.role != "Master" or not contexto.can("integrations.manage")
+            or loja_id is None):
         return
     with st.expander("Triagem real de reposição — conferir no GestãoClick"):
         st.caption(
