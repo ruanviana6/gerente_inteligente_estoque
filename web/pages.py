@@ -22,8 +22,8 @@ from web.errors import AuthorizationError
 from web.insights import gerar_insights
 from web.real_catalog_stock_page import real_catalog_controls
 from web.real_manual_replenishment_page import reposicao_real_manual_controls
-from web.real_store_selector import escolher_loja_real
 from web.real_replenishment_triage import real_triage_controls
+from web.real_store_selector import escolher_loja_real
 from web.reports import filtrar_relatorio
 from web.theme import metric_card, page_header, status_badge, surface
 
