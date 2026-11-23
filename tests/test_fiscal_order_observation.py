@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from fiscal.order_observation import observar_pedido_fiscal
+from fiscal.order_observation import observar_pedido_fiscal, situacao_para_conferencia_fiscal
 from integracoes.gestaoclick import ContratoInvalido
 from integracoes.native_preview import DocumentoPreviaVenda, ItemPreviaVenda
 from integracoes.sales_audit import AuditoriaVendas
@@ -71,3 +71,23 @@ def test_nenhum_cliente_ou_tributo_e_projetado():
         "cliente", "cpf", "cnpj", "nome", "email", "endereco",
         "valor", "cfop", "ncm", "tribtos", "xml", "nota", "chave_nfe",
     })
+
+
+@pytest.mark.parametrize(("situacao", "codigo"), [
+    ("Em separação", "SITUACAO_COMPATIVEL"),
+    ("CONCRETIZADA", "SITUACAO_COMPATIVEL"),
+    ("Em andamento", "APROVACAO_NECESSARIA"),
+    ("Cancelada", "SITUACAO_BLOQUEADA"),
+    ("Orçamento", "SITUACAO_BLOQUEADA"),
+    (None, "NAO_OBSERVADO"),
+])
+def test_classificacao_real_nao_autoriza_cadastro_fiscal(situacao, codigo):
+    tipo, mensagem = situacao_para_conferencia_fiscal(situacao)
+    assert tipo == codigo
+    assert mensagem
+    assert "POST" not in mensagem
+
+
+def test_situacao_invalida_nao_e_aceita():
+    with pytest.raises(ContratoInvalido):
+        situacao_para_conferencia_fiscal("X" * 201)

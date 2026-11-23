@@ -6,6 +6,7 @@ de notas ou a segurança de cadastrar uma NF-e. Nunca libera emissão.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import date
 
@@ -62,4 +63,34 @@ def observar_pedido_fiscal(
         situacao_id=doc.situacao_id if doc else None,
         data_venda=doc.data if doc else None,
         quantidade_linhas=len(doc.itens) if doc else 0,
+    )
+
+
+def situacao_para_conferencia_fiscal(nome: str | None) -> tuple[str, str]:
+    """Reconhece situação comercial, sem transformá-la em autorização de NF-e.
+
+    A API de consulta não fornece aqui prova da UF, nota já existente,
+    tributação ou efeitos do cadastro: qualquer situação permanece bloqueada
+    para POST real até a homologação independente.
+    """
+    if nome is None:
+        return "NAO_OBSERVADO", "Pedido não localizado nesta janela; não comprova ausência no ERP."
+    if not isinstance(nome, str) or len(nome) > 200:
+        raise ContratoInvalido("Situação comercial fora do contrato de conferência.")
+    normal = unicodedata.normalize("NFKD", nome)
+    chave = "".join(x for x in normal if not unicodedata.combining(x)).casefold().strip()
+    if chave in {"em separacao", "concretizada"}:
+        return "SITUACAO_COMPATIVEL", (
+            "Situação comercial compatível com análise de cadastro, mas a criação "
+            "real de NF-e continua bloqueada até confirmar UF CE, nota anterior, "
+            "destinatário, impostos, loja do token e emissão manual."
+        )
+    if chave == "em andamento":
+        return "APROVACAO_NECESSARIA", (
+            "Em andamento exige autorização identificada e auditável antes "
+            "da análise fiscal; a consulta não concede essa autorização."
+        )
+    return "SITUACAO_BLOQUEADA", (
+        "Situação comercial não elegível para cadastro pela regra vigente. "
+        "Confirme o status oficial no GestãoClick."
     )

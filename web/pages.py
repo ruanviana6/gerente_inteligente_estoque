@@ -21,7 +21,9 @@ from web.downloads import csv_export
 from web.errors import AuthorizationError
 from web.insights import gerar_insights
 from web.real_catalog_stock_page import real_catalog_controls
+from web.real_manual_replenishment_page import reposicao_real_manual_controls
 from web.real_replenishment_triage import real_triage_controls
+from web.real_store_selector import escolher_loja_real
 from web.reports import filtrar_relatorio
 from web.theme import metric_card, page_header, status_badge, surface
 
@@ -348,7 +350,10 @@ def _reposicao(servico: Any, contexto: Any) -> None:
 def _planejamento_reposicao(servico: Any, contexto: Any) -> None:
     """Apresenta ciclos explicáveis sem depender de fornecedores ou alterar o ERP."""
     page_header("Reposição Inteligente", "Planeje solicitações à indústria com revisão humana.")
-    real_triage_controls(servico, contexto)
+    if contexto.profile.role == "Master" and contexto.can("integrations.manage"):
+        loja_real = escolher_loja_real(servico.auth)
+        reposicao_real_manual_controls(servico, contexto, loja_real)
+        real_triage_controls(servico, contexto, loja_real)
     modulo = "replenishment.view" if contexto.can("replenishment.view") else "trends.view"
     dados = _carregar(servico, modulo, contexto)
     if dados is None:
