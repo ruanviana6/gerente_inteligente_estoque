@@ -6,8 +6,7 @@ from uuid import UUID
 
 import streamlit as st
 
-from analytics.sales_audit import (conciliar_vendas_com_catalogo, csv_demanda_observada,
-                                   rotular_agrupamento)
+from analytics.sales_audit import conciliar_vendas_com_catalogo, csv_demanda_observada, rotular_agrupamento
 from dados import hoje_local
 from integracoes.account_setup import validar_conta
 from integracoes.gestaoclick import ContratoInvalido, GestaoClickError
