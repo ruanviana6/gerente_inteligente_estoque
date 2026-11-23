@@ -7,7 +7,6 @@ import pytest
 from test_observational_review import payload
 
 from analytics.observational_review import conferir_observacao
-
 from reposicao.cenario_manual_real import preparar_reposicao_real
 from web.real_catalog_stock_page import validar_fotografia
 from web.real_manual_replenishment_page import (
