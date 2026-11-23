@@ -7,7 +7,6 @@ from uuid import uuid4
 
 import streamlit as st
 
-from analytics.demo import gerar_vendas_ficticias
 from dados import hoje_local
 from sincronizacao.periodos import validar_periodo
 from sincronizacao.service import SyncCoordinator
@@ -75,9 +74,7 @@ def integracoes(servico, contexto):
     with st.form("preparar_sincronizacao"):
         datas = st.date_input("Período da consulta", (hoje_local().date() - timedelta(days=59), hoje_local().date()),
                              max_value=hoje_local().date())
-        ficticia = st.checkbox("Usar somente dados fictícios identificados como DEMO", value=False)
-        st.caption("Desmarcado: consulta real da loja configurada. Marcado: apenas simulação, sem acessar a API. "
-                   "Período máximo: 732 dias, incluindo início e fim.")
+        st.caption("Somente API GestãoClick real e autorizada. Período máximo: 732 dias, incluindo início e fim.")
         autorizado = st.checkbox("Confirmo autorização da empresa, contrato e permissões de leitura (consulta real)")
         preparar = st.form_submit_button("Preparar prévia", type="primary")
     coordenador = SyncCoordinator(servico.auth)
@@ -91,42 +88,34 @@ def integracoes(servico, contexto):
             return
         chave = str(uuid4())
         # A chave de repetição não muda em uma tentativa interrompida do mesmo escopo.
-        escopo = (tuple(str(d) for d in datas), ficticia, "demo-v2" if ficticia else "api-v1")
+        escopo = (tuple(str(d) for d in datas), "api-v1")
         tentativa = st.session_state.get("_sync_attempt")
         if tentativa and tentativa["scope"] == escopo:
             chave = tentativa["key"]
         st.session_state["_sync_attempt"] = {"scope": escopo, "key": chave}
         try:
-            if ficticia:
-                fonte = servico.auth.rpc("integration_register_source", {
-                    "p_key": "demo-vendas-v2", "p_name": "DEMO: vendas fictícias, cenário 2", "p_stores": ["DEMO"]},
-                    "integrations.manage")
-                fonte_id = fonte["id"]
-                loja = "DEMO"
-                def leitor():
-                    """Gera somente a amostra explicitamente selecionada pelo Master."""
-                    return gerar_vendas_ficticias(fonte_id, loja, *datas)
-            else:
-                if not autorizado:
-                    st.warning("A consulta real exige autorização explícita e contrato conferido.")
-                    return
-                from integracoes.configuration import missing_configuration, validated_scope
-                from integracoes.runtime import build_reader
+            if not autorizado:
+                st.warning("A consulta real exige autorização explícita e contrato conferido.")
+                return
+            from integracoes.configuration import missing_configuration, validated_scope
+            from integracoes.runtime import build_reader
 
-                values = _secrets()
-                missing = missing_configuration(values)
-                if missing:
-                    st.warning("A consulta real ainda não foi configurada. Use ‘Conferir lojas e situações da conta’ "
-                               "para identificar a loja. Os mapeamentos técnicos precisam refletir o contrato da API; "
-                               "não preencha campos com valores inventados.")
-                    st.caption("Configurações pendentes: " + ", ".join(missing))
-                    return
-                validated_scope(values, atual.profile.organization_id)
-                reader = build_reader(values)
-                fonte_id, loja = reader.config.source_id, reader.config.store_id
-                def leitor():
-                    """Consulta o contrato protegido, sem receber rotas do navegador."""
-                    return reader.read(*datas)
+            values = _secrets()
+            missing = missing_configuration(values)
+            if missing:
+                st.warning(
+                    "A consulta real ainda não foi configurada. Confira a origem e os campos "
+                    "diretamente no contrato da API, sem inventar mapeamentos."
+                )
+                st.caption("Configurações pendentes: " + ", ".join(missing))
+                return
+            validated_scope(values, atual.profile.organization_id)
+            reader = build_reader(values)
+            fonte_id, loja = reader.config.source_id, reader.config.store_id
+
+            def leitor():
+                """Consulta apenas dados reais pelo contrato protegido, sem escrita no ERP."""
+                return reader.read(*datas)
             with st.spinner("Consultando, validando e preparando lote interno…"):
                 resultado = coordenador.prepare(source_id=fonte_id, store_id=loja,
                     request_key=chave, start=datas[0], end=datas[1], read_all=leitor)
