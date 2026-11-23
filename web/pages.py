@@ -20,6 +20,7 @@ from reposicao.embalagens import ler_embalagens
 from web.downloads import csv_export
 from web.errors import AuthorizationError
 from web.insights import gerar_insights
+from web.real_catalog_stock_page import real_catalog_controls
 from web.real_replenishment_triage import real_triage_controls
 from web.reports import filtrar_relatorio
 from web.theme import metric_card, page_header, status_badge, surface
@@ -169,7 +170,7 @@ def _carregar(servico: Any, modulo: str, contexto: Any) -> dict | None:
     _validar_contexto(contexto, dados.get("_access_context"))
     _origem(dados)
     if dados["panel"].empty:
-        st.info("Ainda não há produtos. Um usuário com permissão de importação pode carregar os CSVs.")
+        st.info("Ainda não há base canônica de estoque e vendas para calcular indicadores. Use a fotografia real acima ou a triagem na Reposição Inteligente; não gere sugestões com dados incompletos.")
         return None
     return dados
 
@@ -239,7 +240,8 @@ def _filtros(painel: pd.DataFrame, prefixo: str) -> tuple[pd.DataFrame, dict]:
 
 def _estoque(servico: Any, contexto: Any) -> None:
     """Apresenta catálogo paginado e calcula séries somente quando solicitadas."""
-    page_header("Estoque e histórico", "Encontre o produto e confira a memória dos indicadores.")
+    page_header("Estoque e histórico", "Conferência das fotografias reais e dados consolidados.")
+    real_catalog_controls(servico, contexto)
     dados = _carregar(servico, "inventory.view", contexto)
     if dados is None:
         return
