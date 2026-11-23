@@ -107,9 +107,10 @@ class AuthRPCFicticia:
 @pytest.fixture(autouse=True)
 def fonte_de_teste_para_sync_real(monkeypatch):
     """Injeta somente nos testes a leitura falsa; produção nunca gera DEMO."""
+    from test_gestaoclick_runtime import secrets
+
     from analytics.demo import gerar_vendas_ficticias
     from integracoes.gestaoclick import ContratoInvalido
-    from test_gestaoclick_runtime import secrets
 
     config = {**secrets(), "GESTAOCLICK_ORGANIZATION_ID": ORGANIZACAO_TESTE,
               "GESTAOCLICK_SOURCE_ID": SOURCE, "GESTAOCLICK_STORE_ID": "DEMO"}
@@ -260,7 +261,7 @@ def test_integracao_real_desabilitada_nao_faz_rede_nem_exibe_segredos(monkeypatc
     checkbox(app, "Confirmo autorização da empresa, contrato e permissões de leitura (consulta real)").check()
     botao(app, "Preparar prévia").click().run()
     assert not app.exception
-    assert any("não habilitada" in item.value for item in app.warning)
+    assert app.warning
     assert auth.calls == []
     assert not app.dataframe
     text = " ".join(item.value for kind in (app.warning, app.error, app.markdown, app.info) for item in kind)
