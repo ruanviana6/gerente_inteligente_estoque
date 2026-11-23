@@ -5,7 +5,9 @@ from decimal import Decimal
 import pytest
 
 from analytics.sales_audit import (
-    conciliar_vendas_com_catalogo, csv_demanda_observada, rotular_agrupamento,
+    conciliar_vendas_com_catalogo,
+    csv_demanda_observada,
+    rotular_agrupamento,
 )
 from integracoes.gestaoclick import ContratoInvalido
 from integracoes.native_preview import DocumentoPreviaVenda, ItemPreviaVenda
