@@ -7,7 +7,11 @@ import pytest
 
 from reposicao.cenario_manual_real import preparar_reposicao_real
 from web.real_catalog_stock_page import validar_fotografia
-from web.real_manual_replenishment_page import exportar_cenario_manual_csv
+from web.real_manual_replenishment_page import (
+    exportar_cenario_manual_csv,
+    produtos_reais_identificados,
+    rotulo_produto_real,
+)
 
 DATA = date(2026, 11, 23)
 
@@ -106,3 +110,40 @@ def test_exportacao_e_apenas_cenario_manual_sem_pedido_no_erp():
     assert linhas[1][1] == "1001"
     assert linhas[1][-1] == "Informada e conferida manualmente pelo operador"
     assert linhas[1][14:16] == ["48", "8"]
+
+
+def test_seletor_real_mostra_nome_categoria_id_e_saldo_historico():
+    catalogo = foto()
+    opcoes, pendentes = produtos_reais_identificados(catalogo)
+    assert pendentes == 0
+    assert set(opcoes) == {"1001", "1002"}
+    assert rotulo_produto_real(opcoes["1001"]) == (
+        "Perfumaria 100 ml · Perfumes · ID 1001 · Saldo histórico: 12 UN"
+    )
+
+
+def test_foto_legada_sem_nomes_nao_exibe_lista_de_ids_para_calcular():
+    catalogo = foto()
+    for row in catalogo["rows"]:
+        row["Produto"] = "Não informado"
+        row["Categoria"] = "Não informada"
+    opcoes, pendentes = produtos_reais_identificados(catalogo)
+    assert opcoes == {}
+    assert pendentes == 2
+    assert [r["Saldo na fotografia (não atual)"] for r in catalogo["rows"]] == [12, 1000]
+
+
+def test_identificacao_parcial_nao_esconde_produto_identificado():
+    catalogo = foto()
+    catalogo["rows"][0]["Produto"] = "Não informado"
+    opcoes, pendentes = produtos_reais_identificados(catalogo)
+    assert pendentes == 1
+    assert list(opcoes) == ["1002"]
+    assert "Saldo histórico: 1000 UN" in rotulo_produto_real(opcoes["1002"])
+
+
+def test_saldo_historico_fracionario_nao_e_arredondado_no_rotulo():
+    catalogo = foto()
+    catalogo["rows"][0]["Saldo na fotografia (não atual)"] = 2.125
+    opcoes, _ = produtos_reais_identificados(catalogo)
+    assert "Saldo histórico: 2.125 UN" in rotulo_produto_real(opcoes["1001"])
