@@ -172,6 +172,7 @@ def catalog_full_controls(servico, carregar_configuracao, conta, loja_id: str) -
                 f"Produtos: {resultado['product_count']}. "
                 f"Execução repetida: {'sim' if resultado.get('reused') else 'não'}."
             )
+            return True
         except (AuthenticationError, AuthorizationError):
             raise
         except (AppError, GestaoClickError):
