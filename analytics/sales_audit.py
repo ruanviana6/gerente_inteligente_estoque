@@ -139,7 +139,9 @@ def conciliar_vendas_com_catalogo(
     )
 
 
-def rotular_agrupamento(resultado: ConciliacaoVendas, fotografia: dict) -> tuple[dict, ...]:
+def rotular_agrupamento(
+    resultado: ConciliacaoVendas, fotografia: dict, loja_esperada: str | None = None,
+) -> tuple[dict, ...]:
     """Mostra nomes e grupos reais da mesma fotografia conciliada, sem deduzir dados.
 
     Nenhum rótulo é persistido com a observação e os saldos não são exportados.
@@ -149,6 +151,8 @@ def rotular_agrupamento(resultado: ConciliacaoVendas, fotografia: dict) -> tuple
         raise TypeError("É necessária uma conciliação de vendas validada.")
     if not isinstance(fotografia, dict) or not isinstance(fotografia.get("store_id"), str):
         raise ContratoInvalido("Fotografia de catálogo inválida para identificar produtos.")
+    if loja_esperada is not None and fotografia["store_id"] != loja_esperada:
+        raise ContratoInvalido("A fotografia pertence a outra loja.")
     identificadores = _catalogo(fotografia, fotografia["store_id"])
     por_id = {linha["id"]: linha for linha in fotografia["products"]}
     linhas = []
@@ -175,7 +179,10 @@ def _celula_csv(valor: str | None) -> str:
     return "'" + valor if valor.startswith(("=", "+", "-", "@")) else valor
 
 
-def csv_demanda_observada(resultado: ConciliacaoVendas, fotografia: dict | None = None) -> bytes:
+def csv_demanda_observada(
+    resultado: ConciliacaoVendas, fotografia: dict | None = None,
+    loja_esperada: str | None = None,
+) -> bytes:
     """Exporta somente totais UN por produto; nunca dados de clientes, saldo ou linha."""
 
     if not isinstance(resultado, ConciliacaoVendas):
@@ -185,7 +192,7 @@ def csv_demanda_observada(resultado: ConciliacaoVendas, fotografia: dict | None 
     if fotografia is not None:
         tabela.writerow(("produto_id", "nome_produto", "categoria", "codigo_interno",
                          "quantidade_observada_un"))
-        for linha in rotular_agrupamento(resultado, fotografia):
+        for linha in rotular_agrupamento(resultado, fotografia, loja_esperada):
             tabela.writerow((
                 linha["Produto (ID)"],
                 _celula_csv(linha["Produto"] if linha["Produto"] != "Não informado" else None),
