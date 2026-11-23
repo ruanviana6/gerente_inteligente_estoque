@@ -121,9 +121,13 @@ def real_catalog_controls(servico, contexto):
         st.info(
             f"Identificação pendente: {sem_nome} produto(s) sem nome e "
             f"{sem_categoria} sem categoria na última fotografia. "
-            "Em Administração → Integrações, consulte o catálogo completo da loja "
-            "e salve uma nova fotografia para trazer os dados reais."
+            "Consulte o catálogo completo da loja no GestãoClick e salve uma "
+            "nova fotografia para trazer os dados reais."
         )
+        if st.button("Atualizar identificação em Integrações", key="estoque_ir_integracoes"):
+            st.session_state["admin_area"] = "Integrações"
+            st.session_state["_pagina"] = "Administração"
+            st.rerun()
     busca = st.text_input("Buscar por nome, categoria, código ou ID",
                           key="estoque_catalogo_real_busca").strip()
     linhas = foto["rows"]
