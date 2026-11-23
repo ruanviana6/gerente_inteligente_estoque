@@ -113,10 +113,10 @@ begin
     end if;
     insert into public.catalog_stock_batches (
       organization_id,source_id,store_id,author_id,checksum,product_count,
-      total_stock,missing_variation_ids,missing_variation_codes
+      total_stock,missing_variation_ids,missing_variation_codes,created_at
     ) values (
       org,p_source_id,p_store_id,auth.uid(),fingerprint,count_rows,
-      soma,qtd_sem_id,qtd_sem_codigo
+      soma,qtd_sem_id,qtd_sem_codigo,clock_timestamp()
     ) returning id into batch;
     insert into public.catalog_stock_rows (
       organization_id,batch_id,product_id,codigo_interno,nome,categoria,estoque,
