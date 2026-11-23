@@ -74,6 +74,8 @@ class CatalogoCompleto:
             {
                 "id": produto.id,
                 "codigo_interno": produto.codigo_interno,
+                "nome": produto.nome,
+                "categoria": produto.categoria,
                 "estoque": format(produto.estoque, "f"),
                 "variacoes_sem_id": sum(v.id is None for v in produto.variacoes),
                 "variacoes_sem_codigo": sum(v.codigo is None for v in produto.variacoes),
