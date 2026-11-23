@@ -13,6 +13,7 @@ import streamlit as st
 from integracoes.gestaoclick import ContratoInvalido, GestaoClickError
 from web.errors import AppError, AuthenticationError, AuthorizationError
 from web.real_home_status import selecionar_fonte_real
+from web.real_store_selector import escolher_loja_real
 from web.sales_service import access_stamp
 
 
@@ -96,24 +97,24 @@ def exportar_fotografia_csv(foto: dict) -> bytes:
     return buffer.getvalue().encode("utf-8-sig")
 
 
-def consultar_catalogo_real(auth):
+def consultar_catalogo_real(auth, loja_id: str | None = None):
     """Usa somente duas RPCs autorizadas no Supabase, sem conexão ao GestãoClick."""
     with auth.operation():
         antes = auth.require("integrations.manage")
         if antes.profile.role != "Master":
             raise AuthorizationError("Catálogo real disponível somente para Master.")
         stamp = access_stamp(antes, auth.generation)
-        fonte = selecionar_fonte_real(auth.rpc("integration_sources", {}, "trends.view"))
+        fonte = selecionar_fonte_real(auth.rpc("integration_sources", {}, "trends.view"), loja_id)
         if fonte is None:
             return None
-        fonte_id, loja_id = fonte
+        fonte_id, loja_reconhecida = fonte
         UUID(fonte_id)
         bruto = auth.rpc("catalog_stock_latest", {
-            "p_source_id": fonte_id, "p_store_id": loja_id,
+            "p_source_id": fonte_id, "p_store_id": loja_reconhecida,
         }, "integrations.manage")
         if stamp != access_stamp(auth.require("integrations.manage"), auth.generation):
             raise AuthorizationError("A autorização mudou durante a consulta.")
-        return validar_fotografia(bruto, loja_id)
+        return validar_fotografia(bruto, loja_reconhecida)
 
 
 def real_catalog_controls(servico, contexto):
@@ -121,19 +122,26 @@ def real_catalog_controls(servico, contexto):
     if contexto.profile.role != "Master" or not contexto.can("integrations.manage"):
         return
     st.subheader("Catálogo real · última fotografia do GestãoClick")
+    loja_id = escolher_loja_real(servico.auth)
+    if loja_id is None:
+        return
     try:
-        foto = consultar_catalogo_real(servico.auth)
+        foto = consultar_catalogo_real(servico.auth, loja_id)
     except (AuthenticationError, AuthorizationError):
         raise
     except (AppError, GestaoClickError, ValueError, TypeError):
         st.warning("Não foi possível carregar a fotografia real. Confira Administração → Integrações.")
         return
-    if foto is None:
-        st.info("Nenhuma fotografia real disponível no Supabase.")
-        return
     from web.real_stock_refresh_page import atualizar_fotografia_estoque
 
-    atualizar_fotografia_estoque(servico, contexto, foto["store_id"])
+    # A primeira fotografia também deve poder ser criada a partir de Estoque.
+    atualizar_fotografia_estoque(servico, contexto, loja_id)
+    if foto is None:
+        st.info(
+            f"A loja {loja_id} ainda não possui fotografia real salva. "
+            "Use a conferência acima para consultar e registrar o primeiro catálogo."
+        )
+        return
     data = foto["created_at"].astimezone(ZoneInfo("America/Fortaleza"))
     a, b = st.columns(2)
     a.metric("Produtos na fotografia", len(foto["rows"]))

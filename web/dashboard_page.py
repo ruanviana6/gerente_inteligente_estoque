@@ -7,7 +7,9 @@ import streamlit as st
 
 from integracoes.gestaoclick import GestaoClickError
 from web.errors import AppError, AuthenticationError, AuthorizationError
+from web.real_catalog_stock_page import consultar_catalogo_real
 from web.real_home_status import consultar_status_real
+from web.real_store_selector import escolher_loja_real
 from web.theme import metric_card, page_header, surface
 
 ALERTAS = {
@@ -31,8 +33,11 @@ def _historico_real_na_abertura(servico, contexto):
     """Mostra os últimos dados reais salvos, não chama ERP nem sugere compras."""
     if contexto.profile.role != "Master" or not contexto.can("integrations.manage"):
         return
+    loja_id = escolher_loja_real(servico.auth)
+    if loja_id is None:
+        return
     try:
-        dados = consultar_status_real(servico.auth)
+        dados = consultar_status_real(servico.auth, loja_id)
     except (AuthenticationError, AuthorizationError):
         raise
     except (AppError, GestaoClickError, ValueError, TypeError):
@@ -42,6 +47,37 @@ def _historico_real_na_abertura(servico, contexto):
         )
         return
     if dados is None:
+        # Uma loja pode ter catálogo real sem histórico de vendas consolidado.
+        # Mostrar a fotografia NÃO significa transformar seus saldos em atuais.
+        try:
+            foto = consultar_catalogo_real(servico.auth, loja_id)
+        except (AuthenticationError, AuthorizationError):
+            raise
+        except (AppError, GestaoClickError, ValueError, TypeError):
+            st.warning("Não foi possível consultar a fotografia desta loja no Supabase.")
+            return
+        if foto is None:
+            st.info(
+                f"Loja {loja_id}: ainda sem fotografia de estoque ou observação "
+                "de demanda registrada. Faça a primeira conferência na aba Estoque."
+            )
+            return
+        st.subheader("Estoque real · última fotografia salva")
+        a, b = st.columns(2)
+        a.metric("Produtos na fotografia", len(foto["rows"]))
+        b.metric("Soma dos saldos fotografados", f'{foto["total_stock"]:,.0f}'.replace(",", "."))
+        horario = foto["created_at"].astimezone(ZoneInfo("America/Fortaleza"))
+        st.caption(f'Loja {loja_id} · Fotografado em {horario:%d/%m/%Y %H:%M} (Fortaleza).')
+        st.warning(
+            "Saldo HISTÓRICO, não atual. Ainda não há observação comercial "
+            "reconciliada para esta loja; não é seguro calcular reposição."
+        )
+        faltam = sum(row["Produto"] == "Não informado" for row in foto["rows"])
+        if faltam:
+            st.info(
+                f"{faltam} produtos ainda não possuem nome nesta fotografia. "
+                "Atualize o catálogo pela aba Estoque para carregar os rótulos reais."
+            )
         return
     st.subheader("Dados reais da Flatter · última coleta salva")
     a, b, c = st.columns(3)
@@ -80,7 +116,7 @@ def visao_geral(servico, contexto):
     resumo = dados.get('summary')
     if not resumo:
         st.info(
-            "Os dados reais de estoque e demanda já estão disponíveis acima. "
+            "Quando existirem fotografias reais autorizadas, elas aparecem acima. "
             "A visão consolidada de reposição depende da validação do histórico "
             "operacional de vendas, alterações e devoluções. Nenhum indicador foi inventado."
         )

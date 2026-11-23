@@ -2,11 +2,17 @@
 import csv
 import io
 from copy import deepcopy
+from types import SimpleNamespace
 
 import pytest
 
 from integracoes.gestaoclick import ContratoInvalido
-from web.real_catalog_stock_page import exportar_fotografia_csv, validar_fotografia
+from web.real_catalog_stock_page import (
+    consultar_catalogo_real,
+    exportar_fotografia_csv,
+    real_catalog_controls,
+    validar_fotografia,
+)
 
 
 def exemplo():
@@ -80,3 +86,79 @@ def test_csv_real_impede_formula_externa_em_nome_categoria_e_codigo():
     content = exportar_fotografia_csv(foto).decode("utf-8-sig")
     linhas = list(csv.reader(io.StringIO(content), delimiter=";"))
     assert linhas[1][2:5] == ["'=1+1", "'+SOMA(A1:A2)", "'@comando"]
+
+
+def test_consulta_catalogo_exige_selecao_quando_ha_duas_lojas():
+    from test_real_home_status import AuthFake
+
+    auth = AuthFake()
+    outra_id = "10000000-0000-4000-8000-000000000003"
+    fontes = [
+        {"id": "10000000-0000-4000-8000-000000000001",
+         "name": "GestãoClick: loja 416023", "stores": ["416023"], "active": True},
+        {"id": outra_id, "name": "GestãoClick: loja 424409",
+         "stores": ["424409"], "active": True},
+    ]
+
+    def rpc(name, args, permission):
+        auth.calls.append((name, deepcopy(args), permission))
+        if name == "integration_sources":
+            return deepcopy(fontes)
+        if name == "catalog_stock_latest":
+            assert args == {"p_source_id": outra_id, "p_store_id": "424409"}
+            payload = exemplo()
+            payload["store_id"] = "424409"
+            return payload
+        raise AssertionError("RPC fora do escopo")
+
+    auth.rpc = rpc
+    assert consultar_catalogo_real(auth) is None
+    assert [x[0] for x in auth.calls] == ["integration_sources"]
+    auth.calls.clear()
+    assert consultar_catalogo_real(auth, "424409")["store_id"] == "424409"
+    assert [x[0] for x in auth.calls] == ["integration_sources", "catalog_stock_latest"]
+    auth.calls.clear()
+    assert consultar_catalogo_real(auth, "loja-nao-autorizada") is None
+    assert [x[0] for x in auth.calls] == ["integration_sources"]
+
+
+def test_fotografia_de_outra_loja_e_bloqueada_antes_da_exibicao():
+    from test_real_home_status import AuthFake
+
+    auth = AuthFake()
+
+    def rpc(name, args, permission):
+        auth.calls.append((name, deepcopy(args), permission))
+        if name == "integration_sources":
+            return [{"id": "10000000-0000-4000-8000-000000000001",
+                     "name": "GestãoClick: loja 416023", "stores": ["416023"], "active": True}]
+        if name == "catalog_stock_latest":
+            payload = exemplo()
+            payload["store_id"] = "424409"
+            return payload
+        raise AssertionError("RPC fora do escopo")
+
+    auth.rpc = rpc
+    with pytest.raises(ContratoInvalido):
+        consultar_catalogo_real(auth, "416023")
+
+
+def test_primeira_fotografia_pode_ser_iniciada_na_aba_estoque(monkeypatch):
+    """A ausência de foto não pode esconder a atualização via GET."""
+    from web import real_catalog_stock_page as tela
+    from web import real_stock_refresh_page as atualizacao
+
+    chamadas = []
+    monkeypatch.setattr(tela, "escolher_loja_real", lambda _auth: "416023")
+    monkeypatch.setattr(tela, "consultar_catalogo_real", lambda _auth, _loja: None)
+    monkeypatch.setattr(tela.st, "subheader", lambda _text: None)
+    monkeypatch.setattr(tela.st, "info", lambda _text: chamadas.append("informativo"))
+    monkeypatch.setattr(
+        atualizacao, "atualizar_fotografia_estoque",
+        lambda servico, contexto, loja: chamadas.append(loja),
+    )
+    perfil = SimpleNamespace(role="Master")
+    contexto = SimpleNamespace(profile=perfil, can=lambda permissao: permissao == "integrations.manage")
+    servico = SimpleNamespace(auth=object())
+    real_catalog_controls(servico, contexto)
+    assert chamadas == ["416023", "informativo"]

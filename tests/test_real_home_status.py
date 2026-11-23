@@ -8,7 +8,12 @@ from test_observational_review import payload
 
 from integracoes.gestaoclick import ContratoInvalido
 from web.errors import AuthorizationError
-from web.real_home_status import consultar_status_real, selecionar_fonte_real
+from web.real_home_status import (
+    consultar_fontes_reais,
+    consultar_status_real,
+    listar_fontes_reais,
+    selecionar_fonte_real,
+)
 
 _ID = "10000000-0000-4000-8000-000000000001"
 _FONTE = {"id": _ID, "name": "GestãoClick: loja 416023",
@@ -55,7 +60,8 @@ class AuthFake:
 def test_fonte_real_nao_usa_demo_ou_duas_lojas():
     assert selecionar_fonte_real([_DEMO, _FONTE]) == (_ID, "416023")
     assert selecionar_fonte_real([_DEMO]) is None
-    assert selecionar_fonte_real([_FONTE, deepcopy(_FONTE)]) is None
+    with pytest.raises(ContratoInvalido, match="duplicadas"):
+        selecionar_fonte_real([_FONTE, deepcopy(_FONTE)])
     assert selecionar_fonte_real([{**_FONTE, "stores": ["416023", "424409"]}]) is None
 
 
@@ -96,3 +102,64 @@ def test_nao_entrega_ao_nao_master():
 def test_fonte_malformada_e_bloqueada(bad):
     with pytest.raises(ContratoInvalido):
         selecionar_fonte_real(bad)
+
+
+def test_duas_lojas_exigem_escolha_e_nao_misturam_fontes():
+    outra = {"id": "10000000-0000-4000-8000-000000000003",
+             "name": "GestãoClick: loja 424409", "stores": ["424409"], "active": True}
+    fontes = [_DEMO, outra, _FONTE]
+    assert listar_fontes_reais(fontes) == ((_ID, "416023"), (outra["id"], "424409"))
+    assert selecionar_fonte_real(fontes) is None
+    assert selecionar_fonte_real(fontes, "424409") == (outra["id"], "424409")
+    assert selecionar_fonte_real(fontes, "416023") == (_ID, "416023")
+    assert selecionar_fonte_real(fontes, "999999") is None
+    assert selecionar_fonte_real(fontes, "424409;DROP TABLE") is None
+
+
+def test_fonte_duplicada_em_mesma_loja_bloqueia_ambiguidades():
+    outra = {**_FONTE, "id": "10000000-0000-4000-8000-000000000004"}
+    with pytest.raises(ContratoInvalido, match="duplicadas"):
+        listar_fontes_reais([_FONTE, outra])
+
+
+def test_dashboard_duas_lojas_nao_chama_revisao_sem_selecao():
+    outra = {"id": "10000000-0000-4000-8000-000000000003",
+             "name": "GestãoClick: loja 424409", "stores": ["424409"], "active": True}
+    auth = AuthFake()
+    old_rpc = auth.rpc
+
+    def rpc(name, args, permission):
+        if name == "integration_sources":
+            auth.calls.append((name, deepcopy(args), permission))
+            return [_FONTE, outra]
+        return old_rpc(name, args, permission)
+
+    auth.rpc = rpc
+    assert consultar_status_real(auth) is None
+    assert [c[0] for c in auth.calls] == ["integration_sources"]
+    assert consultar_status_real(auth, "416023").store_id == "416023"
+    assert [c[0] for c in auth.calls][-2:] == ["integration_sources", "demand_observation_review"]
+    auth.calls.clear()
+    assert consultar_status_real(auth, "loja-inexistente") is None
+    assert [c[0] for c in auth.calls] == ["integration_sources"]
+
+
+def test_listagem_revalida_sessao_e_nega_nao_master():
+    auth = AuthFake()
+    assert consultar_fontes_reais(auth) == ((_ID, "416023"),)
+    assert [name for name, _, _ in auth.calls] == ["integration_sources"]
+    operador = AuthFake(role="Operador")
+    with pytest.raises(AuthorizationError):
+        consultar_fontes_reais(operador)
+    assert not operador.calls
+    invalido = AuthFake(invalidar=True)
+    old_rpc = invalido.rpc
+
+    def revogar_durante_listagem(name, args, permission):
+        resultado = old_rpc(name, args, permission)
+        invalido.generation += 1
+        return resultado
+
+    invalido.rpc = revogar_durante_listagem
+    with pytest.raises(AuthorizationError):
+        consultar_fontes_reais(invalido)
