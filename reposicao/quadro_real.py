@@ -69,7 +69,7 @@ def construir_quadro_real(
             "Categoria": produto.categoria or "Não informada",
             "Código interno": produto.codigo_interno or "Não informado",
             "Produto (ID)": produto.id,
-            "Saldo GET da loja (UN; não ao vivo)": format(saldo, "f") if saldo is not None else "Não informado",
+            "Saldo GET (unidade do ERP não conferida)": format(saldo, "f") if saldo is not None else "Não informado",
             "Vendas fechadas observadas (UN)": (
                 format(observado, "f") if observado is not None else "Não observado no período"
             ),
@@ -101,7 +101,7 @@ def exportar_quadro_real_csv(quadro: QuadroReposicaoReal) -> bytes:
     cabecalhos = (
         "Loja (ID)", "Saldo consultado em (UTC)", "Período observado início",
         "Período observado fim", "Produto", "Categoria", "Código interno",
-        "Produto (ID)", "Saldo GET (UN, consulta pontual)",
+        "Produto (ID)", "Saldo GET (unidade do ERP a conferir)",
         "Vendas fechadas observadas (UN, período parcial)", "Variações",
     )
     w.writerow(cabecalhos)
@@ -112,7 +112,7 @@ def exportar_quadro_real_csv(quadro: QuadroReposicaoReal) -> bytes:
             quadro.periodo_fim.isoformat() if quadro.periodo_fim else "",
             *(row[k] for k in (
                 "Produto", "Categoria", "Código interno", "Produto (ID)",
-                "Saldo GET da loja (UN; não ao vivo)",
+                "Saldo GET (unidade do ERP não conferida)",
                 "Vendas fechadas observadas (UN)", "Variações",
             )),
         ]
