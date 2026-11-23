@@ -12,7 +12,7 @@ import streamlit as st
 
 from dados import hoje_local
 from fiscal.lojas import validar_lojas_fiscais
-from fiscal.order_observation import observar_pedido_fiscal
+from fiscal.order_observation import observar_pedido_fiscal, situacao_para_conferencia_fiscal
 from integracoes.account_setup import validar_conta
 from integracoes.gestaoclick import GestaoClickError
 from integracoes.sales_audit import consultar_vendas_integrais
@@ -105,6 +105,17 @@ def fiscal_order_lookup_controls(
             "Situação informada": observacao.situacao,
             "Itens (linhas)": observacao.quantidade_linhas,
         })
+    situacao, orientacao = situacao_para_conferencia_fiscal(observacao.situacao)
+    if situacao == "SITUACAO_COMPATIVEL":
+        st.info(orientacao)
+    else:
+        st.warning(orientacao)
+    st.caption(
+        "Conferência fiscal pendente: UF CE do destinatário, existência de NF-e na "
+        "loja de destino, identidade fiscal de clientes e produtos, NCM/CFOP/impostos, "
+        "loja efetiva do token e envio_automatico. Nenhum desses dados é deduzido "
+        "da situação da venda."
+    )
     st.warning(
         "CONFERÊNCIA, NÃO FATURAMENTO: a loja efetiva do token, o destino CE, "
         "as notas já existentes, os campos fiscais e o efeito do cadastro "
