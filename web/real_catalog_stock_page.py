@@ -1,6 +1,8 @@
 """Exibição da última fotografia real do catálogo, sem atualizar ou modificar o ERP."""
 from __future__ import annotations
 
+import csv
+import io
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from uuid import UUID
@@ -71,6 +73,29 @@ def validar_fotografia(value, loja):
     return {"store_id": loja, "created_at": data, "total_stock": total, "rows": linhas}
 
 
+
+def exportar_fotografia_csv(foto: dict) -> bytes:
+    """Exporta apenas produtos e saldos da foto validada, sem fórmulas no Excel."""
+    buffer = io.StringIO(newline="")
+    writer = csv.writer(buffer, delimiter=";", lineterminator="\r\n")
+    writer.writerow([
+        "Loja (ID)", "Fotografia em (ISO)", "Produto", "Categoria",
+        "Código interno", "Produto (ID)", "Saldo histórico (não atual)",
+    ])
+    for row in foto["rows"]:
+        valores = [
+            foto["store_id"], foto["created_at"].isoformat(),
+            row["Produto"], row["Categoria"], row["Código interno"],
+            row["Produto (ID)"], row["Saldo na fotografia (não atual)"],
+        ]
+        writer.writerow([
+            "'" + value if isinstance(value, str) and
+            value.lstrip().startswith(("=", "+", "-", "@")) else value
+            for value in valores
+        ])
+    return buffer.getvalue().encode("utf-8-sig")
+
+
 def consultar_catalogo_real(auth):
     """Usa somente duas RPCs autorizadas no Supabase, sem conexão ao GestãoClick."""
     with auth.operation():
@@ -106,6 +131,9 @@ def real_catalog_controls(servico, contexto):
     if foto is None:
         st.info("Nenhuma fotografia real disponível no Supabase.")
         return
+    from web.real_stock_refresh_page import atualizar_fotografia_estoque
+
+    atualizar_fotografia_estoque(servico, contexto, foto["store_id"])
     data = foto["created_at"].astimezone(ZoneInfo("America/Fortaleza"))
     a, b = st.columns(2)
     a.metric("Produtos na fotografia", len(foto["rows"]))
@@ -138,3 +166,12 @@ def real_catalog_controls(servico, contexto):
             ("Produto", "Categoria", "Código interno", "Produto (ID)")
         )]
     st.dataframe(linhas, hide_index=True, width="stretch", key="estoque_catalogo_real_tabela")
+    if contexto.can("inventory.export"):
+        st.download_button(
+            "Exportar catálogo real identificado (CSV)",
+            data=exportar_fotografia_csv(foto),
+            file_name=f'catalogo_real_loja_{foto["store_id"]}.csv',
+            mime="text/csv; charset=utf-8",
+            key="estoque_catalogo_real_csv",
+            on_click="ignore",
+        )
