@@ -3,13 +3,29 @@
 ALTER TABLE public.catalog_stock_rows
   ADD COLUMN IF NOT EXISTS nome text,
   ADD COLUMN IF NOT EXISTS categoria text;
-ALTER TABLE public.catalog_stock_rows
-  ADD CONSTRAINT catalog_stock_rows_nome_valid_ck
-    CHECK (nome IS NULL OR
-      (char_length(btrim(nome)) BETWEEN 1 AND 200 AND nome !~ '[<>[:cntrl:]]')),
-  ADD CONSTRAINT catalog_stock_rows_categoria_valid_ck
-    CHECK (categoria IS NULL OR
-      (char_length(btrim(categoria)) BETWEEN 1 AND 200 AND categoria !~ '[<>[:cntrl:]]'));
+-- A alteração também pode ser aplicada em instâncias onde o SQL já foi testado.
+DO $catalog_identification$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.catalog_stock_rows'::regclass
+      AND conname = 'catalog_stock_rows_nome_valid_ck'
+  ) THEN
+    ALTER TABLE public.catalog_stock_rows ADD CONSTRAINT catalog_stock_rows_nome_valid_ck
+      CHECK (nome IS NULL OR
+        (char_length(btrim(nome)) BETWEEN 1 AND 200 AND nome !~ '[<>[:cntrl:]]'));
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.catalog_stock_rows'::regclass
+      AND conname = 'catalog_stock_rows_categoria_valid_ck'
+  ) THEN
+    ALTER TABLE public.catalog_stock_rows ADD CONSTRAINT catalog_stock_rows_categoria_valid_ck
+      CHECK (categoria IS NULL OR
+        (char_length(btrim(categoria)) BETWEEN 1 AND 200 AND categoria !~ '[<>[:cntrl:]]'));
+  END IF;
+END
+$catalog_identification$;
 
 
 CREATE OR REPLACE FUNCTION private.catalog_stock_commit(p_source_id uuid, p_store_id text, p_expected_rows integer, p_expected_stock numeric, p_rows jsonb, p_confirmed boolean)
