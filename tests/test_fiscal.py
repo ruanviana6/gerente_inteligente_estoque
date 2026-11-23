@@ -174,7 +174,6 @@ class GatewayFiscalDemo:
 
 def abrir_fiscal(monkeypatch):
     """Executa widgets Streamlit verdadeiros, sem servidor público nem bypass produtivo."""
-    import web.fiscal_page
     gateway = GatewayFiscalDemo(AuthFiscal())
     script = "from web.fiscal_page import fiscal\nfrom test_fiscal import AuthFiscal\nfrom types import SimpleNamespace\na=AuthFiscal()\nfiscal(SimpleNamespace(auth=a),a.require('fiscal.view'))\n"
     app = AppTest.from_string(script, default_timeout=30).run()
