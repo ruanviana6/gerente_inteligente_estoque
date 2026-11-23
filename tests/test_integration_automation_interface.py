@@ -70,7 +70,7 @@ def test_navegacao_e_selecao_nao_abrem_secrets_nem_executam_erp(automacao_fictic
     state = automacao_ficticia
     app = state.app
     assert not app.exception
-    assert not checkbox(app, "Usar somente dados fictícios identificados como DEMO").value
+    assert not any(c.label == "Usar somente dados fictícios identificados como DEMO" for c in app.checkbox)
     assert not checkbox(app, APPROVAL).value
     checkbox(app, APPROVAL).check().run()
     app.selectbox[0].select(48).run()
