@@ -11,6 +11,7 @@ from dados import hoje_local
 from integracoes.gestaoclick import GestaoClickError
 from reposicao.cenario_manual_real import PreviaReposicaoReal, preparar_reposicao_real
 from web.errors import AppError, AuthenticationError, AuthorizationError
+from web.real_balance_refresh_page import mostrar_saldo_erp_reposicao
 from web.real_catalog_stock_page import consultar_catalogo_real
 from web.real_home_status import consultar_status_real
 
@@ -155,6 +156,7 @@ def reposicao_real_manual_controls(servico, contexto, loja_id: str | None) -> No
                 "Este número é histórico, não é a quantidade atual; "
                 "confira o saldo disponível hoje no GestãoClick antes de simular."
             )
+            mostrar_saldo_erp_reposicao(servico, loja_id, selecionado, selecionado_row)
             with st.container(border=True):
                 st.caption(
                     "Consulta somente a última observação agregada já salva no Supabase. "
@@ -195,8 +197,12 @@ def reposicao_real_manual_controls(servico, contexto, loja_id: str | None) -> No
         with st.form(f"reposicao_real_conferencia_{loja_id}", clear_on_submit=True):
             a, b = st.columns(2)
             with a:
-                saldo = st.text_input("Saldo atual conferido no GestãoClick (UN)", max_chars=12,
-                                      placeholder="Obrigatório, sem usar a foto antiga")
+                saldo = st.text_input(
+                    "Saldo atual conferido no GestãoClick (UN)",
+                    max_chars=12,
+                    placeholder="Obrigatório; digite ou copie de uma consulta GET recente",
+                    key=f"reposicao_saldo_atual_{loja_id}_{selecionado}",
+                )
                 reservas = st.text_input("Reservas atuais conferidas (UN)", max_chars=12,
                                          placeholder="Digite 0 apenas se confirmou zero")
                 media = st.text_input("Média diária conferida de saída (UN/dia)", max_chars=16,

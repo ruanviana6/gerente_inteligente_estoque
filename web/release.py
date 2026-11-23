@@ -1,3 +1,3 @@
 """Identificador público da versão, sem dados ou configurações da aplicação."""
 
-RELEASE = "gestaoclick-volume-observado-reposicao-20261123.6"
+RELEASE = "gestaoclick-saldo-get-reposicao-20261123.7"
