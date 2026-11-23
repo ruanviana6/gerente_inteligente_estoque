@@ -166,7 +166,7 @@ def sales_audit_controls(servico, carregar_configuracao, conta, loja_id: str) ->
             "Este número NÃO é movimentação de estoque nem previsão de demanda válida."
         )
         st.dataframe(
-            list(rotular_agrupamento(resumo, foto)[:25]),
+            list(rotular_agrupamento(resumo, foto, loja_id)[:25]),
             hide_index=True, width="stretch",
         )
         st.caption(
@@ -176,7 +176,7 @@ def sales_audit_controls(servico, carregar_configuracao, conta, loja_id: str) ->
         )
         st.download_button(
             "Exportar todos os produtos observados (CSV)",
-            data=csv_demanda_observada(resumo, foto),
+            data=csv_demanda_observada(resumo, foto, loja_id),
             file_name=f"auditoria_vendas_loja_{loja_id}_{datas[0]}_{datas[1]}.csv",
             mime="text/csv; charset=utf-8",
             key="sales_audit_export",
