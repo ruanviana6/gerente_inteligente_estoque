@@ -23,6 +23,7 @@ SOURCE = "30000000-0000-4000-8000-000000000001"
 RUN = "50000000-0000-4000-8000-000000000001"
 TOKEN = "60000000-0000-4000-8000-000000000001"
 ORGANIZACAO_DIAGNOSTICO = "70000000-0000-4000-8000-000000000001"
+ORGANIZACAO_TESTE = "80000000-0000-4000-8000-000000000001"
 CONFIRMACAO_DIAGNOSTICO = "Autorizo uma consulta real de lojas para verificar a conexão"
 SCRIPT = '''
 import streamlit as st
@@ -41,7 +42,7 @@ class AuthRPCFicticia:
 
     def __init__(self):
         """Cria uma identidade Master fictícia sem token nem senha."""
-        self.context = AccessContext(Profile("user-ficticio", "org-ficticia", "Master fictício", "Master", True),
+        self.context = AccessContext(Profile("user-ficticio", ORGANIZACAO_TESTE, "Master fictício", "Master", True),
                                      frozenset({"integrations.manage"}))
         self.generation = 1
         self.calls = []
@@ -103,6 +104,32 @@ class AuthRPCFicticia:
         return result
 
 
+@pytest.fixture(autouse=True)
+def fonte_de_teste_para_sync_real(monkeypatch):
+    """Injeta somente nos testes a leitura falsa; produção nunca gera DEMO."""
+    from analytics.demo import gerar_vendas_ficticias
+    from integracoes.gestaoclick import ContratoInvalido
+    from test_gestaoclick_runtime import secrets
+
+    config = {**secrets(), "GESTAOCLICK_ORGANIZATION_ID": ORGANIZACAO_TESTE,
+              "GESTAOCLICK_SOURCE_ID": SOURCE, "GESTAOCLICK_STORE_ID": "DEMO"}
+    monkeypatch.setattr("web.integration_page._secrets", lambda: dict(config))
+
+    class LeitorIsolado:
+        def __init__(self):
+            self.config = SimpleNamespace(source_id=SOURCE, store_id="DEMO")
+
+        def read(self, start, end):
+            return gerar_vendas_ficticias(SOURCE, "DEMO", start, end)
+
+    def montar(values):
+        if values.get("GESTAOCLICK_ENABLED") is False:
+            raise ContratoInvalido("A integração real não está habilitada.")
+        return LeitorIsolado()
+
+    monkeypatch.setattr("integracoes.runtime.build_reader", montar)
+
+
 def abrir():
     """Entrega uma página e sua sessão exclusiva, usando o SyncCoordinator verdadeiro."""
     auth = AuthRPCFicticia()
@@ -124,7 +151,7 @@ def checkbox(app, label):
 
 def preparar_demo(app):
     """Solicita a prévia por clique; não confirma a sincronização."""
-    checkbox(app, "Usar somente dados fictícios identificados como DEMO").check()
+    checkbox(app, "Confirmo autorização da empresa, contrato e permissões de leitura (consulta real)").check()
     botao(app, "Preparar prévia").click().run()
     assert not app.exception
     return app
@@ -230,7 +257,6 @@ def test_integracao_real_desabilitada_nao_faz_rede_nem_exibe_segredos(monkeypatc
     monkeypatch.setattr("urllib.request.build_opener", bloquear)
     app, auth = abrir()
     auth.context = replace(auth.context, profile=replace(auth.context.profile, organization_id=ORGANIZACAO_DIAGNOSTICO))
-    checkbox(app, "Usar somente dados fictícios identificados como DEMO").uncheck()
     checkbox(app, "Confirmo autorização da empresa, contrato e permissões de leitura (consulta real)").check()
     botao(app, "Preparar prévia").click().run()
     assert not app.exception
@@ -251,7 +277,6 @@ def test_real_exige_autorizacao_antes_de_ler_configuracao(monkeypatch):
         raise AssertionError("Leitura prematura de configuração.")
     monkeypatch.setattr(web.integration_page, "_secrets", bloquear)
     app, auth = abrir()
-    checkbox(app, "Usar somente dados fictícios identificados como DEMO").uncheck()
     botao(app, "Preparar prévia").click().run()
     assert not app.exception
     assert any("exige autorização" in item.value for item in app.warning)
