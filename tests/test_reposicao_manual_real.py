@@ -4,11 +4,15 @@ import io
 from datetime import date
 
 import pytest
+from test_observational_review import payload
+
+from analytics.observational_review import conferir_observacao
 
 from reposicao.cenario_manual_real import preparar_reposicao_real
 from web.real_catalog_stock_page import validar_fotografia
 from web.real_manual_replenishment_page import (
     exportar_cenario_manual_csv,
+    observacao_produto_real,
     produtos_reais_identificados,
     rotulo_produto_real,
 )
@@ -147,3 +151,27 @@ def test_saldo_historico_fracionario_nao_e_arredondado_no_rotulo():
     catalogo["rows"][0]["Saldo na fotografia (não atual)"] = 2.125
     opcoes, _ = produtos_reais_identificados(catalogo)
     assert "Saldo histórico: 2.125 UN" in rotulo_produto_real(opcoes["1001"])
+
+
+def test_volume_observado_real_do_produto_certo_sem_gerar_demanda():
+    dados = conferir_observacao(payload(), "LOJA_FICTICIA")
+    achada = observacao_produto_real(dados, "LOJA_FICTICIA", "101")
+    assert str(achada.observed_un) == "3"
+    assert dados.period_start.isoformat() == "2026-11-16"
+    assert observacao_produto_real(dados, "LOJA_FICTICIA", "99999") is None
+    assert observacao_produto_real(None, "LOJA_FICTICIA", "101") is None
+
+
+def test_volume_de_outra_loja_e_rejeitado_antes_de_ser_exibido():
+    dados = conferir_observacao(payload(), "LOJA_FICTICIA")
+    with pytest.raises(ValueError, match="não pertence"):
+        observacao_produto_real(dados, "OUTRA_LOJA", "101")
+    with pytest.raises(ValueError, match="produto"):
+        observacao_produto_real(dados, "LOJA_FICTICIA", "=101")
+
+
+def test_observacao_de_venda_nunca_alimenta_media_diaria_da_simulacao():
+    dados = conferir_observacao(payload(), "LOJA_FICTICIA")
+    assert observacao_produto_real(dados, "LOJA_FICTICIA", "101").observed_un == 3
+    with pytest.raises(ValueError, match="média"):
+        simular(media_diaria="")
