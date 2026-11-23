@@ -7,8 +7,12 @@ from types import SimpleNamespace
 import pytest
 
 from integracoes.gestaoclick import ContratoInvalido
-from web.real_catalog_stock_page import (consultar_catalogo_real, exportar_fotografia_csv,
-                                         real_catalog_controls, validar_fotografia)
+from web.real_catalog_stock_page import (
+    consultar_catalogo_real,
+    exportar_fotografia_csv,
+    real_catalog_controls,
+    validar_fotografia,
+)
 
 
 def exemplo():
