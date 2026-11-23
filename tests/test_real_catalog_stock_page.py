@@ -1,10 +1,12 @@
 """Confere fotografia real da loja sem extrapolar a cobertura dos dados."""
+import csv
+import io
 from copy import deepcopy
 
 import pytest
 
 from integracoes.gestaoclick import ContratoInvalido
-from web.real_catalog_stock_page import validar_fotografia
+from web.real_catalog_stock_page import exportar_fotografia_csv, validar_fotografia
 
 
 def exemplo():
@@ -45,3 +47,36 @@ def test_foto_invalida_e_recusada(change):
 
 def test_ausencia_de_foto_nao_e_estoque_zero():
     assert validar_fotografia({"found": False, "store_id": "416023"}, "416023") is None
+
+
+def test_csv_real_contem_nomes_categorias_e_loja_da_fotografia():
+    payload = exemplo()
+    payload["products"][0].update(
+        nome="Perfume Verão 100 ml", categoria="Perfumaria", codigo_interno="FL001",
+    )
+    foto = validar_fotografia(payload, "416023")
+    linhas = list(csv.reader(
+        io.StringIO(exportar_fotografia_csv(foto).decode("utf-8-sig")), delimiter=";",
+    ))
+    assert len(linhas) == 3
+    assert linhas[0] == [
+        "Loja (ID)", "Fotografia em (ISO)", "Produto", "Categoria",
+        "Código interno", "Produto (ID)", "Saldo histórico (não atual)",
+    ]
+    assert linhas[1][:6] == [
+        "416023", "2026-11-22T20:22:50-03:00", "Perfume Verão 100 ml",
+        "Perfumaria", "FL001", "62951783",
+    ]
+    assert linhas[1][6] == "10.0"
+    assert linhas[2][2:5] == ["Não informado", "Não informada", "Não informado"]
+
+
+def test_csv_real_impede_formula_externa_em_nome_categoria_e_codigo():
+    payload = exemplo()
+    payload["products"][0].update(
+        nome="=1+1", categoria="+SOMA(A1:A2)", codigo_interno="@comando",
+    )
+    foto = validar_fotografia(payload, "416023")
+    content = exportar_fotografia_csv(foto).decode("utf-8-sig")
+    linhas = list(csv.reader(io.StringIO(content), delimiter=";"))
+    assert linhas[1][2:5] == ["'=1+1", "'+SOMA(A1:A2)", "'@comando"]
