@@ -18,6 +18,7 @@ A Reposição passa a reunir, em um quadro único e com autorização explícita
 - Uma consulta por clique, **sem polling, POST, escrita no Supabase ou alteração de estoque/pedido/nota do GestãoClick**.
 - A última observação de vendas ainda é parcial: o aplicativo **não calcula pedidos, não decreta cobertura, não subtrai vendas do saldo GET e não preenche demanda zero para produtos não observados**.
 - A consulta completa do catálogo verifica paginação, contagem, IDs e acesso Master. Saldos podem mudar segundos após o GET; o rótulo usa o horário real da leitura.
+- Os saldos da API de catálogo **não vêm com unidade de medida validada em todos os itens**: o cabeçalho informa que a unidade do ERP ainda precisa de conferência. Somente as vendas observadas têm o recorte comprovado de UN.
 - Produtos com variações são marcados para conferência da unidade. Observações de outras lojas são recusadas; vendas cujos IDs não estão no catálogo consultado ficam de fora e geram aviso.
 - A tabela não apresenta clientes, CPFs, CNPJs, preços, pedidos ou chaves fiscais. Exportação protege fórmulas do Excel.
 - A futura recomendação de quantidade em caixas depende da validação das linhas e atualizações de vendas, exclusões, devoluções, reservas, embalagens e prazo. Não foi habilitada automaticamente.
