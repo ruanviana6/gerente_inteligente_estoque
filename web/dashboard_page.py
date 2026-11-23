@@ -78,8 +78,15 @@ def visao_geral(servico, contexto):
     dados = servico.dashboard()
     meta = dados.get('metadata') or {}
     resumo = dados.get('summary')
-    fonte = meta.get('source', 'Nenhuma importação disponível')
-    modo = 'DEMO declarada' if resumo and resumo.get('mode') == 'demo' else 'Origem CSV; classificação do ambiente não informada'
+    if not resumo:
+        st.info(
+            "Os dados reais de estoque e demanda já estão disponíveis acima. "
+            "A visão consolidada de reposição depende da validação do histórico "
+            "operacional de vendas, alterações e devoluções. Nenhum indicador foi inventado."
+        )
+        return
+    fonte = meta.get('source', 'Fonte não informada')
+    modo = 'Fonte simulada (não utilizar no trabalho)' if resumo.get('mode') == 'demo' else 'Fonte de consolidação informada'
     st.caption(f'Fonte: {fonte} · {modo}')
     st.caption(f'Saldo observado: {meta.get("snapshot_date", "não disponível")} · '
                f'Histórico: {meta.get("period_start", "não disponível")} a {meta.get("period_end", "não disponível")} · '
@@ -91,9 +98,6 @@ def visao_geral(servico, contexto):
             with st.spinner('Preparando o resumo autorizado…'):
                 servico.refresh_dashboard()
             st.rerun()
-    if not resumo:
-        st.info('O resumo ainda não foi preparado. O Master pode atualizar os indicadores após a importação; navegar não carrega o histórico bruto.')
-        return
     estoque = resumo['inventory']
     reposicao = resumo.get('replenishment') or {}
     vendas = resumo.get('sales') or {}
@@ -157,7 +161,7 @@ def visao_geral(servico, contexto):
             valor = financeiro.get('capital')
             st.write('Capital conhecido em estoque: ' + (('R$ ' + f'{valor:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')) if valor is not None else 'Não disponível'))
             st.caption('A custo informado, não receita. ' + ('Há custos ausentes; valor parcial.' if financeiro.get('partial') else 'Custos conhecidos no resumo.'))
-    if dados.get('fiscal'):
+    if dados.get('fiscal') and resumo.get('mode') != 'demo':
         fiscal = dados['fiscal']
         st.caption(f'Fiscal DEMO: {fiscal["pending"]} pendentes · {fiscal["conference"]} necessitam conferência. '
                    'Nenhum documento ou dado pessoal é mostrado neste resumo.')
