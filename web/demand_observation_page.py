@@ -106,7 +106,7 @@ def demand_observation_controls(servico, carregar_configuracao, conta, loja_id: 
                             "stamp": _stamp(auth), "store": loja_id, "source_id": source_id,
                             "expires": time.monotonic() + _TTL,
                             "snapshot_id": foto["snapshot_id"], "data": dados,
-                            "products": rotular_agrupamento(conciliado, foto),
+                            "products": rotular_agrupamento(conciliado, foto, loja_id),
                             "unmatched": len(conciliado.produtos_sem_correspondencia),
                         }
             except (AuthenticationError, AuthorizationError):
