@@ -155,7 +155,7 @@ def reposicao_real_manual_controls(servico, contexto, loja_id: str | None) -> No
                 "Este número é histórico, não é a quantidade atual; "
                 "confira o saldo disponível hoje no GestãoClick antes de simular."
             )
-            with st.expander("Conferir volume de vendas observado deste produto", expanded=False):
+            with st.container(border=True):
                 st.caption(
                     "Consulta somente a última observação agregada já salva no Supabase. "
                     "Não consulta o ERP, não registra venda e não preenche automaticamente "
