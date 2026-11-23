@@ -26,7 +26,8 @@ def listar_fontes_reais(fontes: object) -> tuple[tuple[str, str], ...]:
             raise ContratoInvalido("Fonte analítica incompleta.")
         if not ativo or not nome.casefold().startswith("gestãoclick:"):
             continue
-        if len(lojas) != 1 or not isinstance(lojas[0], str) or not lojas[0].isascii() or not lojas[0].isdigit():
+        if (len(lojas) != 1 or not isinstance(lojas[0], str) or not 1 <= len(lojas[0]) <= 20
+                or not lojas[0].isascii() or not lojas[0].isdigit()):
             continue
         try:
             fonte_id = str(UUID(fonte["id"]))
