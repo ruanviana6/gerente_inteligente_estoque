@@ -20,6 +20,7 @@ from reposicao.embalagens import ler_embalagens
 from web.downloads import csv_export
 from web.errors import AuthorizationError
 from web.insights import gerar_insights
+from web.real_batch_replenishment_page import quadro_reposicao_real_controls
 from web.real_catalog_stock_page import real_catalog_controls
 from web.real_manual_replenishment_page import reposicao_real_manual_controls
 from web.real_replenishment_triage import real_triage_controls
@@ -352,6 +353,7 @@ def _planejamento_reposicao(servico: Any, contexto: Any) -> None:
     page_header("Reposição Inteligente", "Planeje solicitações à indústria com revisão humana.")
     if contexto.profile.role == "Master" and contexto.can("integrations.manage"):
         loja_real = escolher_loja_real(servico.auth)
+        quadro_reposicao_real_controls(servico, contexto, loja_real)
         reposicao_real_manual_controls(servico, contexto, loja_real)
         real_triage_controls(servico, contexto, loja_real)
     modulo = "replenishment.view" if contexto.can("replenishment.view") else "trends.view"
