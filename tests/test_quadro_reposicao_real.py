@@ -50,9 +50,9 @@ def test_junta_id_da_mesma_loja_sem_subtrair_vendas_do_saldo_atual():
     assert quadro.produtos_com_venda_observada == 2
     assert quadro.periodo_inicio.isoformat() == "2026-11-16"
     linhas = {r["Produto (ID)"]: r for r in quadro.linhas}
-    assert linhas["101"]["Saldo GET da loja (UN; não ao vivo)"] == "2"
+    assert linhas["101"]["Saldo GET (unidade do ERP não conferida)"] == "2"
     assert linhas["101"]["Vendas fechadas observadas (UN)"] == "3"
-    assert linhas["102"]["Saldo GET da loja (UN; não ao vivo)"] == "0"
+    assert linhas["102"]["Saldo GET (unidade do ERP não conferida)"] == "0"
     assert linhas["103"]["Vendas fechadas observadas (UN)"] == "Não observado no período"
     assert [r["Produto (ID)"] for r in quadro.linhas] == ["101", "102", "103"]
 
@@ -72,7 +72,7 @@ def test_saldo_ausente_nao_vira_zero_e_variacoes_exigem_conferencia():
     )
     quadro = construir_quadro_real(catalogo(produtos=dados), None, "416023", AGORA)
     assert quadro.produtos_com_saldo == 0
-    assert quadro.linhas[0]["Saldo GET da loja (UN; não ao vivo)"] == "Não informado"
+    assert quadro.linhas[0]["Saldo GET (unidade do ERP não conferida)"] == "Não informado"
     assert quadro.linhas[0]["Variações"] == "Conferir unidades/variações"
 
 
