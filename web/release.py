@@ -1,3 +1,3 @@
 """Identificador público da versão, sem dados ou configurações da aplicação."""
 
-RELEASE = "gestaoclick-reposicao-navegacao-corrigida-20261123.8"
+RELEASE = "gestaoclick-quadro-loja-reposicao-20261123.9"
