@@ -99,6 +99,8 @@ def catalog_full_controls(servico, carregar_configuracao, conta, loja_id: str) -
                 "Essas informações não serão usadas no motor de estoque."
             )
         linhas = [{
+            "Produto": p.nome or "Não informado pelo GestãoClick",
+            "Categoria": p.categoria or "Não informada pelo GestãoClick",
             "Produto (ID)": p.id,
             "Código interno": p.codigo_interno or "Não informado",
             "Estoque desta loja": format(p.estoque, "f") if p.estoque is not None else "Não informado",
