@@ -91,3 +91,41 @@ def test_classificacao_real_nao_autoriza_cadastro_fiscal(situacao, codigo):
 def test_situacao_invalida_nao_e_aceita():
     with pytest.raises(ContratoInvalido):
         situacao_para_conferencia_fiscal("X" * 201)
+
+
+def test_triagem_real_mostra_fob_e_isento_sem_acao_de_cadastro(monkeypatch):
+    """A conferência usa escolhas explícitas sem chamar o executor fiscal."""
+    from streamlit.testing.v1 import AppTest
+
+    from web import fiscal_origin_lookup_page as pagina
+
+    monkeypatch.setattr(pagina, "validar_conta", lambda *_: None)
+    monkeypatch.setattr(pagina, "validar_lojas_fiscais", lambda *_: ("1", "2"))
+    leituras = []
+    def consultar(*args, **kwargs):
+        leituras.append((args[3], kwargs["autorizado"]))
+        return auditoria()
+    monkeypatch.setattr(pagina, "consultar_vendas_integrais", consultar)
+
+    app = AppTest.from_string("""
+from contextlib import nullcontext
+from types import SimpleNamespace
+from web.fiscal_origin_lookup_page import fiscal_order_lookup_controls
+auth = SimpleNamespace(operation=nullcontext, require=lambda _: None)
+conta = SimpleNamespace(lojas=[], situacoes=[{"id": "1", "nome": "Em separação"}])
+fiscal_order_lookup_controls(SimpleNamespace(auth=auth), None, conta, "1", "2")
+""").run()
+    assert not leituras
+    assert app.selectbox(key="fiscal_real_frete").value is None
+    assert app.selectbox(key="fiscal_real_contribuinte").value is None
+    app.selectbox(key="fiscal_real_frete").select(1)
+    app.selectbox(key="fiscal_real_contribuinte").select(2)
+    app.text_input(key="fiscal_source_order_number").set_value("1001")
+    app.checkbox(key="fiscal_source_order_consent").check()
+    app.button[0].click().run()
+
+    assert not app.exception
+    assert leituras == [("1", True)]
+    assert any("FOB" in item.value and "isento" in item.value for item in app.json)
+    assert len(app.button) == 1
+    assert "somente leitura" in app.button[0].label

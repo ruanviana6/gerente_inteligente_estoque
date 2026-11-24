@@ -220,3 +220,33 @@ def test_navegar_estoque_usa_callback_antes_de_instanciar_radio(monkeypatch):
     assert botoes[0]["on_click"] is _abrir_estoque_pelo_menu
     botoes[0]["on_click"]()
     assert estado["_pagina"] == "Estoque"
+
+
+def test_formulario_exige_selecao_e_isola_conferencia_por_produto(monkeypatch):
+    """Ao trocar de produto, os números e o aceite precisam de nova conferência."""
+    from streamlit.testing.v1 import AppTest
+
+    from web import real_manual_replenishment_page as page
+
+    monkeypatch.setattr(page, "consultar_catalogo_real", lambda *_: foto())
+    monkeypatch.setattr(page, "mostrar_saldo_erp_reposicao", lambda *_: None)
+    app = AppTest.from_string("""
+from types import SimpleNamespace
+from web.real_manual_replenishment_page import reposicao_real_manual_controls
+contexto = SimpleNamespace(profile=SimpleNamespace(role="Master"), can=lambda _: True)
+reposicao_real_manual_controls(SimpleNamespace(auth=None), contexto, "416023")
+""", default_timeout=30).run()
+    app.toggle[0].set_value(True).run()
+    assert not app.text_input
+
+    seletor = "reposicao_produto_real_416023"
+    app.selectbox(key=seletor).set_value("1001").run()
+    app.text_input(key="repor_media_416023_1001").set_value("5")
+    app.checkbox(key="repor_conferencia_416023_1001").set_value(True)
+    assert app.text_input(key="repor_media_416023_1001").value == "5"
+
+    app.selectbox(key=seletor).set_value("1002").run()
+    assert not app.exception
+    assert len(app.text_input) == 6
+    assert all(campo.value == "" for campo in app.text_input)
+    assert not app.checkbox(key="repor_conferencia_416023_1002").value

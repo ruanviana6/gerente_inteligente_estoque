@@ -5,6 +5,22 @@ Regra vigente de 12/11/2026: uma API, lojas distintas. Origem FLT Comércio
 a NF-e. Emissão exclusivamente manual no ERP, nunca automática.
 As instruções anteriores de duas APIs ou de criar e emitir estão substituídas.
 
+## Bloqueio confirmado no contrato público
+
+A operação `POST /notas_fiscais_produtos` existe e é separada de
+`POST /notas_fiscais_produtos/emitir/{id}`. Na
+[referência oficial](https://api.gestaoclick.com/docs), a descrição do cadastro
+informa que a modalidade de frete é derivada por conta do emitente e ainda não
+é configurável pela API. `valor_frete` indica o valor a ratear entre os itens.
+Esse campo não seleciona FOB.
+
+O cadastro automatizado permanece bloqueado enquanto a operação não respeitar
+FOB, quando exigido. Na triagem real, a tela permite selecionar frete e
+contribuinte para conferência manual. O fluxo DEMO também aceita essas escolhas. Para
+pedidos reais, a operação fiscal segue no GestãoClick, com cadastro e emissão
+manuais. Uma eventual ampliação do contrato deve ser conferida junto com as
+demais condições deste checklist antes da homologação.
+
 ## Preparação já implementada
 
 - Aplicação única com Supabase Auth, permissões, RLS e login persistente.

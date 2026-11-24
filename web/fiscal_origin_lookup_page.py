@@ -13,6 +13,7 @@ import streamlit as st
 from dados import hoje_local
 from fiscal.lojas import validar_lojas_fiscais
 from fiscal.order_observation import observar_pedido_fiscal, situacao_para_conferencia_fiscal
+from fiscal.regras import MODALIDADES_FRETE, TIPOS_CONTRIBUINTE, EscolhasFiscais
 from integracoes.account_setup import validar_conta
 from integracoes.gestaoclick import GestaoClickError
 from integracoes.sales_audit import consultar_vendas_integrais
@@ -48,6 +49,15 @@ def fiscal_order_lookup_controls(
             max_value=hoje,
             key="fiscal_source_order_dates",
         )
+        frete = st.selectbox(
+            "Modalidade do frete para conferência", list(MODALIDADES_FRETE), index=None,
+            format_func=MODALIDADES_FRETE.__getitem__, key="fiscal_real_frete",
+        )
+        contribuinte = st.selectbox(
+            "Tipo de contribuinte para conferência", list(TIPOS_CONTRIBUINTE), index=None,
+            format_func=TIPOS_CONTRIBUINTE.__getitem__, key="fiscal_real_contribuinte",
+        )
+        st.caption("Selecione FOB quando aplicável e confirme a situação de ICMS no cadastro do destinatário.")
         autoriza = st.checkbox(
             "Autorizo somente a consulta das vendas deste período na loja de origem",
             key="fiscal_source_order_consent",
@@ -108,6 +118,15 @@ def fiscal_order_lookup_controls(
     situacao, orientacao = situacao_para_conferencia_fiscal(observacao.situacao)
     if situacao == "SITUACAO_COMPATIVEL":
         st.info(orientacao)
+        if frete is not None and contribuinte is not None:
+            escolhas = EscolhasFiscais(frete, contribuinte)
+            st.write({
+                "Frete selecionado": MODALIDADES_FRETE[escolhas.modalidade_frete],
+                "Contribuinte selecionado": TIPOS_CONTRIBUINTE[escolhas.tipo_contribuinte],
+            })
+            st.caption("Confira essas escolhas ao cadastrar a nota manualmente no GestãoClick.")
+        else:
+            st.info("Selecione o frete e o tipo de contribuinte para montar a conferência manual.")
     else:
         st.warning(orientacao)
     st.caption(
