@@ -168,76 +168,80 @@ def reposicao_real_manual_controls(servico, contexto, loja_id: str | None) -> No
             placeholder="Selecione um produto com nome informado pelo ERP",
             key=f"reposicao_produto_real_{loja_id}",
         )
-        if selecionado is not None:
-            selecionado_row = opcoes[selecionado]
+        if selecionado is None:
+            return
+        selecionado_row = opcoes[selecionado]
+        st.caption(
+            f'Saldo da fotografia: {selecionado_row["Saldo na fotografia (não atual)"]:g} UN. '
+            "Este número é histórico, não é a quantidade atual; "
+            "confira o saldo disponível hoje no GestãoClick antes de simular."
+        )
+        mostrar_saldo_erp_reposicao(servico, loja_id, selecionado, selecionado_row)
+        with st.container(border=True):
             st.caption(
-                f'Saldo da fotografia: {selecionado_row["Saldo na fotografia (não atual)"]:g} UN. '
-                "Este número é histórico, não é a quantidade atual; "
-                "confira o saldo disponível hoje no GestãoClick antes de simular."
+                "Consulta somente a última observação agregada já salva no Supabase. "
+                "Não consulta o ERP, não registra venda e não preenche automaticamente "
+                "a média diária do cálculo. Vendas excluídas ou devolvidas podem não estar cobertas."
             )
-            mostrar_saldo_erp_reposicao(servico, loja_id, selecionado, selecionado_row)
-            with st.container(border=True):
-                st.caption(
-                    "Consulta somente a última observação agregada já salva no Supabase. "
-                    "Não consulta o ERP, não registra venda e não preenche automaticamente "
-                    "a média diária do cálculo. Vendas excluídas ou devolvidas podem não estar cobertas."
-                )
-                if st.button(
-                    "Consultar observação histórica do produto",
-                    key=f"reposicao_volume_observado_{loja_id}",
-                ):
-                    try:
-                        dados_observados = consultar_status_real(servico.auth, loja_id)
-                        linha_observada = observacao_produto_real(
-                            dados_observados, loja_id, selecionado,
+            if st.button(
+                "Consultar observação histórica do produto",
+                key=f"reposicao_volume_observado_{loja_id}",
+            ):
+                try:
+                    dados_observados = consultar_status_real(servico.auth, loja_id)
+                    linha_observada = observacao_produto_real(
+                        dados_observados, loja_id, selecionado,
+                    )
+                except (AuthenticationError, AuthorizationError):
+                    raise
+                except (AppError, GestaoClickError, ValueError, TypeError):
+                    st.warning("Não foi possível conferir a observação desta loja.")
+                else:
+                    if dados_observados is None:
+                        st.info("Nenhuma observação real foi salva para a loja selecionada.")
+                    elif linha_observada is None:
+                        st.info(
+                            "Este produto não consta da última observação do período. "
+                            "Isso não comprova que teve zero vendas."
                         )
-                    except (AuthenticationError, AuthorizationError):
-                        raise
-                    except (AppError, GestaoClickError, ValueError, TypeError):
-                        st.warning("Não foi possível conferir a observação desta loja.")
                     else:
-                        if dados_observados is None:
-                            st.info("Nenhuma observação real foi salva para a loja selecionada.")
-                        elif linha_observada is None:
-                            st.info(
-                                "Este produto não consta da última observação do período. "
-                                "Isso não comprova que teve zero vendas."
-                            )
-                        else:
-                            st.metric(
-                                "UN em vendas fechadas observadas (não demanda validada)",
-                                format(linha_observada.observed_un, "f"),
-                            )
-                            st.caption(
-                                f"Período observado: {dados_observados.period_start:%d/%m/%Y} "
-                                f"a {dados_observados.period_end:%d/%m/%Y}; "
-                                f"loja {loja_id}. Total parcial, não previsão de compras."
-                            )
-        with st.form(f"reposicao_real_conferencia_{loja_id}", clear_on_submit=True):
+                        st.metric(
+                            "UN em vendas fechadas observadas (não demanda validada)",
+                            format(linha_observada.observed_un, "f"),
+                        )
+                        st.caption(
+                            f"Período observado: {dados_observados.period_start:%d/%m/%Y} "
+                            f"a {dados_observados.period_end:%d/%m/%Y}; "
+                            f"loja {loja_id}. Total parcial, não previsão de compras."
+                        )
+        # A troca de produto também troca a identidade dos campos e do aceite.
+        escopo = f"{loja_id}_{selecionado}"
+        with st.form(f"reposicao_real_conferencia_{escopo}", clear_on_submit=True):
             a, b = st.columns(2)
             with a:
                 saldo = st.text_input(
                     "Saldo atual conferido no GestãoClick (UN)",
                     max_chars=12,
                     placeholder="Obrigatório; digite ou copie de uma consulta GET recente",
-                    key=f"reposicao_saldo_atual_{loja_id}_{selecionado}",
+                    key=f"reposicao_saldo_atual_{escopo}",
                 )
                 reservas = st.text_input("Reservas atuais conferidas (UN)", max_chars=12,
-                                         placeholder="Digite 0 apenas se confirmou zero")
+                                         placeholder="Digite 0 apenas se confirmou zero", key=f"repor_reservas_{escopo}")
                 media = st.text_input("Média diária conferida de saída (UN/dia)", max_chars=16,
-                                      placeholder="Ex.: 2,5 (não é histórico automático)")
+                                      placeholder="Ex.: 2,5 (não é histórico automático)", key=f"repor_media_{escopo}")
             with b:
                 caixa = st.text_input("Unidades reais por caixa", max_chars=12,
-                                      placeholder="Ex.: 12")
+                                      placeholder="Ex.: 12", key=f"repor_caixa_{escopo}")
                 prazo = st.text_input("Prazo total da indústria até a entrega (dias)", max_chars=12,
-                                      placeholder="Ex.: 5")
+                                      placeholder="Ex.: 5", key=f"repor_prazo_{escopo}")
                 seguranca = st.text_input("Estoque de segurança conferido (UN)", max_chars=12,
-                                          placeholder="Digite 0 se não houver reserva de segurança")
-            ciclo = st.radio("Ciclo de solicitação", (14, 21), horizontal=True)
+                                          placeholder="Digite 0 se não houver reserva de segurança", key=f"repor_seguranca_{escopo}")
+            ciclo = st.radio("Ciclo de solicitação", (14, 21), horizontal=True, key=f"repor_ciclo_{escopo}")
             st.caption("Cobertura alvo: 30 dias; a simulação considera o maior entre alvo e ciclo.")
             conferi = st.checkbox(
                 "Conferi saldo, reservas, média diária, embalagem e prazo no GestãoClick "
-                "ou em registros operacionais confiáveis para ESTE produto e loja."
+                "ou em registros operacionais confiáveis para ESTE produto e loja.",
+                key=f"repor_conferencia_{escopo}",
             )
             simular = st.form_submit_button("Calcular reposição deste produto", type="primary")
         if not simular:

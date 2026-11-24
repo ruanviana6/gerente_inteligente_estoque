@@ -132,7 +132,8 @@ def fiscal_real_read_controls(servico, contexto):
             servico, _secrets, conta, origem_id, destino_id,
         )
         st.warning(
-            "CADASTRO REAL AINDA BLOQUEADO: faltam validação fiscal completa "
-            "(destinatário, UF CE, NCM, CFOP, CST/CSOSN e impostos), nota anterior, "
-            "efeitos no estoque e envio_automatico. Emissão continua manual no ERP."
+            "Cadastro pela API indisponível para a regra FOB. O contrato do GestãoClick "
+            "aplica frete por conta do emitente e não permite escolher a modalidade. "
+            "Após a triagem, confira e cadastre a NF-e diretamente no GestãoClick. "
+            "A emissão também é manual."
         )
