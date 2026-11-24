@@ -23,7 +23,7 @@ jobs:
       - name: Verificar versão, login e negação no endereço real
         run: >-
           python scripts/verificar_publicacao.py
-          --expected-version gestaoclick-quadro-mobile-reposicao-20261124.1
+          --expected-version gestaoclick-revalidacao-vendas-20261124.2
           --output evidencias/publicado
       - name: Guardar somente evidências anônimas
         if: always()
