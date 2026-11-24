@@ -1,0 +1,9 @@
+# Diagnóstico de trocas e devoluções
+
+A documentação pública consultada em 24/11/2026 confirma a leitura de trocas e devoluções e seus detalhes: [Central de Ajuda](https://central.gestaoclick.com.br/hc/pt-br/articles/5140-api-consultas-de-agenda-atendimentos-mdf-e-financeiro-estoque-fiscal-e-da-conta). O contrato público de 16/11 já registrado neste repositório identifica GET /devolucoes e GET /devolucoes/{id}. O esquema detalhado da conta ainda não foi conferido nesta etapa.
+
+Em Administração → Integrações → Conferir lojas e situações da conta, selecionar a loja analítica e abrir **Conferir trocas e devoluções (somente leitura)**. Selecionar um período de até sete dias pela data de registro da devolução; escolher, se possível, uma janela com devolução conhecida no ERP. Autorizar e executar. O formulário envia somente um GET de listagem, com paginação de um registro e filtros de loja e datas, usando a configuração protegida existente. A aceitação e semântica dos filtros ainda precisam de validação na conta.
+
+O resultado expõe somente contagem da amostra, comparação de loja quando declarada e presença/tipo de campos candidatos fixos. Não expõe valores de registros, clientes, credenciais ou conteúdo de produtos. Não grava no Supabase nem no ERP. Um retorno vazio não prova zero devoluções; uma resposta 200 não prova cobertura, filtros efetivos, vínculo ao pedido original ou permissão para outras operações.
+
+Próxima etapa: confirmar contrato da conta (Referência do aplicativo API, OpenAPI ou amostra controlada), consulta de detalhe, vínculo de origem, situações/cancelamentos, quantidades e unidades. Trocas podem criar nova venda; evitar dupla contagem. Considerar devoluções posteriores à data da venda. Reposição automática e emissão de NF-e permanecem bloqueadas. Nenhuma mudança em Secrets, banco ou serviços pagos.
