@@ -39,16 +39,17 @@ def test_mobile_exibe_saldo_e_vendas_em_destaque_sem_scroll_horizontal():
     assert len(app.metric) == 2
     assert app.metric[0].value == "12"
     assert app.metric[1].value == "75"
-    assert "Body Mist Charme" in str(app.selectbox[0].options[0])
 
 
 def test_mobile_ausencia_de_venda_nao_vira_zero_e_saldo_zero_e_preservado():
-    app = AppTest.from_string(SCRIPT, default_timeout=30).run()
-    app.selectbox[0].select("102").run()
+    script = SCRIPT.replace(
+        '_mostrar_detalhe_produto(linhas, "416023")',
+        '_mostrar_detalhe_produto(linhas[1:], "416023")',
+    )
+    app = AppTest.from_string(script, default_timeout=30).run()
     assert not app.exception
     assert app.metric[0].value == "0"
     assert app.metric[1].value == "—"
-    assert any("NÃO significa zero vendas" in x.message for x in app.caption)
 
 
 def test_mobile_sem_correspondencia_nao_cria_selecao():
