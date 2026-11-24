@@ -78,7 +78,7 @@ def assinar_janela(auditoria: AuditoriaVendas, *, sal: str | None = None) -> Ass
     chave = secrets.token_hex(24) if sal is None else sal
     if (not isinstance(chave, str) or len(chave) != 48
             or any(c not in "0123456789abcdef" for c in chave)):
-        raise ContratoInvalido("A identidade protegida da sessão é inválida.")
+        raise ContratoInvalido("O sal protegido da sessão é inválido.")
     registros = []
     ids = set()
     for doc in auditoria.documentos:
