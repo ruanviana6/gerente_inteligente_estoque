@@ -1,3 +1,3 @@
 """Identificador público da versão, sem dados ou configurações da aplicação."""
 
-RELEASE = "gestaoclick-revalidacao-vendas-20261124.2"
+RELEASE = "gestaoclick-diagnostico-devolucoes-20261124.3"
