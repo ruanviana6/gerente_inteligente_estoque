@@ -16,6 +16,7 @@ from integracoes.gestaoclick import ContratoInvalido, GestaoClickError
 from reposicao.quadro_real import construir_quadro_real, exportar_quadro_real_csv
 from web.errors import AppError, AuthenticationError, AuthorizationError
 from web.integration_page import _secrets
+from web.real_confirmed_batch_page import lote_conferido_controls
 from web.real_home_status import consultar_status_real
 from web.sales_service import access_stamp
 
@@ -213,3 +214,6 @@ def quadro_reposicao_real_controls(servico, contexto, loja_id: str | None) -> No
                 mime="text/csv; charset=utf-8",
                 key=f"quadro_real_exportar_{loja_id}", on_click="ignore",
             )
+        lote_conferido_controls(
+            quadro, exportacao=contexto.can("replenishment.export") and contexto.can("inventory.export"),
+        )
