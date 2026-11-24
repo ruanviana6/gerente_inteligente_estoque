@@ -141,6 +141,7 @@ def test_referencia_expira_ou_muda_de_loja_sem_consultar_erp(monkeypatch):
     auth = AuthFake()
     estado = {}
     monkeypatch.setattr(pagina.st, "session_state", estado)
+    monkeypatch.setattr(pagina, "_stamp", lambda autenticacao: (autenticacao.generation,))
     pagina.guardar_referencia_vendas(auth, "001", "fonte-interna", amostra())
     assert pagina._referencia_valida(auth, "001") is not None
     assert pagina._referencia_valida(auth, "002") is None
