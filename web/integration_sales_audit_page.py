@@ -12,6 +12,7 @@ from integracoes.account_setup import validar_conta
 from integracoes.gestaoclick import ContratoInvalido, GestaoClickError
 from integracoes.sales_audit import VendaIntegralInvalida, consultar_vendas_integrais
 from web.errors import AppError, AuthenticationError, AuthorizationError
+from web.sales_window_recheck_page import guardar_referencia_vendas, revalidar_vendas_controls
 
 _LOJA_STATUS_CONFERIDOS = {
     # IDs provenientes da amostra real conferida na loja 416023;
@@ -53,6 +54,9 @@ def sales_audit_controls(servico, carregar_configuracao, conta, loja_id: str) ->
             "Consulta somente vendas de produtos (sem PDV) e cruza os IDs com a "
             "fotografia já salva desta loja. Limite de sete dias e até 1.000 documentos; "
             "nenhuma venda é importada e nenhum estoque é descontado."
+        )
+        revalidar_vendas_controls(
+            servico, carregar_configuracao, conta, loja_id, _id_fonte,
         )
         situacoes = {row["id"]: row["nome"] for row in conta.situacoes}
         ids = list(situacoes)
@@ -118,6 +122,7 @@ def sales_audit_controls(servico, carregar_configuracao, conta, loja_id: str) ->
                         separacao_id=separacao, concretizada_id=concretizada,
                     )
                     validar_conta(auth, conta)
+                    guardar_referencia_vendas(auth, loja_id, source_id, auditoria)
         except (AuthenticationError, AuthorizationError):
             raise
         except (AppError, GestaoClickError) as erro:
@@ -130,6 +135,11 @@ def sales_audit_controls(servico, carregar_configuracao, conta, loja_id: str) ->
             f"Consulta de leitura concluída: {auditoria.paginas} página(s), "
             f"{auditoria.total_informado} documentos e {auditoria.itens} itens. "
             "Nenhuma venda foi importada."
+        )
+        st.caption(
+            "Uma referência protegida da janela foi guardada por até 15 minutos "
+            "nesta sessão. Na próxima interação, use 'Comparar novamente as vendas' "
+            "para detectar divergências entre leituras."
         )
         st.caption(
             f"Loja: {loja_id} · Fotografia: {foto['product_count']} produtos · "
