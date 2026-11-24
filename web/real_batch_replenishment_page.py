@@ -48,6 +48,45 @@ def consultar_catalogo_para_quadro(
         return catalogo, datetime.now(timezone.utc)
 
 
+def _mostrar_detalhe_produto(linhas: list[dict], loja_id: str) -> None:
+    """No celular mostra saldo e vendas sem depender de rolar colunas laterais."""
+    if not linhas:
+        st.info("Nenhum produto corresponde aos filtros. Limpe a busca para consultar outros itens.")
+        return
+    por_id = {row["Produto (ID)"]: row for row in linhas}
+    if len(por_id) != len(linhas):
+        raise ContratoInvalido("Há produtos repetidos nesta conferência.")
+    selecionado = st.selectbox(
+        "Produto — visualizar saldo e vendas",
+        list(por_id),
+        index=0,
+        format_func=lambda product_id: (
+            f'{por_id[product_id]["Produto"]} · ID {product_id}'
+        ),
+        key=f"detalhe_quadro_reposicao_{loja_id}",
+    )
+    linha = por_id[selecionado]
+    st.write(linha["Produto"])
+    st.caption(
+        f'Categoria: {linha["Categoria"]} · '
+        f'Código interno: {linha["Código interno"]} · '
+        f'Produto ID: {selecionado}'
+    )
+    with st.container(border=True):
+        saldo = linha["Saldo GET (unidade do ERP não conferida)"]
+        st.metric("Saldo na consulta ao GestãoClick", saldo if saldo != "Não informado" else "—")
+        st.caption("Quantidade na unidade do ERP, ainda a conferir; saldo pontual, não ao vivo.")
+        observado = linha["Vendas fechadas observadas (UN)"]
+        st.metric(
+            "Vendas fechadas observadas (UN)",
+            observado if observado != "Não observado no período" else "—",
+        )
+        if observado == "Não observado no período":
+            st.caption("Não observado na amostra; NÃO significa zero vendas.")
+        if linha["Variações"] == "Conferir unidades/variações":
+            st.warning("Produto com variações: confira as unidades antes de calcular reposição.")
+
+
 def quadro_reposicao_real_controls(servico, contexto, loja_id: str | None) -> None:
     """Exibe saldos e vendas reais sem fabricar previsão ou mover estoque."""
     if (contexto.profile.role != "Master" or not contexto.can("integrations.manage")
@@ -141,10 +180,9 @@ def quadro_reposicao_real_controls(servico, contexto, loja_id: str | None) -> No
                 f"{quadro.observados_sem_catalogo} produto(s) observados em vendas não "
                 "correspondem ao catálogo GET desta loja. Não foram incorporados à tabela."
             )
-        st.warning(
-            "CONFERÊNCIA, NÃO PEDIDO: os saldos GET não são estoque reservado "
-            "nem previsão. Nunca desconte as vendas observadas desses saldos. "
-            "A reposição automática depende da conciliação completa de vendas, "
+        st.caption(
+            "Conferência, não pedido: saldo pontual do ERP; vendas parciais não "
+            "são descontadas do saldo nem geram compra. É necessário validar "
             "devoluções, reservas, unidades por caixa e prazo."
         )
         busca = st.text_input(
@@ -163,8 +201,10 @@ def quadro_reposicao_real_controls(servico, contexto, loja_id: str | None) -> No
             )]
         if somente_venda:
             linhas = [x for x in linhas if x["Vendas fechadas observadas (UN)"] != "Não observado no período"]
-        st.dataframe(linhas, hide_index=True, width="stretch")
-        st.caption(f"{len(linhas)} produto(s) exibidos nesta conferência.")
+        st.caption(f"{len(linhas)} produto(s) encontrados nesta conferência.")
+        _mostrar_detalhe_produto(linhas, loja_id)
+        with st.expander("Ver tabela completa — deslize para as colunas à direita"):
+            st.dataframe(linhas, hide_index=True, width="stretch")
         if contexto.can("replenishment.export") and contexto.can("inventory.export"):
             st.download_button(
                 "Exportar quadro completo (CSV)",
