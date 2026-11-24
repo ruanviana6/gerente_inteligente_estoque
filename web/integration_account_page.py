@@ -21,6 +21,7 @@ from web.fiscal_origin_lookup_page import fiscal_order_lookup_controls
 from web.integration_catalog_full_page import catalog_full_controls
 from web.integration_catalog_preview_page import catalog_preview_controls
 from web.integration_native_preview_page import native_preview_controls
+from web.integration_returns_probe_page import returns_probe_controls
 from web.integration_sales_audit_page import sales_audit_controls
 from web.operational_review_page import operational_review_controls
 
@@ -142,6 +143,7 @@ def account_setup_controls(servico, carregar_configuracao):
         if loja_id is not None:
             native_preview_controls(servico, carregar_configuracao, conta, loja_id)
             sales_audit_controls(servico, carregar_configuracao, conta, loja_id)
+            returns_probe_controls(servico, carregar_configuracao, conta, loja_id)
             demand_observation_controls(servico, carregar_configuracao, conta, loja_id)
             operational_review_controls(servico, conta, loja_id)
 
