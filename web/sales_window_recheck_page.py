@@ -13,7 +13,7 @@ from analytics.sales_window_recheck import assinar_janela, comparar_janelas
 from integracoes.account_setup import validar_conta
 from integracoes.diagnostico import _stamp
 from integracoes.gestaoclick import ContratoInvalido, GestaoClickError
-from integracoes.sales_audit import AuditoriaVendas, VendaIntegralInvalida, consultar_vendas_integrais
+from integracoes.sales_audit import AuditoriaVendas, consultar_vendas_integrais
 from web.errors import AppError, AuthenticationError, AuthorizationError
 
 _JANELA_KEY = "_vendas_revalidacao_efemera"
