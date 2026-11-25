@@ -288,3 +288,37 @@ def test_montagem_sem_permissao_financeira_nao_le_erp(auth, conta_atacado):
                                       autorizado=True, transporte=transporte)
     assert not transporte.calls
     carregar.assert_not_called()
+
+
+def test_montagem_sete_linhas_com_ids_textuais_e_variacoes_legadas(auth, configuracao, conta_atacado):
+    """A mesma venda pode trazer IDs em formatos distintos por item."""
+    venda = venda_ficticia()
+    item = venda["produtos"][0]["produto"]
+    variacoes = ["", None, 0, "0", "003", 8, 9]
+    venda["produtos"] = [
+        {"produto": item | {"produto_id": f"00{100 + i}" if i % 2 else 100 + i, "variacao_id": variacao}}
+        for i, variacao in enumerate(variacoes)
+    ]
+    linhas = consultar_itens_para_montagem(
+        auth, lambda: configuracao, conta_atacado, "31", "42", "515", "905", "1",
+        autorizado=True, transporte=TransporteFicticio(resposta(venda)),
+    )
+    assert len(linhas) == 7
+    assert linhas[1]["Produto no atacado (ID)"] == "00101"
+    assert [linha["Variação no atacado (ID)"] for linha in linhas] == [None, None, "0", "0", "003", "8", "9"]
+
+
+@pytest.mark.parametrize(("campo", "valor"), [
+    ("produto_id", ""), ("produto_id", "000"), ("produto_id", True),
+    ("produto_id", PRIVADO), ("variacao_id", 1.5), ("variacao_id", "-1"),
+])
+def test_montagem_recusa_id_invalido_e_mostra_so_indice(auth, configuracao, conta_atacado, campo, valor):
+    """A posição auxilia a conferência sem revelar o conteúdo recusado."""
+    venda = venda_ficticia()
+    venda["produtos"][0]["produto"][campo] = valor
+    with pytest.raises(ContratoInvalido, match="linha 1") as erro:
+        consultar_itens_para_montagem(
+            auth, lambda: configuracao, conta_atacado, "31", "42", "515", "905", "1",
+            autorizado=True, transporte=TransporteFicticio(resposta(venda)),
+        )
+    assert PRIVADO not in str(erro.value)
