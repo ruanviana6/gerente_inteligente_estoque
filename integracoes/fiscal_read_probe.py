@@ -22,6 +22,7 @@ from integracoes.gestaoclick import (
     TransporteHTTPS,
     parse_json_seguro,
 )
+from integracoes.native_preview import _id_produto
 from sincronizacao.service import RPCAuth
 from web.errors import AuthorizationError
 
@@ -173,22 +174,22 @@ def _itens_para_montagem(venda: dict) -> tuple[dict, ...]:
     if not isinstance(produtos, list) or not 1 <= len(produtos) <= 100:
         raise ContratoInvalido("A quantidade de linhas retornada está fora do limite.")
     linhas = []
-    for linha in produtos:
+    for indice, linha in enumerate(produtos, start=1):
         produto = linha.get("produto") if isinstance(linha, dict) else None
         if not isinstance(produto, dict):
             raise ContratoInvalido("A venda retornou uma linha de produto inválida.")
-        identificador = produto.get("produto_id")
-        variacao = produto.get("variacao_id")
-        if (type(identificador) is not int or not 1 <= identificador < 10**18
-                or (variacao is not None and (type(variacao) is not int or not 0 <= variacao < 10**18))):
-            raise ContratoInvalido("A venda retornou um identificador de produto inválido.")
+        try:
+            identificador = _id_produto(produto.get("produto_id"))
+            variacao = _id_produto(produto.get("variacao_id"), variacao=True)
+        except ContratoInvalido:
+            raise ContratoInvalido(f"Identificador de produto ou variação inválido na linha {indice}.") from None
         nome = produto.get("nome_produto")
         unidade = produto.get("sigla_unidade")
         linhas.append({
             "Produto": nome if isinstance(nome, str) and len(nome) <= 200 and nome.isprintable() else None,
             "Unidade": unidade if isinstance(unidade, str) and len(unidade) <= 20 and unidade.isprintable() else None,
-            "Produto no atacado (ID)": str(identificador),
-            "Variação no atacado (ID)": str(variacao) if variacao is not None else None,
+            "Produto no atacado (ID)": identificador,
+            "Variação no atacado (ID)": variacao,
             "Quantidade na venda": _valor_comercial(produto.get("quantidade")),
             "Valor de venda informado": _valor_comercial(produto.get("valor_venda")),
             "Desconto em valor informado": _valor_comercial(produto.get("desconto_valor"), opcional=True),
