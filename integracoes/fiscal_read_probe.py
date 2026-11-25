@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hmac
+import re
 from typing import Any
 from urllib.parse import urlencode
 
@@ -24,21 +25,17 @@ from sincronizacao.service import RPCAuth
 from web.errors import AuthorizationError
 
 
-def consultar_recurso_nfe(
+def _consultar_nfe(
     auth: RPCAuth,
     carregar_configuracao,
     conta: ContaGestaoClick,
     loja_id: str,
+    caminho: str,
     *,
     autorizado: bool,
     transporte: TransporteConsulta | None = None,
 ) -> dict[str, Any]:
-    """Executa uma única chamada de leitura e descarta integralmente o conteúdo.
-
-    GET /notas_fiscais_produtos é documentado publicamente, mas um 200 não
-    comprova que a credencial tenha acesso a todas as notas da loja nem que
-    o cadastro por POST esteja habilitado. Esse teste não ativa operações fiscais.
-    """
+    """Revalida acesso e configuração antes e depois do GET fiscal fixo."""
     with auth.operation():
         stamp = _stamp(auth)
         if autorizado is not True:
@@ -57,9 +54,7 @@ def consultar_recurso_nfe(
             if atual != config:
                 raise AuthorizationError("A configuração fiscal mudou durante a consulta.")
 
-        url = base + "/notas_fiscais_produtos?" + urlencode({
-            "loja_id": loja_id, "pagina": 1, "limite": 1,
-        })
+        url = base + caminho
         revalidar()
         try:
             resposta = (transporte or TransporteHTTPS()).get(url, {
@@ -78,31 +73,78 @@ def consultar_recurso_nfe(
         if type(resposta.status) is not int or resposta.status != 200:
             raise GestaoClickError("O recurso fiscal não respondeu com sucesso. Nenhuma nota foi alterada.")
         payload = parse_json_seguro(resposta.body)
-        rows = payload.get("data")
-        if (type(payload.get("code")) is not int or payload["code"] != 200 or
-                payload.get("status") != "success" or not isinstance(rows, list) or
-                len(rows) > 1 or any(not isinstance(row, dict) for row in rows)):
+        if (type(payload.get("code")) is not int or payload["code"] != 200
+                or payload.get("status") != "success"):
             raise ContratoInvalido("Formato do retorno de NF-e divergente; leitura não comprovada.")
-        # O token pode fixar a loja e ignorar ?loja_id=. Um registro que
-        # declara explicitamente loja_id permite apenas comparar essa amostra.
-        # Não inferir a loja pelo ID da nota, pelo retorno 200 ou por lista vazia.
-        loja_registro_confere: bool | None = None
-        if len(rows) == 1:
-            valor_loja = rows[0].get("loja_id")
-            if type(valor_loja) is int and valor_loja > 0:
-                loja_registro_confere = hmac.compare_digest(str(valor_loja), loja_id)
-            elif (isinstance(valor_loja, str) and valor_loja.isascii() and
-                    valor_loja.isdecimal() and valor_loja):
-                loja_registro_confere = hmac.compare_digest(valor_loja, loja_id)
-        # Não retorna nem guarda linha, chave, nota, destinatário, valor ou metadados brutos.
-        return {
-            "get_autorizado": True,
-            "recurso": "notas_fiscais_produtos",
-            "loja_solicitada": loja_id,
-            "itens_amostra": len(rows),
-            "loja_efetiva_comprovada": False,
-            "loja_no_registro_confere": loja_registro_confere,
-            "cobertura_comprovada": False,
-            "escrita_habilitada": False,
-            "resultado": "GET_RESPONDEU_SEM_HOMOLOGAR_CADASTRO",
-        }
+        return payload
+
+
+def consultar_recurso_nfe(
+    auth: RPCAuth, carregar_configuracao, conta: ContaGestaoClick, loja_id: str,
+    *, autorizado: bool, transporte: TransporteConsulta | None = None,
+) -> dict[str, Any]:
+    """Verifica uma página mínima sem expor dados ou afirmar cobertura."""
+    caminho = "/notas_fiscais_produtos?" + urlencode({"loja_id": loja_id, "pagina": 1, "limite": 1})
+    payload = _consultar_nfe(auth, carregar_configuracao, conta, loja_id, caminho,
+                             autorizado=autorizado, transporte=transporte)
+    rows = payload.get("data")
+    if not isinstance(rows, list) or len(rows) > 1 or any(not isinstance(row, dict) for row in rows):
+        raise ContratoInvalido("Formato do retorno de NF-e divergente; leitura não comprovada.")
+    # O token pode fixar a loja e ignorar ?loja_id=. Um registro que
+    # declara explicitamente loja_id permite apenas comparar essa amostra.
+    # Não inferir a loja pelo ID da nota, pelo retorno 200 ou por lista vazia.
+    loja_registro_confere: bool | None = None
+    if len(rows) == 1:
+        valor_loja = rows[0].get("loja_id")
+        if type(valor_loja) is int and valor_loja > 0:
+            loja_registro_confere = hmac.compare_digest(str(valor_loja), loja_id)
+        elif (isinstance(valor_loja, str) and valor_loja.isascii() and
+                valor_loja.isdecimal() and valor_loja):
+            loja_registro_confere = hmac.compare_digest(valor_loja, loja_id)
+    # Não retorna nem guarda linha, chave, nota, destinatário, valor ou metadados brutos.
+    return {
+        "get_autorizado": True,
+        "recurso": "notas_fiscais_produtos",
+        "loja_solicitada": loja_id,
+        "itens_amostra": len(rows),
+        "loja_efetiva_comprovada": False,
+        "loja_no_registro_confere": loja_registro_confere,
+        "cobertura_comprovada": False,
+        "escrita_habilitada": False,
+        "resultado": "GET_RESPONDEU_SEM_HOMOLOGAR_CADASTRO",
+    }
+
+_STATUS_NFE = frozenset({"Em aberto", "Aprovada", "Reprovada", "Denegada",
+                        "Cancelada", "Enviando", "Corrigida"})
+
+
+def conferir_nfe_por_id(
+    auth: RPCAuth, carregar_configuracao, conta: ContaGestaoClick,
+    loja_id: str, nota_id: str, referencia: str | None = None,
+    *, autorizado: bool, transporte: TransporteConsulta | None = None,
+) -> dict[str, Any]:
+    """Confere ID, loja, situação e referência de nota conhecida em um único GET.
+
+    A API não faz busca por referência aqui. Nota não encontrada, fora de escopo
+    ou de formato divergente não comprova que seja seguro repetir um cadastro.
+    """
+    if type(nota_id) is not str or not re.fullmatch(r"[1-9][0-9]{0,17}", nota_id):
+        raise ContratoInvalido("Informe o ID interno numérico da nota.")
+    if referencia is not None and (
+        type(referencia) is not str
+        or not re.fullmatch(r"Flatter origem [1-9][0-9]{0,17} venda [1-9][0-9]{0,17}", referencia)
+    ):
+        raise ContratoInvalido("A referência da venda de origem não está no formato do Gerente.")
+    payload = _consultar_nfe(
+        auth, carregar_configuracao, conta, loja_id, f"/notas_fiscais_produtos/{nota_id}",
+        autorizado=autorizado, transporte=transporte,
+    )
+    nota = payload.get("data")
+    if not isinstance(nota, dict) or nota.get("id") != nota_id or nota.get("loja_id") != loja_id:
+        raise ContratoInvalido("A resposta não confirma o ID e a loja esperados da nota.")
+    situacao = nota.get("situacao_nf")
+    if not isinstance(situacao, str) or situacao not in _STATUS_NFE:
+        raise ContratoInvalido("A situação retornada pela API não pôde ser reconhecida.")
+    return {"situacao": situacao, "em_aberto": situacao == "Em aberto",
+            "referencia_confere": (nota.get("informacoes_complementares") == referencia)
+            if referencia is not None else None}

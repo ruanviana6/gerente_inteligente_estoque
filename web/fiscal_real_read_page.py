@@ -9,7 +9,7 @@ import streamlit as st
 
 from fiscal.lojas import validar_lojas_fiscais
 from integracoes.account_setup import consultar_conta, validar_conta
-from integracoes.fiscal_read_probe import consultar_recurso_nfe
+from integracoes.fiscal_read_probe import conferir_nfe_por_id, consultar_recurso_nfe
 from integracoes.gestaoclick import GestaoClickError
 from web.errors import AuthenticationError, AuthorizationError
 from web.fiscal_origin_lookup_page import fiscal_order_lookup_controls
@@ -127,6 +127,7 @@ def fiscal_real_read_controls(servico, contexto):
                             "A loja efetiva do token não pôde ser comprovada na amostra. "
                             "Não liberar cadastro fiscal."
                         )
+        _conferir_nota_existente(servico, conta, destino_id)
         st.divider()
         fiscal_order_lookup_controls(
             servico, _secrets, conta, origem_id, destino_id,
@@ -137,3 +138,34 @@ def fiscal_real_read_controls(servico, contexto):
             "Após a triagem, confira e cadastre a NF-e diretamente no GestãoClick. "
             "A emissão também é manual."
         )
+
+def _conferir_nota_existente(servico, conta, destino_id: str) -> None:
+    """Verifica um ID conhecido para homologar loja, situação e referência."""
+    with st.form("fiscal_conferir_nota_id", clear_on_submit=True):
+        st.markdown("**Conferir uma NF-e pelo ID interno**")
+        nota_id = st.text_input("ID interno da NF-e na loja de destino", max_chars=18)
+        referencia = st.text_input("Referência da origem (opcional)", max_chars=62,
+                                    placeholder="Flatter origem 31 venda 901")
+        consentimento = st.checkbox("Autorizo consultar essa NF-e no GestãoClick")
+        consultar = st.form_submit_button("Conferir situação da NF-e")
+    if not consultar:
+        return
+    if not consentimento:
+        st.warning("Confirme a autorização antes de consultar a nota.")
+        return
+    try:
+        resultado = conferir_nfe_por_id(
+            servico.auth, _secrets, conta, destino_id, nota_id.strip(),
+            referencia.strip() or None, autorizado=True,
+        )
+    except (AuthenticationError, AuthorizationError):
+        raise
+    except GestaoClickError as erro:
+        st.warning(str(erro))
+        return
+    st.write(f"Situação na loja de destino: **{resultado['situacao']}**.")
+    if resultado["referencia_confere"] is True:
+        st.success("A referência informada coincide com a referência da nota.")
+    elif resultado["referencia_confere"] is False:
+        st.warning("A referência informada não coincide com a referência da nota.")
+    st.caption("A consulta verifica o ID informado. Use o GestãoClick para conferir o frete e os dados fiscais.")

@@ -14,7 +14,7 @@ from test_gestaoclick_account_setup import (
 from test_gestaoclick_account_setup import auth as auth
 from test_gestaoclick_account_setup import configuracao as configuracao
 
-from integracoes.fiscal_read_probe import consultar_recurso_nfe
+from integracoes.fiscal_read_probe import conferir_nfe_por_id, consultar_recurso_nfe
 from integracoes.gestaoclick import ContratoInvalido, GestaoClickError, RespostaGestaoClick
 from web.errors import AuthorizationError
 
@@ -151,3 +151,76 @@ def test_lista_vazia_nao_prova_loja_efetiva(auth, configuracao, conta):
     assert resultado["loja_no_registro_confere"] is None
     assert resultado["loja_efetiva_comprovada"] is False
     assert len(transporte.calls) == 1
+
+@pytest.mark.parametrize(("situacao", "aberta"), [("Em aberto", True), ("Aprovada", False)])
+def test_detalhe_fiscal_prova_apenas_campos_conferidos(auth, configuracao, conta, situacao, aberta):
+    """Confere o detalhe documentado sem devolver cliente ou conteúdo integral."""
+    referencia = "Flatter origem 31 venda 901"
+    transporte = TransporteFicticio(resposta({
+        "id": "223", "loja_id": "001", "situacao_nf": situacao,
+        "informacoes_complementares": referencia, "cliente": PRIVADO, "chave": SECRET_TOKEN,
+    }))
+    resultado = conferir_nfe_por_id(auth, lambda: configuracao, conta, "001", "223", referencia,
+                                     autorizado=True, transporte=transporte)
+    assert resultado == {"situacao": situacao, "em_aberto": aberta, "referencia_confere": True}
+    assert len(transporte.calls) == 1
+    assert urlsplit(transporte.calls[0][0]).path == "/notas_fiscais_produtos/223"
+    auth.rpc.assert_not_called()
+
+
+@pytest.mark.parametrize("mudancas", [{"id": "224"}, {"loja_id": "002"},
+                                       {"situacao_nf": PRIVADO}, {"situacao_nf": []}])
+def test_detalhe_divergente_nao_confirma_nota(auth, configuracao, conta, mudancas):
+    nota = {"id": "223", "loja_id": "001", "situacao_nf": "Em aberto"} | mudancas
+    with pytest.raises(ContratoInvalido) as erro:
+        conferir_nfe_por_id(auth, lambda: configuracao, conta, "001", "223",
+                             autorizado=True, transporte=TransporteFicticio(resposta(nota)))
+    assert PRIVADO not in str(erro.value)
+
+
+@pytest.mark.parametrize("nota_id", ["223/emitir", "https://fora.invalid", "0", "01", "²", 223])
+def test_nao_aceita_id_como_rota(auth, conta, nota_id):
+    carregar = Mock()
+    transporte = TransporteFicticio()
+    with pytest.raises(ContratoInvalido):
+        conferir_nfe_por_id(auth, carregar, conta, "001", nota_id,
+                             autorizado=True, transporte=transporte)
+    carregar.assert_not_called()
+    assert not transporte.calls
+
+
+def test_referencia_divergente_e_sinalizada_sem_expor_dado(auth, configuracao, conta):
+    nota = {"id": "223", "loja_id": "001", "situacao_nf": "Em aberto",
+            "informacoes_complementares": PRIVADO}
+    resultado = conferir_nfe_por_id(auth, lambda: configuracao, conta, "001", "223",
+                                     "Flatter origem 31 venda 901", autorizado=True,
+                                     transporte=TransporteFicticio(resposta(nota)))
+    assert resultado["referencia_confere"] is False
+    assert PRIVADO not in str(resultado)
+
+
+def test_formulario_exige_consentimento_e_mostra_estado_sem_expor_resposta(monkeypatch):
+    """A conferência de nota existente só usa a leitura após clique consentido."""
+    from streamlit.testing.v1 import AppTest
+
+    from web import fiscal_real_read_page
+
+    consulta = Mock(return_value={"situacao": "Em aberto", "em_aberto": True, "referencia_confere": True})
+    monkeypatch.setattr(fiscal_real_read_page, "conferir_nfe_por_id", consulta)
+    app = AppTest.from_string("""
+from types import SimpleNamespace
+from web.fiscal_real_read_page import _conferir_nota_existente
+_conferir_nota_existente(SimpleNamespace(auth=None), None, "42")
+""").run()
+    consulta.assert_not_called()
+    app.button[0].click().run()
+    consulta.assert_not_called()
+    app.text_input[0].set_value("223")
+    app.text_input[1].set_value("Flatter origem 31 venda 901")
+    app.checkbox[0].check()
+    app.button[0].click().run()
+    assert not app.exception
+    assert consulta.call_count == 1
+    assert consulta.call_args.args[3:] == ("42", "223", "Flatter origem 31 venda 901")
+    assert "Em aberto" in app.markdown[-1].value
+    assert len(app.success) == 1

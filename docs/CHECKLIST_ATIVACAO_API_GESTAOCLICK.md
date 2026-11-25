@@ -39,6 +39,18 @@ para a nota esperada, em aberto e na loja correta. Resposta ambígua exige
 conferência antes de qualquer nova tentativa. O módulo atual faz apenas
 validação local. Ele não está ligado a botões, rotas ou Secrets.
 
+A opção **Conferir uma NF-e pelo ID interno** usa
+`GET /notas_fiscais_produtos/{id}`. Ela comprova que o retorno declara o ID e a
+loja selecionados e mostra a situação reconhecida. Quando informada, compara a
+referência textual exata com `informacoes_complementares`, sem exibir o conteúdo
+do campo. Uma falha ou um 404 não comprova ausência da nota. Se o ID se perder,
+continua necessária a conferência manual antes de uma nova tentativa.
+
+O schema público do cadastro documenta apenas `produto_id`, `variacao_id`,
+`quantidade` e `NCM` por item. Confirmar com o GestãoClick a origem do preço,
+dos descontos e da tributação antes de enviar uma venda real. O valor do
+pagamento não comprova a preservação dos valores unitários da venda de origem.
+
 Em produção, o cadastro pelo Gerente ainda depende da homologação acima. Na
 triagem real, a tela permite selecionar frete e
 contribuinte para conferência manual. O fluxo DEMO também aceita essas escolhas. Para
