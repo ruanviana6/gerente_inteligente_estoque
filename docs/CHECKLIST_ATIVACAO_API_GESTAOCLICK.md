@@ -51,6 +51,16 @@ O schema público do cadastro documenta apenas `produto_id`, `variacao_id`,
 dos descontos e da tributação antes de enviar uma venda real. O valor do
 pagamento não comprova a preservação dos valores unitários da venda de origem.
 
+Para a montagem manual, procure a venda na origem e marque **Exibir itens e
+valores da venda para montagem manual**. A tela faz uma consulta adicional ao
+detalhe da venda, confere a origem declarada, o número e a situação e exibe
+somente os produtos, quantidades, unidades, valores e descontos informados.
+O detalhe é restrito ao Master com permissões fiscal e financeira. Não são
+exibidos custo ou dados pessoais. Os IDs exibidos são do atacado e precisam
+ser associados aos itens da nota no varejo. A tela não recalcula valores nem
+preenche valores ausentes com zero. O operador monta a NF-e avulsa na loja
+de destino, seleciona o frete, confere a tributação e usa apenas **Cadastrar**.
+
 Em produção, o cadastro pelo Gerente ainda depende da homologação acima. Na
 triagem real, a tela permite selecionar frete e
 contribuinte para conferência manual. O fluxo DEMO também aceita essas escolhas. Para

@@ -7,6 +7,7 @@ import re
 from typing import Any
 from urllib.parse import urlencode
 
+from fiscal.lojas import _nome_normalizado, validar_lojas_fiscais
 from integracoes.account_setup import (
     ContaGestaoClick,
     _configuracao,
@@ -25,7 +26,7 @@ from sincronizacao.service import RPCAuth
 from web.errors import AuthorizationError
 
 
-def _consultar_nfe(
+def _consulta_fiscal_get(
     auth: RPCAuth,
     carregar_configuracao,
     conta: ContaGestaoClick,
@@ -33,6 +34,7 @@ def _consultar_nfe(
     caminho: str,
     *,
     autorizado: bool,
+    conferencia_valores: bool = False,
     transporte: TransporteConsulta | None = None,
 ) -> dict[str, Any]:
     """Revalida acesso e configuração antes e depois do GET fiscal fixo."""
@@ -40,6 +42,9 @@ def _consultar_nfe(
         stamp = _stamp(auth)
         if autorizado is not True:
             raise AuthorizationError("Confirme explicitamente a consulta fiscal somente leitura.")
+        if conferencia_valores:
+            auth.require("fiscal.view")
+            auth.require("finance.view")
         validar_conta(auth, conta)
         if (not isinstance(loja_id, str) or loja_id not in {loja["id"] for loja in conta.lojas}):
             raise AuthorizationError("A loja fiscal não pertence ao catálogo autorizado.")
@@ -49,6 +54,9 @@ def _consultar_nfe(
         base = config.validar_conexao()
 
         def revalidar() -> None:
+            if conferencia_valores:
+                auth.require("fiscal.view")
+                auth.require("finance.view")
             validar_conta(auth, conta)
             atual = _configuracao(auth, carregar_configuracao, stamp, True)
             if atual != config:
@@ -85,7 +93,7 @@ def consultar_recurso_nfe(
 ) -> dict[str, Any]:
     """Verifica uma página mínima sem expor dados ou afirmar cobertura."""
     caminho = "/notas_fiscais_produtos?" + urlencode({"loja_id": loja_id, "pagina": 1, "limite": 1})
-    payload = _consultar_nfe(auth, carregar_configuracao, conta, loja_id, caminho,
+    payload = _consulta_fiscal_get(auth, carregar_configuracao, conta, loja_id, caminho,
                              autorizado=autorizado, transporte=transporte)
     rows = payload.get("data")
     if not isinstance(rows, list) or len(rows) > 1 or any(not isinstance(row, dict) for row in rows):
@@ -135,7 +143,7 @@ def conferir_nfe_por_id(
         or not re.fullmatch(r"Flatter origem [1-9][0-9]{0,17} venda [1-9][0-9]{0,17}", referencia)
     ):
         raise ContratoInvalido("A referência da venda de origem não está no formato do Gerente.")
-    payload = _consultar_nfe(
+    payload = _consulta_fiscal_get(
         auth, carregar_configuracao, conta, loja_id, f"/notas_fiscais_produtos/{nota_id}",
         autorizado=autorizado, transporte=transporte,
     )
@@ -148,3 +156,67 @@ def conferir_nfe_por_id(
     return {"situacao": situacao, "em_aberto": situacao == "Em aberto",
             "referencia_confere": (nota.get("informacoes_complementares") == referencia)
             if referencia is not None else None}
+
+
+def _valor_comercial(valor: Any, *, opcional: bool = False) -> str | None:
+    """Valida o decimal textual da origem sem arredondar ou inventar zero."""
+    if opcional and valor is None:
+        return None
+    if type(valor) is not str or not re.fullmatch(r"[0-9]{1,12}(?:\.[0-9]{1,8})?", valor):
+        raise ContratoInvalido("A venda retornou uma quantidade ou valor fora do contrato.")
+    return valor
+
+
+def _itens_para_montagem(venda: dict) -> tuple[dict, ...]:
+    """Mantém a ordem e os valores originais e exclui custo e dados pessoais."""
+    produtos = venda.get("produtos")
+    if not isinstance(produtos, list) or not 1 <= len(produtos) <= 100:
+        raise ContratoInvalido("A quantidade de linhas retornada está fora do limite.")
+    linhas = []
+    for linha in produtos:
+        produto = linha.get("produto") if isinstance(linha, dict) else None
+        if not isinstance(produto, dict):
+            raise ContratoInvalido("A venda retornou uma linha de produto inválida.")
+        identificador = produto.get("produto_id")
+        variacao = produto.get("variacao_id")
+        if (type(identificador) is not int or not 1 <= identificador < 10**18
+                or (variacao is not None and (type(variacao) is not int or not 0 <= variacao < 10**18))):
+            raise ContratoInvalido("A venda retornou um identificador de produto inválido.")
+        nome = produto.get("nome_produto")
+        unidade = produto.get("sigla_unidade")
+        linhas.append({
+            "Produto": nome if isinstance(nome, str) and len(nome) <= 200 and nome.isprintable() else None,
+            "Unidade": unidade if isinstance(unidade, str) and len(unidade) <= 20 and unidade.isprintable() else None,
+            "Produto no atacado (ID)": str(identificador),
+            "Variação no atacado (ID)": str(variacao) if variacao is not None else None,
+            "Quantidade na venda": _valor_comercial(produto.get("quantidade")),
+            "Valor de venda informado": _valor_comercial(produto.get("valor_venda")),
+            "Desconto em valor informado": _valor_comercial(produto.get("desconto_valor"), opcional=True),
+            "Desconto em percentual informado": _valor_comercial(
+                produto.get("desconto_porcentagem"), opcional=True,
+            ),
+            "Total da linha informado": _valor_comercial(produto.get("valor_total")),
+        })
+    return tuple(linhas)
+
+
+def consultar_itens_para_montagem(
+    auth: RPCAuth, carregar_configuracao, conta: ContaGestaoClick,
+    origem_id: str, destino_id: str, venda_id: str, numero: str, situacao_id: str,
+    *, autorizado: bool, transporte: TransporteConsulta | None = None,
+) -> tuple[dict, ...]:
+    """Entrega somente as linhas comerciais da venda previamente localizada."""
+    origem, _ = validar_lojas_fiscais(conta.lojas, origem_id, destino_id)
+    if type(venda_id) is not str or not re.fullmatch(r"[1-9][0-9]{0,17}", venda_id):
+        raise ContratoInvalido("O identificador interno da venda não pode ser consultado.")
+    payload = _consulta_fiscal_get(
+        auth, carregar_configuracao, conta, origem, f"/vendas/{venda_id}",
+        autorizado=autorizado, conferencia_valores=True, transporte=transporte,
+    )
+    venda = payload.get("data")
+    if (not isinstance(venda, dict) or venda.get("id") != venda_id or venda.get("codigo") != numero
+            or venda.get("situacao_id") != situacao_id
+            or _nome_normalizado(venda.get("nome_loja")) != "flt comercio"
+            or ("loja_id" in venda and venda["loja_id"] != origem)):
+        raise ContratoInvalido("O detalhe não confirma a venda e a origem observadas. Consulte novamente.")
+    return _itens_para_montagem(venda)
