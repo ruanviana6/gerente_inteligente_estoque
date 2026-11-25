@@ -14,8 +14,33 @@ informa que a modalidade de frete é derivada por conta do emitente e ainda não
 é configurável pela API. `valor_frete` indica o valor a ratear entre os itens.
 Esse campo não seleciona FOB.
 
-O cadastro automatizado permanece bloqueado enquanto a operação não respeitar
-FOB, quando exigido. Na triagem real, a tela permite selecionar frete e
+Em 25/11/2026, conferimos também `PUT /notas_fiscais_produtos/{id}`. A
+descrição da edição repete a mesma limitação de frete por conta do emitente.
+Portanto, a possibilidade de editar o frete pela tela com a NF-e em aberto
+não comprova uma operação equivalente pela API. O exemplo de cadastro envia
+`envio_automatico: 0`, mas não documenta os efeitos desse valor. O contrato
+também não informa um campo explícito para o indicador de contribuinte na
+requisição de cadastro ou de edição. `indicador_final` não substitui essa
+informação.
+
+O responsável confirmou que o cadastro direto, inclusive pela API, pode deixar
+a NF-e em aberto sem transmissão, criação de venda ou movimentação de estoque.
+O fluxo aprovado mantém o ajuste de FOB e a emissão como ações manuais no ERP.
+O módulo `fiscal/cadastro_aberto.py` prepara o corpo do exemplo oficial, fixa
+`envio_automatico: 0`, carrega uma referência da origem e interpreta o ID que o
+exemplo devolve em `data.dados`. A referência em informações complementares
+ajuda na conferência manual, mas não comprova busca exata ou deduplicação pela API.
+
+Para ligar esse preparo ao executor, faltam a correspondência do destinatário,
+dos itens e da tributação na loja de destino, a regra aplicada ao indicador
+de contribuinte e a reconciliação de nota anterior ou de resposta perdida.
+Validar em homologação ou em caso controlado autorizado que a resposta aponta
+para a nota esperada, em aberto e na loja correta. Resposta ambígua exige
+conferência antes de qualquer nova tentativa. O módulo atual faz apenas
+validação local. Ele não está ligado a botões, rotas ou Secrets.
+
+Em produção, o cadastro pelo Gerente ainda depende da homologação acima. Na
+triagem real, a tela permite selecionar frete e
 contribuinte para conferência manual. O fluxo DEMO também aceita essas escolhas. Para
 pedidos reais, a operação fiscal segue no GestãoClick, com cadastro e emissão
 manuais. Uma eventual ampliação do contrato deve ser conferida junto com as
