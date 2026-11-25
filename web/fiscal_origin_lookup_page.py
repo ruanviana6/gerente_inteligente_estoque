@@ -15,6 +15,7 @@ from fiscal.lojas import validar_lojas_fiscais
 from fiscal.order_observation import observar_pedido_fiscal, situacao_para_conferencia_fiscal
 from fiscal.regras import MODALIDADES_FRETE, TIPOS_CONTRIBUINTE, EscolhasFiscais
 from integracoes.account_setup import validar_conta
+from integracoes.fiscal_read_probe import consultar_itens_para_montagem
 from integracoes.gestaoclick import GestaoClickError
 from integracoes.sales_audit import consultar_vendas_integrais
 from web.errors import AppError, AuthenticationError, AuthorizationError
@@ -62,6 +63,10 @@ def fiscal_order_lookup_controls(
             "Autorizo somente a consulta das vendas deste período na loja de origem",
             key="fiscal_source_order_consent",
         )
+        incluir_itens = st.checkbox(
+            "Exibir itens e valores da venda para montagem manual",
+            key="fiscal_exibir_valores_origem",
+        )
         consultar = st.form_submit_button("Localizar venda na origem (somente leitura)")
     if not consultar:
         return
@@ -74,6 +79,8 @@ def fiscal_order_lookup_controls(
     if not isinstance(periodo, (list, tuple)) or len(periodo) != 2:
         st.warning("Escolha as datas inicial e final.")
         return
+    itens_montagem = None
+    aviso_montagem = None
     try:
         with st.spinner("Conferindo vendas da origem, somente leitura…"):
             with servico.auth.operation():
@@ -89,6 +96,18 @@ def fiscal_order_lookup_controls(
                     {x["id"]: x["nome"] for x in conta.situacoes},
                 )
                 validar_conta(servico.auth, conta)
+                if incluir_itens and situacao_para_conferencia_fiscal(observacao.situacao)[0] == "SITUACAO_COMPATIVEL":
+                    doc = next(doc for doc in auditoria.documentos if doc.codigo == numero)
+                    try:
+                        itens_montagem = consultar_itens_para_montagem(
+                            servico.auth, carregar_configuracao, conta, origem_id, destino_id,
+                            doc.id, numero, doc.situacao_id, autorizado=True,
+                        )
+                        if len(itens_montagem) != observacao.quantidade_linhas:
+                            itens_montagem = None
+                            aviso_montagem = "A quantidade de linhas mudou. Consulte a venda novamente."
+                    except GestaoClickError as erro:
+                        aviso_montagem = str(erro)
     except (AuthenticationError, AuthorizationError):
         raise
     except (AppError, GestaoClickError) as erro:
@@ -115,6 +134,15 @@ def fiscal_order_lookup_controls(
             "Situação informada": observacao.situacao,
             "Itens (linhas)": observacao.quantidade_linhas,
         })
+    if aviso_montagem is not None:
+        st.warning(aviso_montagem)
+    if itens_montagem is not None:
+        st.subheader("Itens da venda para montagem manual")
+        st.dataframe(list(itens_montagem), hide_index=True, width="stretch")
+        st.caption(
+            "Use os valores informados pela origem para conferir a montagem. "
+            "Associe os produtos ao cadastro do varejo e valide a tributação antes de cadastrar."
+        )
     situacao, orientacao = situacao_para_conferencia_fiscal(observacao.situacao)
     if situacao == "SITUACAO_COMPATIVEL":
         st.info(orientacao)
