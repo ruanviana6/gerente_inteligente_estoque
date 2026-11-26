@@ -18,6 +18,7 @@ from test_gestaoclick_account_setup import configuracao as configuracao
 from integracoes.fiscal_read_probe import (
     conferir_nfe_por_id,
     conferir_nfe_por_numero,
+    consultar_dados_para_formulario,
     consultar_itens_para_montagem,
     consultar_recurso_nfe,
 )
@@ -384,3 +385,36 @@ def test_diagnostico_http_informa_codigo_sem_corpo(auth, configuracao, conta, st
     with pytest.raises(GestaoClickError, match=f"HTTP {status}") as erro:
         conferir_nfe_por_numero(auth, lambda: configuracao, conta, "001", "94", autorizado=True, transporte=transporte)
     assert PRIVADO not in str(erro.value)
+
+
+@pytest.mark.parametrize("caso", ["ok", "cliente divergente", "duas opções", "outra UF", "sem consentimento"])
+def test_preparo_formulario_cliente_da_venda(auth, configuracao, conta_atacado, caso):
+    cliente = {"id": "94", "tipo_pessoa": "PF", "nome": "Pessoa fictícia",
+               "enderecos": [{"endereco": {"estado": "Ceará", "nome_cidade": "Cidade fictícia"}}],
+               "observacao": PRIVADO, "cnpj": SECRET_TOKEN}
+    if caso == "cliente divergente":
+        cliente["id"] = "95"
+    if caso == "duas opções":
+        cliente["enderecos"] *= 2
+    if caso == "outra UF":
+        cliente["enderecos"][0]["endereco"]["estado"] = "PE"
+    transporte = TransporteFicticio(resposta(venda_ficticia() | {"cliente_id": "94"}), resposta(cliente))
+
+    def consultar_dados():
+        return consultar_dados_para_formulario(auth, lambda: configuracao, conta_atacado, "31", "42",
+                                               "515", "905", "1", autorizado=caso != "sem consentimento",
+                                               transporte=transporte)
+
+    if caso == "ok":
+        itens, dados = consultar_dados()
+        assert dados["Cidade"] == "Cidade fictícia" and dados["UF"] == "CE" and dados["CPF"] is None
+        assert len(itens) == 1 and PRIVADO not in str(dados) and SECRET_TOKEN not in str(dados)
+    elif caso == "sem consentimento":
+        with pytest.raises(AuthorizationError):
+            consultar_dados()
+        assert not transporte.calls
+        return
+    else:
+        with pytest.raises(ContratoInvalido):
+            consultar_dados()
+    assert [urlsplit(url).path for url, _, _ in transporte.calls] == ["/vendas/515", "/clientes/94"]
