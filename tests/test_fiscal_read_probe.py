@@ -322,3 +322,29 @@ def test_montagem_recusa_id_invalido_e_mostra_so_indice(auth, configuracao, cont
             autorizado=True, transporte=TransporteFicticio(resposta(venda)),
         )
     assert PRIVADO not in str(erro.value)
+
+
+@pytest.mark.parametrize(("campo", "valor", "coluna", "esperado"), [
+    ("desconto_valor", "", "Desconto em valor informado", None),
+    ("desconto_porcentagem", "", "Desconto em percentual informado", None),
+    ("quantidade", 2, "Quantidade na venda", "2"),
+    ("valor_venda", "3.123456780000", "Valor de venda informado", "3.123456780000"),
+])
+def test_montagem_preserva_decimais_e_descontos_ausentes(campo, valor, coluna, esperado):
+    from integracoes.fiscal_read_probe import _itens_para_montagem
+
+    venda = venda_ficticia()
+    venda["produtos"][0]["produto"][campo] = valor
+    assert _itens_para_montagem(venda)[0][coluna] == esperado
+
+
+@pytest.mark.parametrize("valor", [None, "", True, "1,230", "1.234567891", "1e5", PRIVADO])
+def test_montagem_indica_linha_e_campo_sem_revelar_valor(valor):
+    from integracoes.fiscal_read_probe import _itens_para_montagem
+
+    venda = venda_ficticia()
+    item = venda["produtos"][0]["produto"]
+    venda["produtos"].append({"produto": item | {"valor_total": valor}})
+    with pytest.raises(ContratoInvalido, match="linha 2, o campo valor_total") as erro:
+        _itens_para_montagem(venda)
+    assert PRIVADO not in str(erro.value)
