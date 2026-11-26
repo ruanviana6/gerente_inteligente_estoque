@@ -9,7 +9,7 @@ import streamlit as st
 
 from fiscal.lojas import validar_lojas_fiscais
 from integracoes.account_setup import consultar_conta, validar_conta
-from integracoes.fiscal_read_probe import conferir_nfe_por_id, consultar_recurso_nfe
+from integracoes.fiscal_read_probe import conferir_nfe_por_id, conferir_nfe_por_numero, consultar_recurso_nfe
 from integracoes.gestaoclick import GestaoClickError
 from web.errors import AuthenticationError, AuthorizationError
 from web.fiscal_origin_lookup_page import fiscal_order_lookup_controls
@@ -127,6 +127,7 @@ def fiscal_real_read_controls(servico, contexto):
                             "A loja efetiva do token não pôde ser comprovada na amostra. "
                             "Não liberar cadastro fiscal."
                         )
+        _conferir_por_numero(servico, conta, destino_id)
         _conferir_nota_existente(servico, conta, destino_id)
         st.divider()
         fiscal_order_lookup_controls(
@@ -138,6 +139,28 @@ def fiscal_real_read_controls(servico, contexto):
             "Após a triagem, confira e cadastre a NF-e diretamente no GestãoClick. "
             "A emissão também é manual."
         )
+
+def _conferir_por_numero(servico, conta, destino_id: str) -> None:
+    with st.form("fiscal_conferir_nota_numero"):
+        st.markdown("**Conferir pelo número da NF-e**")
+        numero = st.text_input("Número da NF-e na Flagship - Flatter", max_chars=9)
+        consentimento = st.checkbox("Autorizo buscar esse número na loja de destino")
+        consultar = st.form_submit_button("Consultar NF-e por número")
+    if not consultar:
+        return
+    if not consentimento:
+        st.warning("Confirme a autorização antes de consultar a nota.")
+        return
+    try:
+        resultado = conferir_nfe_por_numero(servico.auth, _secrets, conta, destino_id,
+                                            numero.strip(), autorizado=True)
+    except (AuthenticationError, AuthorizationError):
+        raise
+    except GestaoClickError as erro:
+        st.warning(str(erro))
+        return
+    st.write(f"Situação na Flagship - Flatter: **{resultado['situacao']}** · ID interno: {resultado['id']}")
+
 
 def _conferir_nota_existente(servico, conta, destino_id: str) -> None:
     """Verifica um ID conhecido para homologar loja, situação e referência."""

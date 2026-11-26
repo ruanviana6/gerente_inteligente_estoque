@@ -75,12 +75,20 @@ def _consulta_fiscal_get(
             revalidar()
             raise GestaoClickError("Consulta fiscal indisponível. Nenhuma nota foi alterada.") from None
         revalidar()
-        if resposta.status in (401, 403):
-            raise GestaoClickError("A consulta de NF-e foi recusada por autenticação ou permissão.")
-        if resposta.status == 429:
-            raise GestaoClickError("Limite de requisições da API atingido.")
-        if type(resposta.status) is not int or resposta.status != 200:
-            raise GestaoClickError("O recurso fiscal não respondeu com sucesso. Nenhuma nota foi alterada.")
+        status = resposta.status
+        if type(status) is not int or not 100 <= status <= 599:
+            raise GestaoClickError("O GestãoClick retornou um status HTTP inválido.")
+        if status != 200:
+            orientacoes = {
+                401: "Confira as credenciais de leitura.",
+                402: "Confira a disponibilidade da API no plano atual.",
+                403: "Confira as permissões da chave para o recurso e a loja.",
+                404: "O recurso não foi localizado com os dados e o acesso utilizados. Confira a loja e o identificador.",
+                429: "Limite de requisições atingido. Aguarde antes de consultar novamente.",
+            }
+            orientacao = orientacoes.get(status, "Consulte novamente mais tarde." if status >= 500
+                                         else "Confira os parâmetros da consulta.")
+            raise GestaoClickError(f"Consulta GestãoClick retornou HTTP {status}. {orientacao}")
         payload = parse_json_seguro(resposta.body)
         if (type(payload.get("code")) is not int or payload["code"] != 200
                 or payload.get("status") != "success"):
@@ -125,6 +133,36 @@ def consultar_recurso_nfe(
 
 _STATUS_NFE = frozenset({"Em aberto", "Aprovada", "Reprovada", "Denegada",
                         "Cancelada", "Enviando", "Corrigida"})
+
+
+def conferir_nfe_por_numero(
+    auth: RPCAuth, carregar_configuracao, conta: ContaGestaoClick, loja_id: str, numero: str,
+    *, autorizado: bool, transporte: TransporteConsulta | None = None,
+) -> dict[str, str]:
+    """Consulta uma saída modelo 55 por número na loja, recusando resultados ambíguos."""
+    if not isinstance(numero, str) or not re.fullmatch(r"[0-9]{1,9}", numero) or int(numero) == 0:
+        raise ContratoInvalido("Informe o número da NF-e com até nove algarismos.")
+    numero = str(int(numero))
+    filtros = urlencode({"numero": numero, "loja_id": loja_id, "tipo": 1, "pagina": 1, "limite": 2})
+    payload = _consulta_fiscal_get(auth, carregar_configuracao, conta, loja_id,
+                                  "/notas_fiscais_produtos?" + filtros, autorizado=autorizado, transporte=transporte)
+    registros, meta = payload.get("data"), payload.get("meta")
+    if not isinstance(registros, list) or not isinstance(meta, dict):
+        raise ContratoInvalido("A API não confirmou os resultados da pesquisa por número.")
+    total = meta.get("total_registros")
+    if type(total) is int and total == 0 and not registros:
+        raise ContratoInvalido("A consulta não encontrou esse número entre as notas de saída acessíveis na loja.")
+    if (type(total) is not int or total != 1 or len(registros) != 1
+            or meta.get("proxima_pagina") is not None or meta.get("total_paginas") != 1):
+        raise ContratoInvalido("A consulta não confirmou uma única nota. Confira a série e consulte pelo ID interno.")
+    nota = registros[0]
+    if (not isinstance(nota, dict) or nota.get("loja_id") != loja_id
+            or nota.get("tipo_nf") != "1" or nota.get("modelo") != "55"
+            or not re.fullmatch(r"0*" + numero, str(nota.get("numero_nf")))
+            or not isinstance(nota.get("id"), str) or not re.fullmatch(r"[1-9][0-9]{0,17}", nota["id"])
+            or not isinstance(nota.get("situacao_nf"), str) or nota["situacao_nf"] not in _STATUS_NFE):
+        raise ContratoInvalido("A resposta não confirmou a identidade e a situação da NF-e de saída nessa loja.")
+    return {"id": nota["id"], "situacao": nota["situacao_nf"]}
 
 
 def conferir_nfe_por_id(
