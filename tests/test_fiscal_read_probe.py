@@ -17,6 +17,7 @@ from test_gestaoclick_account_setup import configuracao as configuracao
 
 from integracoes.fiscal_read_probe import (
     conferir_nfe_por_id,
+    conferir_nfe_por_numero,
     consultar_itens_para_montagem,
     consultar_recurso_nfe,
 )
@@ -347,4 +348,39 @@ def test_montagem_indica_linha_e_campo_sem_revelar_valor(valor):
     venda["produtos"].append({"produto": item | {"valor_total": valor}})
     with pytest.raises(ContratoInvalido, match="linha 2, o campo valor_total") as erro:
         _itens_para_montagem(venda)
+    assert PRIVADO not in str(erro.value)
+
+
+def nota_saida_ficticia():
+    return {"id": "843", "loja_id": "001", "tipo_nf": "1", "modelo": "55", "numero_nf": "0094",
+            "situacao_nf": "Em aberto", "nome_destinatario": PRIVADO}
+
+
+def test_numero_comercial_filtra_loja_sem_expor_dados(auth, configuracao, conta):
+    transporte = TransporteFicticio(resposta([nota_saida_ficticia()], meta={"total_registros": 1, "total_paginas": 1}))
+    resultado = conferir_nfe_por_numero(auth, lambda: configuracao, conta, "001", "00094",
+                                        autorizado=True, transporte=transporte)
+    assert resultado == {"id": "843", "situacao": "Em aberto"}
+    assert len(transporte.calls) == 1
+    url = urlsplit(transporte.calls[0][0])
+    assert url.path == "/notas_fiscais_produtos"
+    assert parse_qs(url.query) == {"loja_id": ["001"], "numero": ["94"], "tipo": ["1"], "pagina": ["1"], "limite": ["2"]}
+
+
+@pytest.mark.parametrize(("total", "alteracoes"), [
+    (0, {}), (2, {}), (1, {"loja_id": "002"}), (1, {"numero_nf": "95"}),
+    (1, {"modelo": "65"}), (1, {"tipo_nf": "0"}), (1, {"situacao_nf": "inválido"}),
+])
+def test_busca_por_numero_rejeita_resultado_inconclusivo(auth, configuracao, conta, total, alteracoes):
+    notas = [nota_saida_ficticia() | alteracoes] * total
+    transporte = TransporteFicticio(resposta(notas, meta={"total_registros": total, "total_paginas": 1}))
+    with pytest.raises(ContratoInvalido):
+        conferir_nfe_por_numero(auth, lambda: configuracao, conta, "001", "94", autorizado=True, transporte=transporte)
+
+
+@pytest.mark.parametrize("status", [402, 404, 500])
+def test_diagnostico_http_informa_codigo_sem_corpo(auth, configuracao, conta, status):
+    transporte = TransporteFicticio(RespostaGestaoClick(status, PRIVADO.encode()))
+    with pytest.raises(GestaoClickError, match=f"HTTP {status}") as erro:
+        conferir_nfe_por_numero(auth, lambda: configuracao, conta, "001", "94", autorizado=True, transporte=transporte)
     assert PRIVADO not in str(erro.value)

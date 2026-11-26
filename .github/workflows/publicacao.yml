@@ -23,7 +23,7 @@ jobs:
       - name: Verificar versão, login e negação no endereço real
         run: >-
           python scripts/verificar_publicacao.py
-          --expected-version flatter-montagem-fiscal-20261126.1
+          --expected-version flatter-consulta-nfe-20261126.2
           --output evidencias/publicado
       - name: Guardar somente evidências anônimas
         if: always()
