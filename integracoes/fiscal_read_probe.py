@@ -243,11 +243,11 @@ def _itens_para_montagem(venda: dict) -> tuple[dict, ...]:
     return tuple(linhas)
 
 
-def consultar_itens_para_montagem(
+def _venda_para_montagem(
     auth: RPCAuth, carregar_configuracao, conta: ContaGestaoClick,
     origem_id: str, destino_id: str, venda_id: str, numero: str, situacao_id: str,
     *, autorizado: bool, transporte: TransporteConsulta | None = None,
-) -> tuple[dict, ...]:
+) -> dict:
     """Entrega somente as linhas comerciais da venda previamente localizada."""
     origem, _ = validar_lojas_fiscais(conta.lojas, origem_id, destino_id)
     if type(venda_id) is not str or not re.fullmatch(r"[1-9][0-9]{0,17}", venda_id):
@@ -262,4 +262,51 @@ def consultar_itens_para_montagem(
             or _nome_normalizado(venda.get("nome_loja")) != "flt comercio"
             or ("loja_id" in venda and venda["loja_id"] != origem)):
         raise ContratoInvalido("O detalhe não confirma a venda e a origem observadas. Consulte novamente.")
+    return venda
+
+
+def consultar_itens_para_montagem(
+    auth: RPCAuth, carregar_configuracao, conta: ContaGestaoClick,
+    origem_id: str, destino_id: str, venda_id: str, numero: str, situacao_id: str,
+    *, autorizado: bool, transporte: TransporteConsulta | None = None,
+) -> tuple[dict, ...]:
+    """Entrega apenas as linhas da venda conferida."""
+    venda = _venda_para_montagem(auth, carregar_configuracao, conta, origem_id, destino_id,
+                                venda_id, numero, situacao_id, autorizado=autorizado, transporte=transporte)
     return _itens_para_montagem(venda)
+
+
+def consultar_dados_para_formulario(
+    auth: RPCAuth, carregar_configuracao, conta: ContaGestaoClick,
+    origem_id: str, destino_id: str, venda_id: str, numero: str, situacao_id: str,
+    *, autorizado: bool, transporte: TransporteConsulta | None = None,
+) -> tuple[tuple[dict, ...], dict]:
+    """Projeta dados de preenchimento somente para o cliente identificado na venda."""
+    venda = _venda_para_montagem(auth, carregar_configuracao, conta, origem_id, destino_id,
+                                venda_id, numero, situacao_id, autorizado=autorizado, transporte=transporte)
+    linhas = _itens_para_montagem(venda)
+    cliente_id = venda.get("cliente_id")
+    if not isinstance(cliente_id, str) or not re.fullmatch(r"[1-9][0-9]{0,17}", cliente_id):
+        raise ContratoInvalido("A venda não identifica o cliente pelo ID interno.")
+    resposta = _consulta_fiscal_get(auth, carregar_configuracao, conta, origem_id, f"/clientes/{cliente_id}",
+                                    autorizado=autorizado, conferencia_valores=True, transporte=transporte)
+    cliente = resposta.get("data")
+    if not isinstance(cliente, dict) or cliente.get("id") != cliente_id:
+        raise ContratoInvalido("O cadastro retornado não corresponde ao cliente da venda.")
+    enderecos = cliente.get("enderecos")
+    if not isinstance(enderecos, list) or len(enderecos) != 1 or not isinstance(enderecos[0], dict):
+        raise ContratoInvalido("Confira o endereço fiscal do cliente. A origem não informou um único endereço.")
+    endereco = enderecos[0].get("endereco")
+    if not isinstance(endereco, dict) or _nome_normalizado(endereco.get("estado")) not in {"ce", "ceara"}:
+        raise ContratoInvalido("A origem não confirmou um endereço fiscal no Ceará.")
+    tipo = cliente.get("tipo_pessoa")
+    if tipo not in ("PF", "PJ"):
+        raise ContratoInvalido("O tipo de pessoa do cliente precisa ser conferido.")
+    campos = {"Nome / razão social": cliente.get("nome" if tipo == "PF" else "razao_social"),
+              "CPF" if tipo == "PF" else "CNPJ": cliente.get("cpf" if tipo == "PF" else "cnpj"),
+              "Inscrição estadual": cliente.get("inscricao_estadual"),
+              "CEP": endereco.get("cep"), "Logradouro": endereco.get("logradouro"),
+              "Número": endereco.get("numero"), "Complemento": endereco.get("complemento"),
+              "Bairro": endereco.get("bairro"), "Cidade": endereco.get("nome_cidade"), "UF": "CE"}
+    return linhas, {k: v if isinstance(v, str) and 0 < len(v) <= 250 and v.isprintable() else None
+                    for k, v in campos.items()}

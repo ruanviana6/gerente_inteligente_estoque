@@ -1,7 +1,7 @@
 """Localiza número comercial na consulta de vendas do Atacado, só GET.
 
-Sem repasse de clientes, valores, endereço ou notas ao front-end; nenhuma
-informação entra no banco. O status não valida elegibilidade fiscal.
+Exibe os dados de montagem apenas na consulta autorizada pelo Master.
+Nenhuma informação entra no banco. O status não valida elegibilidade fiscal.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from fiscal.lojas import validar_lojas_fiscais
 from fiscal.order_observation import observar_pedido_fiscal, situacao_para_conferencia_fiscal
 from fiscal.regras import MODALIDADES_FRETE, TIPOS_CONTRIBUINTE, EscolhasFiscais
 from integracoes.account_setup import validar_conta
-from integracoes.fiscal_read_probe import consultar_itens_para_montagem
+from integracoes.fiscal_read_probe import consultar_dados_para_formulario, consultar_itens_para_montagem
 from integracoes.gestaoclick import GestaoClickError
 from integracoes.sales_audit import consultar_vendas_integrais
 from web.errors import AppError, AuthenticationError, AuthorizationError
@@ -67,6 +67,10 @@ def fiscal_order_lookup_controls(
             "Exibir itens e valores da venda para montagem manual",
             key="fiscal_exibir_valores_origem",
         )
+        incluir_cliente = st.checkbox(
+            "Autorizo consultar e exibir o destinatário e os itens desta venda para preencher a nota",
+            key="fiscal_dados_formulario",
+        )
         consultar = st.form_submit_button("Localizar venda na origem (somente leitura)")
     if not consultar:
         return
@@ -80,6 +84,7 @@ def fiscal_order_lookup_controls(
         st.warning("Escolha as datas inicial e final.")
         return
     itens_montagem = None
+    destinatario = None
     aviso_montagem = None
     try:
         with st.spinner("Conferindo vendas da origem, somente leitura…"):
@@ -96,13 +101,17 @@ def fiscal_order_lookup_controls(
                     {x["id"]: x["nome"] for x in conta.situacoes},
                 )
                 validar_conta(servico.auth, conta)
-                if incluir_itens and situacao_para_conferencia_fiscal(observacao.situacao)[0] == "SITUACAO_COMPATIVEL":
+                if (incluir_itens or incluir_cliente) and (
+                    situacao_para_conferencia_fiscal(observacao.situacao)[0] == "SITUACAO_COMPATIVEL"
+                ):
                     doc = next(doc for doc in auditoria.documentos if doc.codigo == numero)
                     try:
-                        itens_montagem = consultar_itens_para_montagem(
-                            servico.auth, carregar_configuracao, conta, origem_id, destino_id,
-                            doc.id, numero, doc.situacao_id, autorizado=True,
-                        )
+                        args = (servico.auth, carregar_configuracao, conta, origem_id, destino_id,
+                                doc.id, numero, doc.situacao_id)
+                        if incluir_cliente:
+                            itens_montagem, destinatario = consultar_dados_para_formulario(*args, autorizado=True)
+                        else:
+                            itens_montagem = consultar_itens_para_montagem(*args, autorizado=True)
                         if len(itens_montagem) != observacao.quantidade_linhas:
                             itens_montagem = None
                             aviso_montagem = "A quantidade de linhas mudou. Consulte a venda novamente."
@@ -137,11 +146,18 @@ def fiscal_order_lookup_controls(
     if aviso_montagem is not None:
         st.warning(aviso_montagem)
     if itens_montagem is not None:
+        if destinatario is not None:
+            st.subheader("Destinatário da venda no atacado")
+            st.json(destinatario)
+            st.caption("Campos vazios precisam ser conferidos no cadastro de origem.")
         st.subheader("Itens da venda para montagem manual")
-        st.dataframe(list(itens_montagem), hide_index=True, width="stretch")
+        colunas = ["Produto", "Unidade", "Quantidade na venda", "Valor de venda informado",
+                   "Desconto em valor informado", "Desconto em percentual informado", "Total da linha informado"]
+        st.dataframe(list(itens_montagem), column_order=colunas if incluir_cliente else None,
+                     hide_index=True, width="stretch")
         st.caption(
             "Use os valores informados pela origem para conferir a montagem. "
-            "Associe os produtos ao cadastro do varejo e valide a tributação antes de cadastrar."
+            "Transcreva a descrição, a quantidade e o preço de cada linha. Confira os descontos e a tributação."
         )
     situacao, orientacao = situacao_para_conferencia_fiscal(observacao.situacao)
     if situacao == "SITUACAO_COMPATIVEL":
@@ -159,7 +175,7 @@ def fiscal_order_lookup_controls(
         st.warning(orientacao)
     st.caption(
         "Conferência fiscal pendente: UF CE do destinatário, existência de NF-e na "
-        "loja de destino, identidade fiscal de clientes e produtos, NCM/CFOP/impostos, "
+        "loja de destino, dados fiscais do destinatário e dos itens, NCM/CFOP/impostos, "
         "loja efetiva do token e envio_automatico. Nenhum desses dados é deduzido "
         "da situação da venda."
     )
