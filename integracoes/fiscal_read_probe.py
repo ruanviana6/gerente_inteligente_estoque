@@ -159,13 +159,17 @@ def conferir_nfe_por_id(
             if referencia is not None else None}
 
 
-def _valor_comercial(valor: Any, *, opcional: bool = False) -> str | None:
-    """Valida o decimal textual da origem sem arredondar ou inventar zero."""
-    if opcional and valor is None:
+def _valor_comercial(produto: dict, campo: str, linha: int, *, opcional: bool = False) -> str | None:
+    """Preserva o decimal de origem e identifica divergências sem expor o pedido."""
+    valor = produto.get(campo)
+    if opcional and (valor is None or valor == ""):
         return None
-    if type(valor) is not str or not re.fullmatch(r"[0-9]{1,12}(?:\.[0-9]{1,8})?", valor):
-        raise ContratoInvalido("A venda retornou uma quantidade ou valor fora do contrato.")
-    return valor
+    if type(valor) is int and 0 <= valor < 10**12:
+        return str(valor)
+    if isinstance(valor, str) and re.fullmatch(r"[0-9]{1,12}(?:\.[0-9]{1,8}0{0,10})?", valor):
+        return valor
+    motivo = "ausente ou vazio" if valor is None or valor == "" else "em formato incompatível"
+    raise ContratoInvalido(f"Na linha {linha}, o campo {campo} está {motivo}. Confira o item no GestãoClick.")
 
 
 def _itens_para_montagem(venda: dict) -> tuple[dict, ...]:
@@ -190,13 +194,13 @@ def _itens_para_montagem(venda: dict) -> tuple[dict, ...]:
             "Unidade": unidade if isinstance(unidade, str) and len(unidade) <= 20 and unidade.isprintable() else None,
             "Produto no atacado (ID)": identificador,
             "Variação no atacado (ID)": variacao,
-            "Quantidade na venda": _valor_comercial(produto.get("quantidade")),
-            "Valor de venda informado": _valor_comercial(produto.get("valor_venda")),
-            "Desconto em valor informado": _valor_comercial(produto.get("desconto_valor"), opcional=True),
+            "Quantidade na venda": _valor_comercial(produto, "quantidade", indice),
+            "Valor de venda informado": _valor_comercial(produto, "valor_venda", indice),
+            "Desconto em valor informado": _valor_comercial(produto, "desconto_valor", indice, opcional=True),
             "Desconto em percentual informado": _valor_comercial(
-                produto.get("desconto_porcentagem"), opcional=True,
+                produto, "desconto_porcentagem", indice, opcional=True,
             ),
-            "Total da linha informado": _valor_comercial(produto.get("valor_total")),
+            "Total da linha informado": _valor_comercial(produto, "valor_total", indice),
         })
     return tuple(linhas)
 
